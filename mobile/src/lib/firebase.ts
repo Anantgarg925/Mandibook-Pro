@@ -12,8 +12,10 @@ const firebaseConfig = {
 
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 
-// Use memoryLocalCache — persistentLocalCache requires IndexedDB (web only).
-// Offline-first persistence is handled manually via AsyncStorage in ShopContext.
-const db = initializeFirestore(app, { localCache: memoryLocalCache() });
+// experimentalForceLongPolling: true fixes WebChannel connection failures in Expo/React Native.
+const db = initializeFirestore(app, {
+  localCache: memoryLocalCache(),
+  experimentalForceLongPolling: true,
+});
 
 export { app, db };
