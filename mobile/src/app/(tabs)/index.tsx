@@ -9,7 +9,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { Plus, Users } from 'lucide-react-native';
+import { Plus, Users, BarChart2 } from 'lucide-react-native';
 import { useShop } from '@/context/ShopContext';
 import { useInquiries } from '@/hooks/useInquiries';
 import { useTodayTrucks } from '@/hooks/useTodayTrucks';
@@ -208,6 +208,18 @@ export default function HomeScreen() {
                 </Text>
               </View>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+                <Pressable
+                  testID="reports-nav-btn"
+                  onPress={() => router.push('/reports' as any)}
+                  style={({ pressed }) => ({
+                    width: 40, height: 40, borderRadius: Radius.round,
+                    alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: pressed ? Colors.border : Colors.surface,
+                    borderWidth: 1, borderColor: Colors.border,
+                  })}
+                >
+                  <BarChart2 size={20} color={Colors.primary} />
+                </Pressable>
                 <Pressable
                   testID="buyers-nav-btn"
                   onPress={() => router.push('/buyers' as any)}
