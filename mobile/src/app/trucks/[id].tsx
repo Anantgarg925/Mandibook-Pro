@@ -208,7 +208,7 @@ export default function TruckDetailScreen() {
       {/* FAB */}
       <Pressable
         testID="new-inquiry-fab"
-        onPress={() => router.push({ pathname: '/trucks/register', params: { truckId: id } })}
+        onPress={() => router.push({ pathname: '/bills/new', params: { truckId: id } })}
         style={({ pressed }) => ({
           position: 'absolute',
           bottom: 24,

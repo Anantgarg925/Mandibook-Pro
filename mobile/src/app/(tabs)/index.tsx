@@ -1,28 +1,147 @@
-import { useEffect } from 'react';
-import { Text, View, ActivityIndicator } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { CheckCircle2 } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  FlatList,
+  Pressable,
+  ActivityIndicator,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
+import { Plus } from 'lucide-react-native';
 import { useShop } from '@/context/ShopContext';
-import { Colors, FontSize, Spacing } from '@/lib/theme';
-import { toIndianCurrency, toIndianDate, toIndianWeight, toIndianNumber } from '@/lib/formatters';
+import { useInquiries } from '@/hooks/useInquiries';
+import { useTodayTrucks } from '@/hooks/useTodayTrucks';
+import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
+import { toIndianCurrency, toIndianDate } from '@/lib/formatters';
+import type { Inquiry, InquiryStatus } from '@/types/inquiry';
+
+type FilterTab = 'ALL' | 'PENDING' | 'CONFIRMED' | 'UDHAARI';
+
+const STATUS_COLOR: Record<string, string> = {
+  PENDING: Colors.warning,
+  CONFIRMED: Colors.success,
+  CANCELLED: Colors.danger,
+};
+
+function MetricCard({
+  label,
+  value,
+  sub,
+  accent,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  accent: string;
+}) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: Colors.surface,
+        borderRadius: Radius.md,
+        padding: Spacing.md,
+        borderLeftWidth: 4,
+        borderLeftColor: accent,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 4,
+        elevation: 2,
+      }}
+    >
+      <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginBottom: 4 }}>{label}</Text>
+      <Text style={{ fontSize: FontSize.xl, fontWeight: '800', color: Colors.text }}>{value}</Text>
+      {sub ? (
+        <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 2 }}>{sub}</Text>
+      ) : null}
+    </View>
+  );
+}
+
+function BillRow({ item, onPress }: { item: Inquiry; onPress: () => void }) {
+  return (
+    <Pressable
+      testID={`bill-row-${item.id}`}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: Spacing.md,
+        backgroundColor: pressed ? Colors.background : Colors.surface,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.border,
+      })}
+    >
+      <Text
+        style={{ width: 52, fontSize: FontSize.xs, fontWeight: '700', color: Colors.textSecond }}
+      >
+        #{item.slipNumber}
+      </Text>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text }} numberOfLines={1}>
+          {item.customerName}
+        </Text>
+        <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>
+          {item.grade} · {item.sacks} bags
+        </Text>
+      </View>
+      <View style={{ alignItems: 'flex-end', gap: 4 }}>
+        <View
+          style={{
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+            borderRadius: Radius.round,
+            backgroundColor:
+              item.status === 'CONFIRMED'
+                ? '#E8F5E9'
+                : item.status === 'PENDING'
+                  ? '#FFF8E1'
+                  : '#FFEBEE',
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 10,
+              fontWeight: '700',
+              color: STATUS_COLOR[item.status] ?? Colors.textSecond,
+            }}
+          >
+            {item.status}
+          </Text>
+        </View>
+        {item.netAmount > 0 ? (
+          <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: Colors.text }}>
+            {toIndianCurrency(item.netAmount)}
+          </Text>
+        ) : null}
+      </View>
+    </Pressable>
+  );
+}
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { shop, loading } = useShop();
+  const { shop, loading: shopLoading } = useShop();
+  const { inquiries, pending, confirmed, udhaari, loading: billsLoading } = useInquiries();
+  const { trucks } = useTodayTrucks();
+  const [activeFilter, setActiveFilter] = useState<FilterTab>('ALL');
 
   useEffect(() => {
-    if (loading) return;
+    if (shopLoading) return;
     SplashScreen.hideAsync();
-    if (!shop) {
-      router.replace('/onboarding');
-    }
-  }, [loading, shop, router]);
+    if (!shop) router.replace('/onboarding');
+  }, [shopLoading, shop, router]);
 
-  if (loading) {
+  if (shopLoading) {
     return (
-      <View testID="home-loading" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background }}>
+      <View
+        testID="home-loading"
+        style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background }}
+      >
         <ActivityIndicator color={Colors.primary} size="large" />
       </View>
     );
@@ -30,59 +149,187 @@ export default function HomeScreen() {
 
   if (!shop) return null;
 
-  return (
-    <View testID="home-screen" style={{ flex: 1 }}>
-      <LinearGradient
-        colors={['#FF8A3D', '#FF6B00', '#E55A00']}
-        style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: Spacing.lg }}
-      >
-        <View
-          style={{
-            alignItems: 'center',
-            backgroundColor: 'rgba(255,255,255,0.12)',
-            borderRadius: 24,
-            paddingVertical: Spacing.xl,
-            paddingHorizontal: Spacing.lg,
-            borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.25)',
-            minWidth: 280,
-          }}
-        >
-          <CheckCircle2 size={56} color="#FFFFFF" strokeWidth={2.5} />
-          <Text style={{ color: Colors.surface, fontSize: FontSize.xxl, fontWeight: '800', marginTop: Spacing.md }}>
-            MandiBook Pro
-          </Text>
-          <Text style={{ color: Colors.surface, fontSize: FontSize.md, fontWeight: '500', marginTop: Spacing.xs, opacity: 0.9 }}>
-            {shop.firmName}
-          </Text>
-
-          <View
-            style={{
-              marginTop: Spacing.xl,
-              backgroundColor: 'rgba(0,0,0,0.18)',
-              borderRadius: 14,
-              paddingVertical: Spacing.md,
-              paddingHorizontal: Spacing.lg,
-              gap: 6,
-              width: '100%',
-            }}
-          >
-            <Row label="Amount" value={toIndianCurrency(943878)} />
-            <Row label="Weight" value={toIndianWeight(23327)} />
-            <Row label="Count" value={toIndianNumber(1250000)} />
-            <Row label="Date" value={toIndianDate(Date.now())} />
-          </View>
-        </View>
-      </LinearGradient>
-    </View>
+  const todaySale = confirmed.reduce((s, i) => s + i.grossAmount, 0);
+  const totalStock = trucks.reduce(
+    (sum, t) =>
+      sum +
+      t.gradeInventory.reduce(
+        (s, g) => s + Math.max(0, g.totalKg - g.confirmedKg - g.provisionalKg),
+        0
+      ),
+    0
   );
-}
 
-function Row({ label, value }: { label: string; value: string }) {
+  const filteredBills: Inquiry[] =
+    activeFilter === 'ALL'
+      ? inquiries
+      : activeFilter === 'PENDING'
+        ? pending
+        : activeFilter === 'CONFIRMED'
+          ? confirmed
+          : udhaari;
+
+  const FILTERS: { key: FilterTab; label: string; count: number }[] = [
+    { key: 'ALL', label: 'सभी', count: inquiries.length },
+    { key: 'PENDING', label: 'Pending', count: pending.length },
+    { key: 'CONFIRMED', label: 'Confirmed', count: confirmed.length },
+    { key: 'UDHAARI', label: 'उधारी', count: udhaari.length },
+  ];
+
   return (
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-      <Text style={{ color: 'rgba(255,255,255,0.85)', fontSize: FontSize.sm }}>{label}</Text>
-      <Text style={{ color: Colors.surface, fontSize: FontSize.sm, fontWeight: '700' }}>{value}</Text>
-    </View>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top']}>
+      <FlatList
+        testID="home-feed"
+        data={filteredBills.slice(0, 50)}
+        keyExtractor={(i) => i.id}
+        renderItem={({ item }) => (
+          <BillRow item={item} onPress={() => router.push(`/bills/${item.id}`)} />
+        )}
+        showsVerticalScrollIndicator={false}
+        ListHeaderComponent={
+          <View>
+            {/* Top bar */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingHorizontal: Spacing.md,
+                paddingTop: Spacing.sm,
+                paddingBottom: Spacing.xs,
+              }}
+            >
+              <View>
+                <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: Colors.text }}>
+                  {shop.firmName}
+                </Text>
+                <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>
+                  {toIndianDate(Date.now())}
+                </Text>
+              </View>
+              <Pressable
+                testID="new-bill-fab"
+                onPress={() => router.push('/bills/new')}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  backgroundColor: pressed ? '#E55A00' : Colors.primary,
+                  paddingVertical: 10,
+                  paddingHorizontal: Spacing.md,
+                  borderRadius: Radius.round,
+                })}
+              >
+                <Plus size={16} color="#FFF" strokeWidth={3} />
+                <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>
+                  नया बिल
+                </Text>
+              </Pressable>
+            </View>
+
+            {/* Metric cards 2×2 */}
+            <View
+              style={{
+                flexDirection: 'row',
+                gap: Spacing.sm,
+                paddingHorizontal: Spacing.md,
+                marginTop: Spacing.sm,
+              }}
+            >
+              <MetricCard
+                label="Today's Sale"
+                value={toIndianCurrency(todaySale)}
+                accent={Colors.success}
+              />
+              <MetricCard
+                label="Confirmed"
+                value={String(confirmed.length)}
+                sub="bills"
+                accent={Colors.info}
+              />
+            </View>
+            <View
+              style={{
+                flexDirection: 'row',
+                gap: Spacing.sm,
+                paddingHorizontal: Spacing.md,
+                marginTop: Spacing.sm,
+                marginBottom: Spacing.md,
+              }}
+            >
+              <MetricCard
+                label="Pending"
+                value={String(pending.length)}
+                sub="awaiting"
+                accent={Colors.warning}
+              />
+              <MetricCard
+                label="Stock Left"
+                value={`${Math.round(totalStock / 1000 * 10) / 10} t`}
+                sub={`${trucks.length} trucks`}
+                accent={Colors.primary}
+              />
+            </View>
+
+            {/* Filter chips */}
+            <View
+              style={{
+                flexDirection: 'row',
+                paddingHorizontal: Spacing.md,
+                gap: Spacing.xs,
+                marginBottom: Spacing.xs,
+              }}
+            >
+              {FILTERS.map(({ key, label, count }) => (
+                <Pressable
+                  key={key}
+                  testID={`filter-${key}`}
+                  onPress={() => setActiveFilter(key)}
+                  style={{
+                    paddingVertical: 7,
+                    paddingHorizontal: Spacing.sm,
+                    borderRadius: Radius.round,
+                    backgroundColor: activeFilter === key ? Colors.primary : Colors.surface,
+                    borderWidth: 1,
+                    borderColor: activeFilter === key ? Colors.primary : Colors.border,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: FontSize.xs,
+                      fontWeight: '700',
+                      color: activeFilter === key ? '#FFF' : Colors.textSecond,
+                    }}
+                  >
+                    {label} {count > 0 ? `(${count})` : null}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {billsLoading ? (
+              <ActivityIndicator
+                testID="bills-loading"
+                color={Colors.primary}
+                style={{ marginVertical: Spacing.lg }}
+              />
+            ) : null}
+          </View>
+        }
+        ListEmptyComponent={
+          billsLoading ? null : (
+            <View
+              testID="bills-empty"
+              style={{ alignItems: 'center', paddingVertical: 48 }}
+            >
+              <Text style={{ fontSize: 40, marginBottom: Spacing.sm }}>📋</Text>
+              <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond }}>
+                {activeFilter === 'ALL' ? 'आज कोई बिल नहीं' : 'No bills in this filter'}
+              </Text>
+            </View>
+          )
+        }
+      />
+    </SafeAreaView>
   );
 }
