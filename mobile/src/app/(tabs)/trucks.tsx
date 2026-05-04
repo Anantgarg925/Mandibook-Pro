@@ -4,8 +4,8 @@ import { useRouter } from 'expo-router';
 import { Plus } from 'lucide-react-native';
 import { useTodayTrucks } from '@/hooks/useTodayTrucks';
 import TruckCard from '@/components/truck/TruckCard';
-import TruckCardSkeleton from '@/components/truck/TruckCardSkeleton';
-import { Colors, FontSize, Spacing } from '@/lib/theme';
+import { SkeletonTable } from '@/components/common/SkeletonLoader';
+import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import type { Truck } from '@/types/truck';
 
 function ListHeader({ onAdd }: { onAdd: () => void }) {
@@ -45,17 +45,31 @@ function ListHeader({ onAdd }: { onAdd: () => void }) {
   );
 }
 
-function EmptyState() {
+function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <View
       testID="empty-trucks"
-      style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 80 }}
+      style={{ alignItems: 'center', paddingVertical: 64 }}
     >
-      <Text style={{ fontSize: 64, marginBottom: Spacing.md }}>🚛</Text>
-      <Text style={{ fontSize: FontSize.lg, fontWeight: '700', color: Colors.text, marginBottom: 4 }}>
-        कोई गाड़ी नहीं
+      <Text style={{ fontSize: 48, marginBottom: Spacing.sm }}>🚛</Text>
+      <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: Colors.text }}>
+        आज कोई गाड़ी नहीं
       </Text>
-      <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond }}>No trucks registered today</Text>
+      <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond, marginTop: 4, marginBottom: Spacing.lg }}>
+        No trucks registered today
+      </Text>
+      <Pressable
+        testID="empty-add-truck"
+        onPress={onAdd}
+        style={({ pressed }) => ({
+          paddingVertical: Spacing.sm,
+          paddingHorizontal: Spacing.lg,
+          borderRadius: Radius.round,
+          backgroundColor: pressed ? '#E55A00' : Colors.primary,
+        })}
+      >
+        <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: '#FFF' }}>+ गाड़ी जोड़ें</Text>
+      </Pressable>
     </View>
   );
 }
@@ -71,9 +85,7 @@ export default function TrucksScreen() {
     return (
       <View testID="trucks-loading" style={{ flex: 1, backgroundColor: Colors.background }}>
         <ListHeader onAdd={handleAdd} />
-        <TruckCardSkeleton />
-        <TruckCardSkeleton />
-        <TruckCardSkeleton />
+        <SkeletonTable rows={3} />
       </View>
     );
   }
@@ -85,7 +97,7 @@ export default function TrucksScreen() {
       keyExtractor={(t) => t.id}
       renderItem={({ item }) => <TruckCard truck={item} onPress={() => handlePress(item)} />}
       ListHeaderComponent={<ListHeader onAdd={handleAdd} />}
-      ListEmptyComponent={<EmptyState />}
+      ListEmptyComponent={<EmptyState onAdd={handleAdd} />}
       contentContainerStyle={{ paddingBottom: Spacing.xl, backgroundColor: Colors.background }}
       style={{ backgroundColor: Colors.background }}
       showsVerticalScrollIndicator={false}

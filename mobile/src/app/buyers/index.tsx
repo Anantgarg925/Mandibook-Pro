@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { View, Text, FlatList, Pressable, TextInput, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Search, Users } from 'lucide-react-native';
+import { ArrowLeft, Search } from 'lucide-react-native';
 import { useBuyers } from '@/hooks/useBuyers';
 import { toIndianCurrency } from '@/lib/formatters';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
@@ -122,12 +122,12 @@ export default function BuyerListScreen() {
           contentContainerStyle={{ paddingBottom: Spacing.xl }}
           ListEmptyComponent={
             <View style={{ alignItems: 'center', paddingVertical: 64 }} testID="buyers-empty">
-              <Users size={48} color={Colors.border} />
-              <Text style={{ fontSize: FontSize.lg, fontWeight: '700', color: Colors.text, marginTop: Spacing.md }}>
-                No buyers yet
+              <Text style={{ fontSize: 48, marginBottom: Spacing.sm }}>👥</Text>
+              <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: Colors.text }}>
+                कोई ग्राहक नहीं
               </Text>
-              <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond, marginTop: 4 }}>
-                Buyers are added automatically when bills are created
+              <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond, marginTop: 4, textAlign: 'center', paddingHorizontal: Spacing.lg }}>
+                Customers appear after first UDHAARI sale
               </Text>
             </View>
           }
