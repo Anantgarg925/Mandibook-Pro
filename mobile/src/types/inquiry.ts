@@ -29,7 +29,27 @@ export type Inquiry = {
 
 export type Buyer = {
   id: string;
+  code: string;
   name: string;
   phone: string;
+  outstandingBalance: number;
   lastTransactionDate: number;
+  lastPaymentAmount?: number;
+  lastPaymentDate?: number;
+  createdAt: number;
+};
+
+export type TransactionType = 'SALE' | 'PAYMENT';
+export type PaymentMethod = 'CASH' | 'UPI' | 'CHEQUE';
+
+export type Transaction = {
+  id: string;
+  type: TransactionType;
+  amount: number;
+  date: number;
+  paymentMethod?: PaymentMethod;
+  upiRef?: string;
+  note?: string;
+  slipNumber?: number;
+  createdAt: number;
 };

@@ -1,5 +1,5 @@
 import { Linking, Alert } from 'react-native';
-import type { Inquiry } from '@/types/inquiry';
+import type { Inquiry, Buyer } from '@/types/inquiry';
 import type { ShopData } from '@/context/ShopContext';
 import { toIndianCurrency } from '@/lib/formatters';
 
@@ -36,6 +36,11 @@ export function generateThekedaarMessage(inquiry: Inquiry, shop: ShopData): stri
     `भुगतान: ${inquiry.paymentMode}${inquiry.upiRef ? ` [${inquiry.upiRef}]` : ''}\n` +
     `धन्यवाद!`
   );
+}
+
+export function generateBalanceMessage(buyer: Buyer, shop: ShopData): string {
+  const bal = toIndianCurrency(buyer.outstandingBalance);
+  return `नमस्ते ${buyer.name} जी,\n\n${shop.firmName} में आपका बकाया:\n*${bal}*\n\nकृपया जल्द भुगतान करें।\nधन्यवाद 🙏`;
 }
 
 export async function openWhatsApp(phone: string, message: string): Promise<void> {

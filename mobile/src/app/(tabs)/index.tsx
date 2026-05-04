@@ -9,7 +9,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { Plus } from 'lucide-react-native';
+import { Plus, Users } from 'lucide-react-native';
 import { useShop } from '@/context/ShopContext';
 import { useInquiries } from '@/hooks/useInquiries';
 import { useTodayTrucks } from '@/hooks/useTodayTrucks';
@@ -207,24 +207,38 @@ export default function HomeScreen() {
                   {toIndianDate(Date.now())}
                 </Text>
               </View>
-              <Pressable
-                testID="new-bill-fab"
-                onPress={() => router.push('/bills/new')}
-                style={({ pressed }) => ({
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  gap: 6,
-                  backgroundColor: pressed ? '#E55A00' : Colors.primary,
-                  paddingVertical: 10,
-                  paddingHorizontal: Spacing.md,
-                  borderRadius: Radius.round,
-                })}
-              >
-                <Plus size={16} color="#FFF" strokeWidth={3} />
-                <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>
-                  नया बिल
-                </Text>
-              </Pressable>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+                <Pressable
+                  testID="buyers-nav-btn"
+                  onPress={() => router.push('/buyers' as any)}
+                  style={({ pressed }) => ({
+                    width: 40, height: 40, borderRadius: Radius.round,
+                    alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: pressed ? Colors.border : Colors.surface,
+                    borderWidth: 1, borderColor: Colors.border,
+                  })}
+                >
+                  <Users size={20} color={Colors.info} />
+                </Pressable>
+                <Pressable
+                  testID="new-bill-fab"
+                  onPress={() => router.push('/bills/new')}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 6,
+                    backgroundColor: pressed ? '#E55A00' : Colors.primary,
+                    paddingVertical: 10,
+                    paddingHorizontal: Spacing.md,
+                    borderRadius: Radius.round,
+                  })}
+                >
+                  <Plus size={16} color="#FFF" strokeWidth={3} />
+                  <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>
+                    नया बिल
+                  </Text>
+                </Pressable>
+              </View>
             </View>
 
             {/* Metric cards 2×2 */}

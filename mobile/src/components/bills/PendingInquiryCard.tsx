@@ -6,7 +6,8 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import { writeBatch, doc, setDoc } from 'firebase/firestore';
+import { writeBatch, doc, setDoc, collection, addDoc, updateDoc, getDoc, getDocs, query, where, increment } from 'firebase/firestore';
+import { generateCode } from '@/utils/buyerCode';
 import { useRouter } from 'expo-router';
 import { db } from '@/lib/firebase';
 import { useShop } from '@/context/ShopContext';
@@ -93,53 +94,7 @@ export default function PendingInquiryCard({ inquiry }: Props) {
       upiRef: upiRef.trim(),
     });
 
-    // 2. Deduct from truck gradeInventory
-    try {
-      const truckRef = doc(db, 'shops', shop.shopId, 'trucks', inquiry.truckId);
-      // We'll do the deduction outside the batch to read current state first
-      batch.commit().then(async () => {
-        try {
-          const { getDoc, updateDoc } = await import('firebase/firestore');
-          const truckSnap = await getDoc(truckRef);
-          if (truckSnap.exists()) {
-            const truck = truckSnap.data();
-            const newInventory = (truck.gradeInventory as Array<{
-              code: string;
-              provisionalKg: number;
-              confirmedKg: number;
-            }>).map((g) =>
-              g.code === inquiry.grade
-                ? {
-                    ...g,
-                    provisionalKg: Math.max(0, g.provisionalKg - result.totalWeight),
-                    confirmedKg: g.confirmedKg + result.totalWeight,
-                  }
-                : g
-            );
-            await updateDoc(truckRef, { gradeInventory: newInventory });
-          }
-        } catch { /* best-effort */ }
-
-        // 3. UDHAARI upsert
-        if (paymentMode === 'UDHAARI' && inquiry.customerPhone) {
-          try {
-            const phone = inquiry.customerPhone.replace(/\D/g, '');
-            const buyerRef = doc(db, 'shops', shop.shopId, 'buyers', `${shop.shopId}_${phone}`);
-            await setDoc(
-              buyerRef,
-              {
-                name: inquiry.customerName,
-                phone: inquiry.customerPhone,
-                outstandingBalance: result.net,
-                lastPurchaseDate: Date.now(),
-              },
-              { merge: true }
-            );
-          } catch { /* best-effort */ }
-        }
-      });
-    } catch { /* best-effort */ }
-
+    // 2. Commit the batch
     try {
       await batch.commit();
     } catch (err) {
@@ -147,6 +102,66 @@ export default function PendingInquiryCard({ inquiry }: Props) {
       setErrors({ rate: 'Save failed. Try again.' });
       return;
     }
+
+    // 3. Deduct from truck gradeInventory (best-effort, post-commit)
+    try {
+      const truckRef = doc(db, 'shops', shop.shopId, 'trucks', inquiry.truckId);
+      const truckSnap = await getDoc(truckRef);
+      if (truckSnap.exists()) {
+        const truck = truckSnap.data();
+        const newInventory = (truck.gradeInventory as Array<{
+          code: string;
+          provisionalKg: number;
+          confirmedKg: number;
+        }>).map((g) =>
+          g.code === inquiry.grade
+            ? {
+                ...g,
+                provisionalKg: Math.max(0, g.provisionalKg - result.totalWeight),
+                confirmedKg: g.confirmedKg + result.totalWeight,
+              }
+            : g
+        );
+        await updateDoc(truckRef, { gradeInventory: newInventory });
+      }
+    } catch { /* best-effort */ }
+
+    // 4. Auto-create/update buyer and add SALE transaction (best-effort)
+    try {
+      const allBuyerCodes = (await getDocs(collection(db, 'shops', shop.shopId, 'buyers'))).docs.map(d => d.data().code as string);
+      const buyerQ = query(
+        collection(db, 'shops', shop.shopId, 'buyers'),
+        where('phone', '==', inquiry.customerPhone || '')
+      );
+      const buyerSnap = await getDocs(buyerQ);
+      let buyerCode: string;
+
+      if (buyerSnap.empty) {
+        buyerCode = generateCode(inquiry.customerName, allBuyerCodes);
+        await setDoc(doc(db, 'shops', shop.shopId, 'buyers', buyerCode), {
+          code: buyerCode,
+          name: inquiry.customerName,
+          phone: inquiry.customerPhone || '',
+          outstandingBalance: paymentMode === 'UDHAARI' ? result.net : 0,
+          lastTransactionDate: Date.now(),
+          createdAt: Date.now(),
+        });
+      } else {
+        buyerCode = buyerSnap.docs[0].data().code as string;
+        await updateDoc(doc(db, 'shops', shop.shopId, 'buyers', buyerCode), {
+          outstandingBalance: paymentMode === 'UDHAARI' ? increment(result.net) : increment(0),
+          lastTransactionDate: Date.now(),
+        });
+      }
+
+      await addDoc(collection(db, 'shops', shop.shopId, 'buyers', buyerCode, 'transactions'), {
+        type: 'SALE',
+        amount: result.net,
+        date: Date.now(),
+        slipNumber: inquiry.slipNumber,
+        createdAt: Date.now(),
+      });
+    } catch { /* best-effort */ }
 
     setAuthorizing(false);
     router.push(`/slip/${inquiry.id}`);
