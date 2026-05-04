@@ -23,10 +23,16 @@ export function useDateInquiries(date: Date) {
       where('status', '==', 'CONFIRMED'),
       orderBy('date', 'asc')
     );
-    const unsub = onSnapshot(q, snap => {
-      setInquiries(snap.docs.map(d => ({ id: d.id, ...d.data() } as Inquiry)));
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      q,
+      snap => {
+        setInquiries(snap.docs.map(d => ({ id: d.id, ...d.data() } as Inquiry)));
+        setLoading(false);
+      },
+      _err => {
+        setLoading(false);
+      }
+    );
     return unsub;
   }, [shop?.shopId, date.toDateString()]);
 

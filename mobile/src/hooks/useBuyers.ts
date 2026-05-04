@@ -15,10 +15,16 @@ export function useBuyers() {
       collection(db, 'shops', shop.shopId, 'buyers'),
       orderBy('name', 'asc')
     );
-    const unsub = onSnapshot(q, (snap) => {
-      setBuyers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Buyer)));
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setBuyers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Buyer)));
+        setLoading(false);
+      },
+      _err => {
+        setLoading(false);
+      }
+    );
     return unsub;
   }, [shop?.shopId]);
 
@@ -38,10 +44,16 @@ export function useBuyerTransactions(buyerCode: string) {
       collection(db, 'shops', shop.shopId, 'buyers', buyerCode, 'transactions'),
       orderBy('date', 'desc')
     );
-    const unsub = onSnapshot(q, (snap) => {
-      setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() } as Transaction)));
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      q,
+      (snap) => {
+        setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() } as Transaction)));
+        setLoading(false);
+      },
+      _err => {
+        setLoading(false);
+      }
+    );
     return unsub;
   }, [shop?.shopId, buyerCode]);
 

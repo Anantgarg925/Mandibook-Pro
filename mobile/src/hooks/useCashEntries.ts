@@ -24,10 +24,16 @@ export function useCashEntries(date: Date) {
       collection(db, 'shops', shop.shopId, 'daySummary', key, 'cashEntries'),
       orderBy('createdAt', 'asc')
     );
-    const unsub = onSnapshot(q, snap => {
-      setEntries(snap.docs.map(d => ({ id: d.id, ...d.data() } as CashEntry)));
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      q,
+      snap => {
+        setEntries(snap.docs.map(d => ({ id: d.id, ...d.data() } as CashEntry)));
+        setLoading(false);
+      },
+      _err => {
+        setLoading(false);
+      }
+    );
     return unsub;
   }, [shop?.shopId, key]);
 

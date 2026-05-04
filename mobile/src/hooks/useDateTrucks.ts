@@ -22,10 +22,16 @@ export function useDateTrucks(date: Date) {
       where('date', '<=', end.getTime()),
       orderBy('date', 'asc')
     );
-    const unsub = onSnapshot(q, snap => {
-      setTrucks(snap.docs.map(d => ({ id: d.id, ...d.data() } as Truck)));
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      q,
+      snap => {
+        setTrucks(snap.docs.map(d => ({ id: d.id, ...d.data() } as Truck)));
+        setLoading(false);
+      },
+      _err => {
+        setLoading(false);
+      }
+    );
     return unsub;
   }, [shop?.shopId, date.toDateString()]);
 
