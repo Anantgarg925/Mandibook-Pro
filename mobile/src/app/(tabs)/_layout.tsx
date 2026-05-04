@@ -1,55 +1,41 @@
 import React from 'react';
-import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Link, Tabs } from 'expo-router';
-import { Pressable } from 'react-native';
-
-import { useColorScheme } from '@/lib/useColorScheme';
+import { Tabs } from 'expo-router';
+import { Home, Truck } from 'lucide-react-native';
 import { useClientOnlyValue } from '@/lib/useClientOnlyValue';
-
-// You can explore the built-in icon families and icons on the web at https://icons.expo.fyi/
-function TabBarIcon(props: {
-  name: React.ComponentProps<typeof FontAwesome>['name'];
-  color: string;
-}) {
-  return <FontAwesome size={28} className="-mb-1" {...props} />;
-}
+import { Colors } from '@/lib/theme';
 
 export default function TabLayout() {
-  const colorScheme = useColorScheme();
-
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colorScheme === 'dark' ? 'white' : 'blue',
-        // Disable the static render of the header on web
-        // to prevent a hydration error in React Navigation v6.
+        tabBarActiveTintColor: Colors.primary,
+        tabBarInactiveTintColor: Colors.textSecond,
+        tabBarStyle: { borderTopColor: Colors.border },
         headerShown: useClientOnlyValue(false, true),
-      }}>
+      }}
+    >
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Tab One',
-          tabBarButtonTestID: 'tab-one',
-          tabBarIcon: ({ color }: { color: string }) => <TabBarIcon name="code" color={color} />,
-          headerRight: () => (
-            <Link href="/modal" asChild testID="open-modal-button">
-              <Pressable testID="modal-link-pressable" className="mr-4 active:opacity-50">
-                <FontAwesome
-                  name="info-circle"
-                  size={25}
-                  color={colorScheme === 'dark' ? 'white' : 'black'}
-                />
-              </Pressable>
-            </Link>
-          ),
+          title: 'Home',
+          tabBarButtonTestID: 'tab-home',
+          tabBarIcon: ({ color }: { color: string }) => <Home size={24} color={color} />,
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="trucks"
+        options={{
+          title: 'गाड़ियां',
+          tabBarButtonTestID: 'tab-trucks',
+          tabBarIcon: ({ color }: { color: string }) => <Truck size={24} color={color} />,
+          headerShown: false,
         }}
       />
       <Tabs.Screen
         name="two"
         options={{
-          title: 'Tab Two',
-          tabBarButtonTestID: 'tab-two',
-          tabBarIcon: ({ color }: { color: string }) => <TabBarIcon name="code" color={color} />,
+          href: null,
         }}
       />
     </Tabs>
