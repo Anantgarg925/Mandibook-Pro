@@ -28,6 +28,8 @@ function RootLayoutNav({ colorScheme }: { colorScheme: 'light' | 'dark' | null |
         <Stack.Screen name="trucks/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="bills/new" options={{ headerShown: false }} />
         <Stack.Screen name="bills/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="slip/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="authorization" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>

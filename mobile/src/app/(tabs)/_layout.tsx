@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Home, Truck } from 'lucide-react-native';
+import { Home, Truck, ShieldCheck } from 'lucide-react-native';
 import { useClientOnlyValue } from '@/lib/useClientOnlyValue';
 import { Colors } from '@/lib/theme';
 
@@ -29,6 +29,15 @@ export default function TabLayout() {
           title: 'गाड़ियां',
           tabBarButtonTestID: 'tab-trucks',
           tabBarIcon: ({ color }: { color: string }) => <Truck size={24} color={color} />,
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="auth"
+        options={{
+          title: 'Authorize',
+          tabBarButtonTestID: 'tab-auth',
+          tabBarIcon: ({ color }: { color: string }) => <ShieldCheck size={24} color={color} />,
           headerShown: false,
         }}
       />
