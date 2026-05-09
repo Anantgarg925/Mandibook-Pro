@@ -34,7 +34,7 @@ const ShopCreateSchema = z.object({
   }),
   adminPin: z.string(),
   teamNames: z.array(z.string()).default([]),
-  createdAt: z.number().int(),
+  createdAt: z.number(),
 });
 
 const ShopUpdateSchema = z.object({
@@ -51,7 +51,7 @@ const ShopUpdateSchema = z.object({
   charges: ChargesSchema.optional(),
   adminPin: z.string().optional(),
   teamNames: z.array(z.string()).optional(),
-  createdAt: z.number().int().optional(),
+  createdAt: z.number().optional(),
 });
 
 function parseShop(shop: {
@@ -95,7 +95,8 @@ shopsRouter.get("/:shopId", async (c) => {
       return c.json({ error: { message: "Shop not found", code: "NOT_FOUND" } }, 404);
     }
     return c.json({ data: parseShop(shop) });
-  } catch {
+  } catch (err) {
+    console.error('[GET /api/shops/:shopId]', err);
     return c.json({ error: { message: "Failed to fetch shop", code: "INTERNAL_ERROR" } }, 500);
   }
 });
@@ -129,6 +130,7 @@ shopsRouter.post("/", zValidator("json", ShopCreateSchema), async (c) => {
     if (prismaErr?.code === "P2002") {
       return c.json({ error: { message: "Shop already exists", code: "CONFLICT" } }, 409);
     }
+    console.error('[POST /api/shops]', err);
     return c.json({ error: { message: "Failed to create shop", code: "INTERNAL_ERROR" } }, 500);
   }
 });
@@ -161,6 +163,7 @@ shopsRouter.put("/:shopId", zValidator("json", ShopUpdateSchema), async (c) => {
     if (prismaErr?.code === "P2025") {
       return c.json({ error: { message: "Shop not found", code: "NOT_FOUND" } }, 404);
     }
+    console.error('[PUT /api/shops/:shopId]', err);
     return c.json({ error: { message: "Failed to update shop", code: "INTERNAL_ERROR" } }, 500);
   }
 });

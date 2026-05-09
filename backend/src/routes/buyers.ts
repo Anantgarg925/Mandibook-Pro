@@ -12,10 +12,10 @@ const BuyerCreateSchema = z.object({
   name: z.string(),
   phone: z.string().default(""),
   outstandingBalance: z.number().default(0),
-  lastTransactionDate: z.number().int(),
+  lastTransactionDate: z.number(),
   lastPaymentAmount: z.number().optional(),
-  lastPaymentDate: z.number().int().optional(),
-  createdAt: z.number().int(),
+  lastPaymentDate: z.number().optional(),
+  createdAt: z.number(),
 });
 
 const BuyerUpdateSchema = z.object({
@@ -23,10 +23,10 @@ const BuyerUpdateSchema = z.object({
   name: z.string().optional(),
   phone: z.string().optional(),
   outstandingBalance: z.number().optional(),
-  lastTransactionDate: z.number().int().optional(),
+  lastTransactionDate: z.number().optional(),
   lastPaymentAmount: z.number().nullable().optional(),
-  lastPaymentDate: z.number().int().nullable().optional(),
-  createdAt: z.number().int().optional(),
+  lastPaymentDate: z.number().nullable().optional(),
+  createdAt: z.number().optional(),
 });
 
 // GET /api/buyers?shopId=
@@ -40,7 +40,8 @@ buyersRouter.get("/", async (c) => {
   try {
     const buyers = await prisma.buyer.findMany({ where: { shopId }, orderBy: { name: "asc" } });
     return c.json({ data: buyers });
-  } catch {
+  } catch (err) {
+    console.error('[GET /api/buyers]', err);
     return c.json({ error: { message: "Failed to fetch buyers", code: "INTERNAL_ERROR" } }, 500);
   }
 });
@@ -54,7 +55,8 @@ buyersRouter.get("/:id", async (c) => {
       return c.json({ error: { message: "Buyer not found", code: "NOT_FOUND" } }, 404);
     }
     return c.json({ data: buyer });
-  } catch {
+  } catch (err) {
+    console.error('[GET /api/buyers/:id]', err);
     return c.json({ error: { message: "Failed to fetch buyer", code: "INTERNAL_ERROR" } }, 500);
   }
 });
@@ -83,6 +85,7 @@ buyersRouter.post("/", zValidator("json", BuyerCreateSchema), async (c) => {
     if (prismaErr?.code === "P2002") {
       return c.json({ error: { message: "Buyer with this code already exists in shop", code: "CONFLICT" } }, 409);
     }
+    console.error('[POST /api/buyers]', err);
     return c.json({ error: { message: "Failed to create buyer", code: "INTERNAL_ERROR" } }, 500);
   }
 });
@@ -99,6 +102,7 @@ buyersRouter.put("/:id", zValidator("json", BuyerUpdateSchema), async (c) => {
     if (prismaErr?.code === "P2025") {
       return c.json({ error: { message: "Buyer not found", code: "NOT_FOUND" } }, 404);
     }
+    console.error('[PUT /api/buyers/:id]', err);
     return c.json({ error: { message: "Failed to update buyer", code: "INTERNAL_ERROR" } }, 500);
   }
 });

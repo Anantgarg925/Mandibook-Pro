@@ -11,12 +11,12 @@ const TransactionCreateSchema = z.object({
   buyerCode: z.string(),
   type: z.enum(["SALE", "PAYMENT"]),
   amount: z.number(),
-  date: z.number().int(),
+  date: z.number(),
   paymentMethod: z.enum(["CASH", "UPI", "CHEQUE"]).optional(),
   upiRef: z.string().optional(),
   note: z.string().optional(),
   slipNumber: z.number().int().optional(),
-  createdAt: z.number().int(),
+  createdAt: z.number(),
 });
 
 // GET /api/transactions?shopId=&buyerCode=
@@ -37,7 +37,8 @@ transactionsRouter.get("/", async (c) => {
       orderBy: { createdAt: "desc" },
     });
     return c.json({ data: transactions });
-  } catch {
+  } catch (err) {
+    console.error('[GET /api/transactions]', err);
     return c.json({ error: { message: "Failed to fetch transactions", code: "INTERNAL_ERROR" } }, 500);
   }
 });
@@ -62,7 +63,8 @@ transactionsRouter.post("/", zValidator("json", TransactionCreateSchema), async 
       },
     });
     return c.json({ data: transaction }, 201);
-  } catch {
+  } catch (err) {
+    console.error('[POST /api/transactions]', err);
     return c.json({ error: { message: "Failed to create transaction", code: "INTERNAL_ERROR" } }, 500);
   }
 });

@@ -22,7 +22,7 @@ model Shop {
   charges     String  // JSON ShopCharges object
   adminPin    String
   teamNames   String  // JSON array of strings
-  createdAt   Int
+  createdAt   Float
 
   trucks       Truck[]
   inquiries    Inquiry[]
@@ -41,8 +41,8 @@ model Truck {
   freightAmount  Float
   gradeInventory String  // JSON array
   status         String  @default("ACTIVE")
-  date           Int
-  createdAt      Int
+  date           Float
+  createdAt      Float
 
   shop       Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
   inquiries  Inquiry[]
@@ -70,8 +70,8 @@ model Inquiry {
   paymentMode    String
   upiRef         String  @default("")
   status         String  @default("PENDING")
-  date           Int
-  createdAt      Int
+  date           Float
+  createdAt      Float
 
   shop  Shop  @relation(fields: [shopId], references: [id], onDelete: Cascade)
   truck Truck @relation(fields: [truckId], references: [id], onDelete: Cascade)
@@ -84,10 +84,10 @@ model Buyer {
   name                 String
   phone                String
   outstandingBalance   Float   @default(0)
-  lastTransactionDate  Int
+  lastTransactionDate  Float
   lastPaymentAmount    Float?
-  lastPaymentDate      Int?
-  createdAt            Int
+  lastPaymentDate      Float?
+  createdAt            Float
 
   shop         Shop          @relation(fields: [shopId], references: [id], onDelete: Cascade)
   transactions Transaction[]
@@ -101,12 +101,12 @@ model Transaction {
   buyerCode     String
   type          String  // 'SALE' | 'PAYMENT'
   amount        Float
-  date          Int
+  date          Float
   paymentMethod String?
   upiRef        String?
   note          String?
   slipNumber    Int?
-  createdAt     Int
+  createdAt     Float
 
   shop  Shop  @relation(fields: [shopId], references: [id], onDelete: Cascade)
   buyer Buyer @relation(fields: [buyerCode, shopId], references: [code, shopId], onDelete: Cascade)

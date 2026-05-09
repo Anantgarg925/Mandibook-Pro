@@ -16,8 +16,8 @@ const TruckCreateSchema = z.object({
   freightAmount: z.number().default(0),
   gradeInventory: z.array(z.unknown()).default([]),
   status: z.enum(["ACTIVE", "CLOSED"]).default("ACTIVE"),
-  date: z.number().int(),
-  createdAt: z.number().int(),
+  date: z.number(),
+  createdAt: z.number(),
 });
 
 const TruckUpdateSchema = z.object({
@@ -29,8 +29,8 @@ const TruckUpdateSchema = z.object({
   freightAmount: z.number().optional(),
   gradeInventory: z.array(z.unknown()).optional(),
   status: z.enum(["ACTIVE", "CLOSED"]).optional(),
-  date: z.number().int().optional(),
-  createdAt: z.number().int().optional(),
+  date: z.number().optional(),
+  createdAt: z.number().optional(),
 });
 
 function parseTruck(truck: {
@@ -70,7 +70,8 @@ trucksRouter.get("/", async (c) => {
 
     const trucks = await prisma.truck.findMany({ where, orderBy: { createdAt: "desc" } });
     return c.json({ data: trucks.map(parseTruck) });
-  } catch {
+  } catch (err) {
+    console.error('[GET /api/trucks]', err);
     return c.json({ error: { message: "Failed to fetch trucks", code: "INTERNAL_ERROR" } }, 500);
   }
 });
@@ -96,7 +97,8 @@ trucksRouter.post("/", zValidator("json", TruckCreateSchema), async (c) => {
       },
     });
     return c.json({ data: parseTruck(truck) }, 201);
-  } catch {
+  } catch (err) {
+    console.error('[POST /api/trucks]', err);
     return c.json({ error: { message: "Failed to create truck", code: "INTERNAL_ERROR" } }, 500);
   }
 });
@@ -125,6 +127,7 @@ trucksRouter.put("/:id", zValidator("json", TruckUpdateSchema), async (c) => {
     if (prismaErr?.code === "P2025") {
       return c.json({ error: { message: "Truck not found", code: "NOT_FOUND" } }, 404);
     }
+    console.error('[PUT /api/trucks/:id]', err);
     return c.json({ error: { message: "Failed to update truck", code: "INTERNAL_ERROR" } }, 500);
   }
 });
@@ -140,6 +143,7 @@ trucksRouter.delete("/:id", async (c) => {
     if (prismaErr?.code === "P2025") {
       return c.json({ error: { message: "Truck not found", code: "NOT_FOUND" } }, 404);
     }
+    console.error('[DELETE /api/trucks/:id]', err);
     return c.json({ error: { message: "Failed to delete truck", code: "INTERNAL_ERROR" } }, 500);
   }
 });

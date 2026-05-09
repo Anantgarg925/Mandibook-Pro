@@ -27,8 +27,8 @@ const InquiryCreateSchema = z.object({
   paymentMode: z.enum(["CASH", "UPI", "UDHAARI"]),
   upiRef: z.string().default(""),
   status: z.enum(["PENDING", "CONFIRMED", "CANCELLED"]).default("PENDING"),
-  date: z.number().int(),
-  createdAt: z.number().int(),
+  date: z.number(),
+  createdAt: z.number(),
 });
 
 const InquiryUpdateSchema = z.object({
@@ -51,8 +51,8 @@ const InquiryUpdateSchema = z.object({
   paymentMode: z.enum(["CASH", "UPI", "UDHAARI"]).optional(),
   upiRef: z.string().optional(),
   status: z.enum(["PENDING", "CONFIRMED", "CANCELLED"]).optional(),
-  date: z.number().int().optional(),
-  createdAt: z.number().int().optional(),
+  date: z.number().optional(),
+  createdAt: z.number().optional(),
 });
 
 // GET /api/inquiries?shopId=&date=&status=
@@ -72,7 +72,8 @@ inquiriesRouter.get("/", async (c) => {
 
     const inquiries = await prisma.inquiry.findMany({ where, orderBy: { createdAt: "desc" } });
     return c.json({ data: inquiries });
-  } catch {
+  } catch (err) {
+    console.error('[GET /api/inquiries]', err);
     return c.json({ error: { message: "Failed to fetch inquiries", code: "INTERNAL_ERROR" } }, 500);
   }
 });
@@ -109,7 +110,8 @@ inquiriesRouter.post("/", zValidator("json", InquiryCreateSchema), async (c) => 
       },
     });
     return c.json({ data: inquiry }, 201);
-  } catch {
+  } catch (err) {
+    console.error('[POST /api/inquiries]', err);
     return c.json({ error: { message: "Failed to create inquiry", code: "INTERNAL_ERROR" } }, 500);
   }
 });
@@ -126,6 +128,7 @@ inquiriesRouter.put("/:id", zValidator("json", InquiryUpdateSchema), async (c) =
     if (prismaErr?.code === "P2025") {
       return c.json({ error: { message: "Inquiry not found", code: "NOT_FOUND" } }, 404);
     }
+    console.error('[PUT /api/inquiries/:id]', err);
     return c.json({ error: { message: "Failed to update inquiry", code: "INTERNAL_ERROR" } }, 500);
   }
 });
@@ -141,6 +144,7 @@ inquiriesRouter.delete("/:id", async (c) => {
     if (prismaErr?.code === "P2025") {
       return c.json({ error: { message: "Inquiry not found", code: "NOT_FOUND" } }, 404);
     }
+    console.error('[DELETE /api/inquiries/:id]', err);
     return c.json({ error: { message: "Failed to delete inquiry", code: "INTERNAL_ERROR" } }, 500);
   }
 });
