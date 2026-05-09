@@ -1,17 +1,17 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
   FlatList,
   Pressable,
   ActivityIndicator,
-  ScrollView,
   TextInput,
+  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { Plus, Search, Bell, Settings, ChevronRight, Truck } from 'lucide-react-native';
+import { Plus, Search, Settings, Truck, ChevronRight } from 'lucide-react-native';
 import { useShop } from '@/context/ShopContext';
 import { useInquiries } from '@/hooks/useInquiries';
 import { useTodayTrucks } from '@/hooks/useTodayTrucks';
@@ -35,68 +35,200 @@ const STATUS_BG: Record<string, string> = {
   UDHAARI: '#FFEBEE',
 };
 
-function MetricCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent: string }) {
+function MetricCard({
+  label,
+  labelHindi,
+  value,
+  sub,
+  amber,
+}: {
+  label: string;
+  labelHindi?: string;
+  value: string;
+  sub?: string;
+  amber?: boolean;
+}) {
   return (
-    <View style={{
-      flex: 1,
-      backgroundColor: Colors.surface,
-      borderRadius: Radius.md,
-      padding: Spacing.md,
-      borderLeftWidth: 4,
-      borderLeftColor: accent,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.06,
-      shadowRadius: 4,
-      elevation: 2,
-    }}>
-      <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginBottom: 4 }}>{label}</Text>
-      <Text style={{ fontSize: FontSize.xl, fontWeight: '800', color: Colors.text }}>{value}</Text>
-      {sub ? <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 2 }}>{sub}</Text> : null}
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: amber ? '#FFF8E1' : Colors.surface,
+        borderRadius: Radius.md,
+        padding: Spacing.md,
+        borderWidth: 1,
+        borderColor: amber ? Colors.warning : Colors.border,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.06,
+        shadowRadius: 4,
+        elevation: 2,
+      }}
+    >
+      <Text
+        style={{
+          fontSize: FontSize.xs,
+          color: amber ? Colors.warning : Colors.textSecond,
+          marginBottom: 2,
+          fontWeight: '600',
+          textTransform: 'uppercase',
+          letterSpacing: 0.4,
+        }}
+      >
+        {label}
+      </Text>
+      {labelHindi ? (
+        <Text
+          style={{
+            fontSize: 10,
+            color: amber ? Colors.warning : Colors.textSecond,
+            marginBottom: 6,
+            opacity: 0.7,
+          }}
+        >
+          {labelHindi}
+        </Text>
+      ) : (
+        <View style={{ marginBottom: 6 }} />
+      )}
+      <Text
+        style={{
+          fontSize: FontSize.xl,
+          fontWeight: '800',
+          color: amber ? Colors.warning : Colors.text,
+        }}
+      >
+        {value}
+      </Text>
+      {sub ? (
+        <Text
+          style={{
+            fontSize: FontSize.xs,
+            color: amber ? Colors.warning : Colors.textSecond,
+            marginTop: 2,
+          }}
+        >
+          {sub}
+        </Text>
+      ) : null}
     </View>
   );
 }
 
-function TruckChip({ truck, onPress }: { truck: any; onPress: () => void }) {
-  const available = truck.gradeInventory.reduce(
-    (s: number, g: any) => s + Math.max(0, g.totalKg - g.confirmedKg - g.provisionalKg), 0
+function TruckCard({ truck, onPress }: { truck: any; onPress: () => void }) {
+  const totalKg: number = truck.gradeInventory.reduce(
+    (s: number, g: any) => s + g.totalKg,
+    0
   );
+  const confirmedKg: number = truck.gradeInventory.reduce(
+    (s: number, g: any) => s + g.confirmedKg,
+    0
+  );
+  const provisionalKg: number = truck.gradeInventory.reduce(
+    (s: number, g: any) => s + g.provisionalKg,
+    0
+  );
+  const availableKg = Math.max(0, totalKg - confirmedKg - provisionalKg);
+  const soldPct = totalKg > 0 ? Math.round(((confirmedKg + provisionalKg) / totalKg) * 100) : 0;
+
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => ({
-        backgroundColor: pressed ? '#E8F5E9' : Colors.surface,
+        backgroundColor: pressed ? '#F1F8F1' : Colors.surface,
         borderRadius: Radius.md,
         padding: Spacing.md,
-        marginRight: Spacing.sm,
-        width: 160,
+        marginHorizontal: Spacing.md,
+        marginBottom: Spacing.sm,
         borderWidth: 1,
         borderColor: Colors.border,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.05,
-        shadowRadius: 3,
-        elevation: 1,
+        shadowOpacity: 0.06,
+        shadowRadius: 4,
+        elevation: 2,
       })}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-        <View style={{ width: 28, height: 28, borderRadius: 6, backgroundColor: '#E8F5E9', alignItems: 'center', justifyContent: 'center' }}>
-          <Truck size={14} color={Colors.primary} />
+      {/* Top row */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.sm }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flex: 1 }}>
+          <View
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: Radius.sm,
+              backgroundColor: '#E8F5E9',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Truck size={18} color={Colors.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text
+              style={{
+                fontSize: FontSize.sm,
+                fontWeight: '800',
+                color: Colors.text,
+              }}
+              numberOfLines={1}
+            >
+              {truck.truckNumber}
+            </Text>
+            <Text
+              style={{ fontSize: FontSize.xs, color: Colors.textSecond }}
+              numberOfLines={1}
+            >
+              {truck.senderName}
+            </Text>
+          </View>
         </View>
-        <Text style={{ fontSize: FontSize.xs, fontWeight: '800', color: Colors.primary }} numberOfLines={1}>
-          {truck.truckNumber}
-        </Text>
+        <View style={{ alignItems: 'flex-end' }}>
+          <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: Colors.primary }}>
+            {Math.round((availableKg / 1000) * 10) / 10} t
+          </Text>
+          <Text style={{ fontSize: 10, color: Colors.textSecond }}>Available</Text>
+        </View>
       </View>
-      <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }} numberOfLines={1}>{truck.senderName}</Text>
-      <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text, marginTop: 4 }}>
-        {Math.round(available / 1000 * 10) / 10} t
-      </Text>
-      <Text style={{ fontSize: 10, color: Colors.textSecond }}>available</Text>
+
+      {/* Progress bar */}
+      <View>
+        <View
+          style={{
+            height: 6,
+            backgroundColor: '#f1f5f9',
+            borderRadius: Radius.round,
+            overflow: 'hidden',
+          }}
+        >
+          <View
+            style={{
+              height: 6,
+              width: `${soldPct}%`,
+              backgroundColor: Colors.primary,
+              borderRadius: Radius.round,
+            }}
+          />
+        </View>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
+          <Text style={{ fontSize: 10, color: Colors.textSecond }}>Sold Inventory</Text>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: Colors.text }}>{soldPct}%</Text>
+        </View>
+      </View>
     </Pressable>
   );
 }
 
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .slice(0, 2)
+    .map((w) => w[0] ?? '')
+    .join('')
+    .toUpperCase();
+}
+
 function BillRow({ item, onPress }: { item: Inquiry; onPress: () => void }) {
+  const initials = getInitials(item.customerName);
   return (
     <Pressable
       testID={`bill-row-${item.id}`}
@@ -109,26 +241,57 @@ function BillRow({ item, onPress }: { item: Inquiry; onPress: () => void }) {
         backgroundColor: pressed ? Colors.background : Colors.surface,
         borderBottomWidth: 1,
         borderBottomColor: Colors.border,
+        gap: Spacing.sm,
       })}
     >
-      <Text style={{ width: 52, fontSize: FontSize.xs, fontWeight: '700', color: Colors.textSecond }}>
-        #{item.slipNumber}
-      </Text>
+      {/* Avatar */}
+      <View
+        style={{
+          width: 48,
+          height: 48,
+          borderRadius: 24,
+          backgroundColor: Colors.surface,
+          borderWidth: 1,
+          borderColor: Colors.border,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: Colors.primary }}>
+          {initials}
+        </Text>
+      </View>
+
+      {/* Center */}
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text }} numberOfLines={1}>
+        <Text
+          style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text }}
+          numberOfLines={1}
+        >
           {item.customerName}
         </Text>
         <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>
-          {item.grade} · {item.sacks} bags
+          Grade: {item.grade} {'\u2022'} Qty: {item.sacks} bags
         </Text>
       </View>
+
+      {/* Right */}
       <View style={{ alignItems: 'flex-end', gap: 4 }}>
-        <View style={{
-          paddingHorizontal: 8, paddingVertical: 3,
-          borderRadius: Radius.round,
-          backgroundColor: STATUS_BG[item.status] ?? '#F5F5F5',
-        }}>
-          <Text style={{ fontSize: 10, fontWeight: '700', color: STATUS_COLOR[item.status] ?? Colors.textSecond }}>
+        <View
+          style={{
+            paddingHorizontal: 8,
+            paddingVertical: 3,
+            borderRadius: Radius.round,
+            backgroundColor: STATUS_BG[item.status] ?? '#F5F5F5',
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 10,
+              fontWeight: '700',
+              color: STATUS_COLOR[item.status] ?? Colors.textSecond,
+            }}
+          >
             {item.status}
           </Text>
         </View>
@@ -139,6 +302,52 @@ function BillRow({ item, onPress }: { item: Inquiry; onPress: () => void }) {
         ) : null}
       </View>
     </Pressable>
+  );
+}
+
+function PulseDot() {
+  const scale = useRef(new Animated.Value(1)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(scale, { toValue: 1.5, duration: 700, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 0.3, duration: 700, useNativeDriver: true }),
+        ]),
+        Animated.parallel([
+          Animated.timing(scale, { toValue: 1, duration: 700, useNativeDriver: true }),
+          Animated.timing(opacity, { toValue: 1, duration: 700, useNativeDriver: true }),
+        ]),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, [scale, opacity]);
+
+  return (
+    <View style={{ width: 16, height: 16, alignItems: 'center', justifyContent: 'center' }}>
+      <Animated.View
+        style={{
+          position: 'absolute',
+          width: 14,
+          height: 14,
+          borderRadius: 7,
+          backgroundColor: '#EF4444',
+          opacity,
+          transform: [{ scale }],
+        }}
+      />
+      <View
+        style={{
+          width: 8,
+          height: 8,
+          borderRadius: 4,
+          backgroundColor: '#EF4444',
+        }}
+      />
+    </View>
   );
 }
 
@@ -173,19 +382,32 @@ export default function HomeScreen() {
 
   const todaySale = confirmed.reduce((s, i) => s + i.grossAmount, 0);
   const totalStock = trucks.reduce(
-    (sum, t) => sum + t.gradeInventory.reduce(
-      (s, g) => s + Math.max(0, g.totalKg - g.confirmedKg - g.provisionalKg), 0
-    ), 0
+    (sum, t) =>
+      sum +
+      t.gradeInventory.reduce(
+        (s: number, g: any) => s + Math.max(0, g.totalKg - g.confirmedKg - g.provisionalKg),
+        0
+      ),
+    0
   );
 
-  const initials = shop?.firmName.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase() ?? '';
+  const initials =
+    shop?.firmName
+      .split(' ')
+      .slice(0, 2)
+      .map((w: string) => w[0])
+      .join('')
+      .toUpperCase() ?? '';
 
   const filteredBills = search
-    ? inquiries.filter(i =>
-        i.customerName.toLowerCase().includes(search.toLowerCase()) ||
-        i.slipNumber.toString().includes(search)
+    ? inquiries.filter(
+        (i) =>
+          i.customerName.toLowerCase().includes(search.toLowerCase()) ||
+          i.slipNumber.toString().includes(search)
       )
     : inquiries.slice(0, 30);
+
+  const visibleTrucks = trucks.slice(0, 3);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top']}>
@@ -199,73 +421,132 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View>
-            {/* Header */}
-            <View style={{
-              backgroundColor: Colors.headerBg,
-              paddingHorizontal: Spacing.md,
-              paddingTop: Spacing.sm,
-              paddingBottom: Spacing.lg,
-            }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            {/* ── Header ── */}
+            <View
+              style={{
+                backgroundColor: Colors.surface,
+                paddingHorizontal: Spacing.md,
+                paddingTop: Spacing.sm,
+                paddingBottom: Spacing.md,
+                borderBottomWidth: 1,
+                borderBottomColor: Colors.border,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                {/* Left: avatar + firm info */}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-                  <View style={{
-                    width: 40, height: 40, borderRadius: 20,
-                    backgroundColor: 'rgba(255,255,255,0.2)',
-                    alignItems: 'center', justifyContent: 'center',
-                    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)',
-                  }}>
-                    <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: '#FFF' }}>{initials}</Text>
+                  <View
+                    style={{
+                      width: 40,
+                      height: 40,
+                      borderRadius: 20,
+                      backgroundColor: 'rgba(232,245,233,0.6)',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: FontSize.sm,
+                        fontWeight: '800',
+                        color: Colors.primary,
+                      }}
+                    >
+                      {initials}
+                    </Text>
                   </View>
                   <View>
-                    <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: '#FFF' }}>{shop?.firmName}</Text>
-                    <Text style={{ fontSize: FontSize.xs, color: 'rgba(255,255,255,0.7)' }}>{toIndianDate(Date.now())}</Text>
+                    <Text
+                      style={{
+                        fontSize: FontSize.md,
+                        fontWeight: '800',
+                        color: Colors.text,
+                      }}
+                    >
+                      {shop?.firmName ?? ''}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: FontSize.xs,
+                        color: Colors.textSecond,
+                        textTransform: 'uppercase',
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      {toIndianDate(Date.now())} {'\u2022'} ADMIN
+                    </Text>
                   </View>
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                  <Pressable
-                    testID="reports-nav-btn"
-                    onPress={() => router.push('/reports' as any)}
-                    style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}
-                  >
-                    <Bell size={18} color="#FFF" />
-                  </Pressable>
-                  <Pressable
-                    testID="settings-nav-btn"
-                    onPress={() => router.push('/settings' as any)}
-                    style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}
-                  >
-                    <Settings size={18} color="#FFF" />
-                  </Pressable>
-                </View>
+
+                {/* Right: settings only */}
+                <Pressable
+                  testID="settings-nav-btn"
+                  onPress={() => router.push('/settings' as any)}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: Colors.background,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Settings size={18} color={Colors.textSecond} />
+                </Pressable>
               </View>
             </View>
 
-            {/* Metric cards */}
+            {/* ── Metric cards (2x2 grid) ── */}
             <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.md, gap: Spacing.sm }}>
               <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-                <MetricCard label="आज की बिक्री" value={toIndianCurrency(todaySale)} accent={Colors.success} />
-                <MetricCard label="Confirmed" value={String(confirmed.length)} sub="bills" accent={Colors.info} />
+                <MetricCard
+                  label="Today's Total Sale"
+                  labelHindi="आज की बिक्री"
+                  value={toIndianCurrency(todaySale)}
+                />
+                <MetricCard
+                  label="Confirmed Bills"
+                  value={String(confirmed.length)}
+                  sub="bills confirmed"
+                />
               </View>
               <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-                <MetricCard label="Pending" value={String(pending.length)} sub="awaiting" accent={Colors.warning} />
-                <MetricCard label="Stock Left" value={`${Math.round(totalStock / 1000 * 10) / 10} t`} sub={`${trucks.length} trucks`} accent={Colors.primary} />
+                <MetricCard
+                  label="Pending Auth"
+                  value={String(pending.length)}
+                  sub="awaiting"
+                  amber
+                />
+                <MetricCard
+                  label="Stock Remaining"
+                  value={`${Math.round((totalStock / 1000) * 10) / 10} t`}
+                  sub={`${trucks.length} trucks`}
+                />
               </View>
             </View>
 
-            {/* Search bar */}
-            <View style={{
-              marginHorizontal: Spacing.md,
-              marginTop: Spacing.md,
-              flexDirection: 'row',
-              alignItems: 'center',
-              backgroundColor: Colors.surface,
-              borderRadius: Radius.md,
-              paddingHorizontal: Spacing.sm,
-              paddingVertical: Spacing.xs,
-              borderWidth: 1,
-              borderColor: Colors.border,
-              gap: Spacing.xs,
-            }}>
+            {/* ── Search bar ── */}
+            <View
+              style={{
+                marginHorizontal: Spacing.md,
+                marginTop: Spacing.md,
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: Colors.surface,
+                borderRadius: Radius.md,
+                paddingHorizontal: Spacing.sm,
+                paddingVertical: Spacing.xs,
+                borderWidth: 1,
+                borderColor: Colors.border,
+                gap: Spacing.xs,
+              }}
+            >
               <Search size={16} color={Colors.textSecond} />
               <TextInput
                 testID="home-search"
@@ -273,44 +554,139 @@ export default function HomeScreen() {
                 placeholderTextColor={Colors.textSecond}
                 value={search}
                 onChangeText={setSearch}
-                style={{ flex: 1, fontSize: FontSize.sm, color: Colors.text, paddingVertical: 6 }}
+                style={{
+                  flex: 1,
+                  fontSize: FontSize.sm,
+                  color: Colors.text,
+                  paddingVertical: 6,
+                }}
               />
             </View>
 
-            {/* Today's Trucks section */}
+            {/* ── Today's Trucks (vertical cards) ── */}
             {trucks.length > 0 ? (
               <View style={{ marginTop: Spacing.md }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, marginBottom: Spacing.sm }}>
-                  <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: Colors.text }}>Today's Trucks</Text>
-                  <Pressable testID="view-all-trucks" onPress={() => router.push('/(tabs)/trucks' as any)} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                    <Text style={{ fontSize: FontSize.xs, color: Colors.primary, fontWeight: '700' }}>View All</Text>
+                {/* Section header */}
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    paddingHorizontal: Spacing.md,
+                    marginBottom: Spacing.sm,
+                  }}
+                >
+                  <View>
+                    <Text
+                      style={{
+                        fontSize: FontSize.md,
+                        fontWeight: '800',
+                        color: Colors.text,
+                      }}
+                    >
+                      Today's Trucks
+                    </Text>
+                    <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>
+                      आज की गाड़ियाँ
+                    </Text>
+                  </View>
+                  <Pressable
+                    testID="view-all-trucks"
+                    onPress={() => router.push('/(tabs)/trucks' as any)}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: FontSize.xs,
+                        color: Colors.primary,
+                        fontWeight: '700',
+                      }}
+                    >
+                      View All
+                    </Text>
                     <ChevronRight size={14} color={Colors.primary} />
                   </Pressable>
                 </View>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ paddingHorizontal: Spacing.md, paddingBottom: Spacing.xs }}
-                  style={{ flexGrow: 0 }}
-                >
-                  {trucks.map(t => (
-                    <TruckChip key={t.id} truck={t} onPress={() => router.push(`/trucks/${t.id}` as any)} />
-                  ))}
-                </ScrollView>
+
+                {/* Vertical truck cards */}
+                {visibleTrucks.map((t) => (
+                  <TruckCard
+                    key={t.id}
+                    truck={t}
+                    onPress={() => router.push(`/trucks/${t.id}` as any)}
+                  />
+                ))}
+
+                {trucks.length > 3 ? (
+                  <Pressable
+                    onPress={() => router.push('/(tabs)/trucks' as any)}
+                    style={{
+                      marginHorizontal: Spacing.md,
+                      marginBottom: Spacing.sm,
+                      paddingVertical: Spacing.sm,
+                      alignItems: 'center',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: FontSize.xs,
+                        color: Colors.primary,
+                        fontWeight: '700',
+                      }}
+                    >
+                      + {trucks.length - 3} more trucks — View All
+                    </Text>
+                  </Pressable>
+                ) : null}
               </View>
             ) : null}
 
-            {/* Live Bill Feed header */}
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, marginTop: Spacing.md, marginBottom: Spacing.xs }}>
-              <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: Colors.text }}>Live Bill Feed</Text>
-              <Pressable testID="buyers-nav-btn" onPress={() => router.push('/buyers' as any)} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
-                <Text style={{ fontSize: FontSize.xs, color: Colors.primary, fontWeight: '700' }}>Buyers</Text>
-                <ChevronRight size={14} color={Colors.primary} />
-              </Pressable>
+            {/* ── Live Bill Feed header ── */}
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                paddingHorizontal: Spacing.md,
+                marginTop: Spacing.md,
+                marginBottom: Spacing.xs,
+              }}
+            >
+              <View>
+                <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: Colors.text }}>
+                  Live Bill Feed
+                </Text>
+                <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>
+                  लाइव बिल
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+                <Pressable
+                  testID="buyers-nav-btn"
+                  onPress={() => router.push('/buyers' as any)}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}
+                >
+                  <Text
+                    style={{
+                      fontSize: FontSize.xs,
+                      color: Colors.primary,
+                      fontWeight: '700',
+                    }}
+                  >
+                    Buyers
+                  </Text>
+                  <ChevronRight size={14} color={Colors.primary} />
+                </Pressable>
+                <PulseDot />
+              </View>
             </View>
 
             {billsLoading ? (
-              <ActivityIndicator testID="bills-loading" color={Colors.primary} style={{ marginVertical: Spacing.lg }} />
+              <ActivityIndicator
+                testID="bills-loading"
+                color={Colors.primary}
+                style={{ marginVertical: Spacing.lg }}
+              />
             ) : null}
           </View>
         }
@@ -318,7 +694,9 @@ export default function HomeScreen() {
           billsLoading ? null : (
             <View testID="bills-empty" style={{ alignItems: 'center', paddingVertical: 48 }}>
               <Text style={{ fontSize: 40, marginBottom: Spacing.sm }}>📋</Text>
-              <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond }}>आज कोई बिल नहीं</Text>
+              <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond }}>
+                आज कोई बिल नहीं
+              </Text>
             </View>
           )
         }
@@ -361,13 +739,19 @@ export default function HomeScreen() {
         />
       )}
 
-      {(!launchGone && launchVisible) ? (
+      {!launchGone && launchVisible ? (
         <LaunchView
           visible={launchVisible}
           shopName={shop?.firmName ?? ''}
           onHide={() => setLaunchGone(true)}
-          onAdminPress={() => { setPinGone(false); setPinVisible(true); }}
-          onMemberPress={() => { setLaunchGone(true); router.push('/authorization' as any); }}
+          onAdminPress={() => {
+            setPinGone(false);
+            setPinVisible(true);
+          }}
+          onMemberPress={() => {
+            setLaunchGone(true);
+            router.push('/authorization' as any);
+          }}
         />
       ) : null}
 
@@ -376,7 +760,10 @@ export default function HomeScreen() {
           visible={pinVisible}
           correctPin={shop?.adminPin ?? ''}
           onHide={() => setPinGone(true)}
-          onSuccess={() => { setLaunchGone(true); setPinVisible(false); }}
+          onSuccess={() => {
+            setLaunchGone(true);
+            setPinVisible(false);
+          }}
           onCancel={() => setPinVisible(false)}
         />
       ) : null}
