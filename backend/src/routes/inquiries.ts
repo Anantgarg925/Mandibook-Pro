@@ -81,6 +81,22 @@ inquiriesRouter.get("/", async (c) => {
   }
 });
 
+// GET /api/inquiries/:id
+inquiriesRouter.get("/:id", async (c) => {
+  const { id } = c.req.param();
+  const shopId = c.req.query("shopId");
+  try {
+    const inquiry = await prisma.inquiry.findUnique({ where: { id } });
+    if (!inquiry || (shopId && inquiry.shopId !== shopId)) {
+      return c.json({ error: { message: "Inquiry not found", code: "NOT_FOUND" } }, 404);
+    }
+    return c.json({ data: inquiry });
+  } catch (err) {
+    console.error('[GET /api/inquiries/:id]', err);
+    return c.json({ error: { message: "Failed to fetch inquiry", code: "INTERNAL_ERROR" } }, 500);
+  }
+});
+
 // POST /api/inquiries
 inquiriesRouter.post("/", zValidator("json", InquiryCreateSchema), async (c) => {
   const body = c.req.valid("json");
