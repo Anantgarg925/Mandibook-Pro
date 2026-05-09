@@ -3,19 +3,19 @@ import { Tabs } from 'expo-router';
 import { Home, FileText, Truck, BarChart2, Settings } from 'lucide-react-native';
 import { useClientOnlyValue } from '@/lib/useClientOnlyValue';
 import { Colors } from '@/lib/theme';
+import { useLaunch } from '@/context/LaunchContext';
 
 export default function TabLayout() {
+  const { launchComplete } = useLaunch();
+
   return (
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textSecond,
-        tabBarStyle: {
-          borderTopColor: Colors.border,
-          backgroundColor: Colors.surface,
-          height: 60,
-          paddingBottom: 8,
-        },
+        tabBarStyle: launchComplete
+          ? { borderTopColor: Colors.border, backgroundColor: Colors.surface, height: 60, paddingBottom: 8 }
+          : { display: 'none' },
         headerShown: useClientOnlyValue(false, true),
       }}
     >

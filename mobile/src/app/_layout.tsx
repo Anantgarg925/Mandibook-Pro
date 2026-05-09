@@ -7,6 +7,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { ShopProvider } from '@/context/ShopContext';
+import { LaunchProvider } from '@/context/LaunchContext';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 
 export const unstable_settings = {
@@ -57,10 +58,12 @@ export default function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <KeyboardProvider>
-            <ShopProvider>
-              <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
-              <RootLayoutNav colorScheme={colorScheme} />
-            </ShopProvider>
+            <LaunchProvider>
+              <ShopProvider>
+                <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+                <RootLayoutNav colorScheme={colorScheme} />
+              </ShopProvider>
+            </LaunchProvider>
           </KeyboardProvider>
         </GestureHandlerRootView>
       </QueryClientProvider>

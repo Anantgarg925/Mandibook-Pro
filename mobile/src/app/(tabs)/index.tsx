@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Tabs } from 'expo-router';
+import { useLaunch } from '@/context/LaunchContext';
 import * as SplashScreen from 'expo-splash-screen';
 import { Plus, Search, Settings, Truck, ChevronRight } from 'lucide-react-native';
 import { useShop } from '@/context/ShopContext';
@@ -354,6 +354,7 @@ function PulseDot() {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const { setLaunchComplete } = useLaunch();
   const { shop, loading: shopLoading } = useShop();
   const { inquiries, pending, confirmed, loading: billsLoading } = useInquiries();
   const { trucks } = useTodayTrucks();
@@ -412,13 +413,6 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top']}>
-      <Tabs.Screen
-        options={{
-          tabBarStyle: launchGone
-            ? { borderTopColor: Colors.border, backgroundColor: Colors.surface, height: 60, paddingBottom: 8 }
-            : { display: 'none' },
-        }}
-      />
       <FlatList
         testID="home-feed"
         data={filteredBills}
@@ -758,6 +752,7 @@ export default function HomeScreen() {
           }}
           onMemberPress={() => {
             setLaunchGone(true);
+            setLaunchComplete(true);
             router.push('/authorization' as any);
           }}
         />
@@ -770,6 +765,7 @@ export default function HomeScreen() {
           onHide={() => setPinGone(true)}
           onSuccess={() => {
             setLaunchGone(true);
+            setLaunchComplete(true);
             setPinVisible(false);
           }}
           onCancel={() => setPinVisible(false)}
