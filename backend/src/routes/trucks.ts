@@ -76,6 +76,22 @@ trucksRouter.get("/", async (c) => {
   }
 });
 
+// GET /api/trucks/:id
+trucksRouter.get("/:id", async (c) => {
+  const { id } = c.req.param();
+  const shopId = c.req.query("shopId");
+  try {
+    const truck = await prisma.truck.findUnique({ where: { id } });
+    if (!truck || (shopId && truck.shopId !== shopId)) {
+      return c.json({ error: { message: "Truck not found", code: "NOT_FOUND" } }, 404);
+    }
+    return c.json({ data: parseTruck(truck) });
+  } catch (err) {
+    console.error('[GET /api/trucks/:id]', err);
+    return c.json({ error: { message: "Failed to fetch truck", code: "INTERNAL_ERROR" } }, 500);
+  }
+});
+
 // POST /api/trucks
 trucksRouter.post("/", zValidator("json", TruckCreateSchema), async (c) => {
   const body = c.req.valid("json");
