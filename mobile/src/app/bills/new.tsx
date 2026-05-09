@@ -245,7 +245,7 @@ export default function NewBillScreen() {
         paymentMode,
         upiRef: upiRef.trim(),
         status: 'PENDING',
-        date: Date.now(),
+        date: (() => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); })(),
         createdAt: Date.now(),
       },
       truckUpdate: {
