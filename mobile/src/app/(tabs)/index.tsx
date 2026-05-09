@@ -354,31 +354,33 @@ function PulseDot() {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { setLaunchComplete } = useLaunch();
+  const { launchComplete, setLaunchComplete } = useLaunch();
   const { shop, loading: shopLoading } = useShop();
   const { inquiries, pending, confirmed, loading: billsLoading } = useInquiries();
   const { trucks } = useTodayTrucks();
   const [search, setSearch] = useState('');
-  const [splashGone, setSplashGone] = useState(false);
-  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+  const [splashGone, setSplashGone] = useState(launchComplete);
+  const [minTimeElapsed, setMinTimeElapsed] = useState(launchComplete);
   const [launchVisible, setLaunchVisible] = useState(false);
-  const [launchGone, setLaunchGone] = useState(false);
+  const [launchGone, setLaunchGone] = useState(launchComplete);
   const [pinVisible, setPinVisible] = useState(false);
   const [pinGone, setPinGone] = useState(true);
 
   useEffect(() => {
+    if (launchComplete) return;
     const timer = setTimeout(() => setMinTimeElapsed(true), 3000);
     return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
+    if (launchComplete) return;
     if (shopLoading || !minTimeElapsed) return;
     SplashScreen.hideAsync();
     if (!shop) {
       setSplashGone(true);
       router.replace('/onboarding');
     }
-  }, [shopLoading, minTimeElapsed, shop, router]);
+  }, [shopLoading, minTimeElapsed, shop, router, launchComplete]);
 
   if (!shop && !shopLoading) return null;
 
