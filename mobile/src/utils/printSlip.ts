@@ -1,5 +1,6 @@
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
+import { Platform } from 'react-native';
 import type { Inquiry } from '@/types/inquiry';
 import type { ShopData } from '@/context/ShopContext';
 
@@ -178,6 +179,40 @@ export function generateSlipHTML(inquiry: Inquiry, shop: ShopData): string {
 
 export async function printSlip(inquiry: Inquiry, shop: ShopData): Promise<void> {
   const html = generateSlipHTML(inquiry, shop);
+
+  if (Platform.OS === 'web') {
+    // expo-print on web calls window.print() on the current page.
+    // Instead, inject the receipt HTML into a hidden iframe and print only that.
+    const iframe = document.createElement('iframe');
+    Object.assign(iframe.style, {
+      position: 'fixed',
+      right: '0',
+      bottom: '0',
+      width: '0',
+      height: '0',
+      border: 'none',
+      visibility: 'hidden',
+    });
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(html);
+      doc.close();
+      setTimeout(() => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 1000);
+      }, 300);
+    }
+    return;
+  }
+
   await Print.printAsync({ html });
 }
 
