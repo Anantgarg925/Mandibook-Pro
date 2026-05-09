@@ -147,15 +147,21 @@ export default function HomeScreen() {
   const { trucks } = useTodayTrucks();
   const [search, setSearch] = useState('');
   const [splashGone, setSplashGone] = useState(false);
+  const [minTimeElapsed, setMinTimeElapsed] = useState(false);
 
   useEffect(() => {
-    if (shopLoading) return;
+    const timer = setTimeout(() => setMinTimeElapsed(true), 3000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  useEffect(() => {
+    if (shopLoading || !minTimeElapsed) return;
     SplashScreen.hideAsync();
     if (!shop) {
       setSplashGone(true);
       router.replace('/onboarding');
     }
-  }, [shopLoading, shop, router]);
+  }, [shopLoading, minTimeElapsed, shop, router]);
 
   if (!shop && !shopLoading) return null;
 
@@ -341,7 +347,7 @@ export default function HomeScreen() {
 
       {!splashGone && (
         <SplashScreenView
-          visible={shopLoading}
+          visible={shopLoading || !minTimeElapsed}
           onHide={() => setSplashGone(true)}
         />
       )}
