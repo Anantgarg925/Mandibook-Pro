@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, FileText } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useShop } from '@/context/ShopContext';
@@ -163,54 +163,73 @@ export default function BillDetailScreen() {
       </ScrollView>
 
       {/* Action buttons */}
-      {inquiry.status === 'PENDING' ? (
-        <View
-          style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
+      <View
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          gap: Spacing.xs,
+          padding: Spacing.md,
+          backgroundColor: Colors.surface,
+          borderTopWidth: 1,
+          borderTopColor: Colors.border,
+        }}
+      >
+        {inquiry.status === 'PENDING' ? (
+          <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+            <Pressable
+              testID="cancel-bill-button"
+              onPress={() => updateStatus('CANCELLED')}
+              disabled={statusMutation.isPending}
+              style={{
+                flex: 1,
+                height: 48,
+                borderRadius: Radius.md,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: Colors.danger,
+              }}
+            >
+              <Text style={{ fontSize: FontSize.sm, color: Colors.danger, fontWeight: '700' }}>Cancel</Text>
+            </Pressable>
+            <Pressable
+              testID="confirm-bill-button"
+              onPress={() => updateStatus('CONFIRMED')}
+              disabled={statusMutation.isPending}
+              style={{
+                flex: 2,
+                height: 48,
+                borderRadius: Radius.md,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: Colors.success,
+              }}
+            >
+              <Text style={{ fontSize: FontSize.md, color: '#FFF', fontWeight: '700' }}>✅ Confirm</Text>
+            </Pressable>
+          </View>
+        ) : null}
+        <Pressable
+          testID="view-slip-button"
+          onPress={() => router.push(`/slip/${id}` as any)}
+          style={({ pressed }) => ({
+            height: 52,
+            borderRadius: Radius.md,
             flexDirection: 'row',
-            gap: Spacing.sm,
-            padding: Spacing.md,
-            backgroundColor: Colors.surface,
-            borderTopWidth: 1,
-            borderTopColor: Colors.border,
-          }}
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+            backgroundColor: pressed ? '#005a10' : '#00450d',
+          })}
         >
-          <Pressable
-            testID="cancel-bill-button"
-            onPress={() => updateStatus('CANCELLED')}
-            disabled={statusMutation.isPending}
-            style={{
-              flex: 1,
-              height: 52,
-              borderRadius: Radius.md,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderWidth: 1,
-              borderColor: Colors.danger,
-            }}
-          >
-            <Text style={{ fontSize: FontSize.sm, color: Colors.danger, fontWeight: '700' }}>Cancel</Text>
-          </Pressable>
-          <Pressable
-            testID="confirm-bill-button"
-            onPress={() => updateStatus('CONFIRMED')}
-            disabled={statusMutation.isPending}
-            style={{
-              flex: 2,
-              height: 52,
-              borderRadius: Radius.md,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: Colors.success,
-            }}
-          >
-            <Text style={{ fontSize: FontSize.md, color: '#FFF', fontWeight: '700' }}>✅ Confirm</Text>
-          </Pressable>
-        </View>
-      ) : null}
+          <FileText size={18} color="#FFF" />
+          <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: '#FFF' }}>
+            View Delivery Slip / डिलीवरी स्लिप
+          </Text>
+        </Pressable>
+      </View>
     </SafeAreaView>
   );
 }
