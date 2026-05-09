@@ -144,9 +144,11 @@ export default function SettingsScreen() {
           borderBottomColor: Colors.border,
         }}
       >
-        <Pressable testID="settings-back" onPress={() => router.back()} style={{ padding: 4 }}>
-          <ArrowLeft size={24} color={Colors.text} />
-        </Pressable>
+        {router.canGoBack() ? (
+          <Pressable testID="settings-back" onPress={() => router.back()} style={{ padding: 4 }}>
+            <ArrowLeft size={24} color={Colors.text} />
+          </Pressable>
+        ) : null}
         <Text style={{ flex: 1, fontSize: FontSize.lg, fontWeight: '800', color: Colors.text }}>
           Settings / सेटिंग्स
         </Text>

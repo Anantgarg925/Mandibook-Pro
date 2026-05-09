@@ -194,9 +194,11 @@ export default function DaySummaryScreen() {
         borderBottomWidth: 1,
         borderBottomColor: Colors.border,
       }}>
-        <Pressable testID="back-btn" onPress={() => router.back()} style={{ padding: 4 }}>
-          <ArrowLeft size={24} color={Colors.text} />
-        </Pressable>
+        {router.canGoBack() ? (
+          <Pressable testID="back-btn" onPress={() => router.back()} style={{ padding: 4 }}>
+            <ArrowLeft size={24} color={Colors.text} />
+          </Pressable>
+        ) : <View style={{ width: 32 }} />}
         <Text style={{ flex: 1, fontSize: FontSize.lg, fontWeight: '800', color: Colors.text }}>
           दिन का हिसाब
         </Text>
