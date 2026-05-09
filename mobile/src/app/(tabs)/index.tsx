@@ -18,6 +18,7 @@ import { useTodayTrucks } from '@/hooks/useTodayTrucks';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { toIndianCurrency, toIndianDate } from '@/lib/formatters';
 import type { Inquiry } from '@/types/inquiry';
+import { SplashScreenView } from '@/components/SplashScreenView';
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: Colors.warning,
@@ -145,22 +146,18 @@ export default function HomeScreen() {
   const { inquiries, pending, confirmed, loading: billsLoading } = useInquiries();
   const { trucks } = useTodayTrucks();
   const [search, setSearch] = useState('');
+  const [splashGone, setSplashGone] = useState(false);
 
   useEffect(() => {
     if (shopLoading) return;
     SplashScreen.hideAsync();
-    if (!shop) router.replace('/onboarding');
+    if (!shop) {
+      setSplashGone(true);
+      router.replace('/onboarding');
+    }
   }, [shopLoading, shop, router]);
 
-  if (shopLoading) {
-    return (
-      <View testID="home-loading" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background }}>
-        <ActivityIndicator color={Colors.primary} size="large" />
-      </View>
-    );
-  }
-
-  if (!shop) return null;
+  if (!shop && !shopLoading) return null;
 
   const todaySale = confirmed.reduce((s, i) => s + i.grossAmount, 0);
   const totalStock = trucks.reduce(
@@ -169,7 +166,7 @@ export default function HomeScreen() {
     ), 0
   );
 
-  const initials = shop.firmName.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase();
+  const initials = shop?.firmName.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase() ?? '';
 
   const filteredBills = search
     ? inquiries.filter(i =>
@@ -208,7 +205,7 @@ export default function HomeScreen() {
                     <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: '#FFF' }}>{initials}</Text>
                   </View>
                   <View>
-                    <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: '#FFF' }}>{shop.firmName}</Text>
+                    <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: '#FFF' }}>{shop?.firmName}</Text>
                     <Text style={{ fontSize: FontSize.xs, color: 'rgba(255,255,255,0.7)' }}>{toIndianDate(Date.now())}</Text>
                   </View>
                 </View>
@@ -341,6 +338,13 @@ export default function HomeScreen() {
         <Plus size={18} color="#FFF" strokeWidth={3} />
         <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '800' }}>नया बिल</Text>
       </Pressable>
+
+      {!splashGone && (
+        <SplashScreenView
+          visible={shopLoading}
+          onHide={() => setSplashGone(true)}
+        />
+      )}
     </SafeAreaView>
   );
 }
