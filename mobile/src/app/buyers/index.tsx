@@ -1,11 +1,24 @@
 import React, { useState, useMemo } from 'react';
-import { View, Text, FlatList, Pressable, TextInput, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  FlatList,
+  Pressable,
+  TextInput,
+  ActivityIndicator,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Search } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  Clock,
+  Search,
+  SlidersHorizontal,
+  UserPlus,
+  Users,
+} from 'lucide-react-native';
 import { useBuyers } from '@/hooks/useBuyers';
-import { toIndianCurrency } from '@/lib/formatters';
-import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
+import { toIndianCurrency, toIndianDate } from '@/lib/formatters';
 import type { Buyer } from '@/types/inquiry';
 
 export default function BuyerListScreen() {
@@ -13,162 +26,433 @@ export default function BuyerListScreen() {
   const { buyers, loading } = useBuyers();
   const [search, setSearch] = useState('');
 
-  const sorted = useMemo(() =>
-    [...buyers]
-      .sort((a, b) => b.outstandingBalance - a.outstandingBalance)
-      .filter(b =>
-        !search ||
-        b.name.toLowerCase().includes(search.toLowerCase()) ||
-        b.phone.includes(search) ||
-        b.code.toLowerCase().includes(search.toLowerCase())
-      ),
+  const sorted = useMemo(
+    () =>
+      [...buyers]
+        .sort((a, b) => b.outstandingBalance - a.outstandingBalance)
+        .filter(
+          (b) =>
+            !search ||
+            b.name.toLowerCase().includes(search.toLowerCase()) ||
+            b.phone.includes(search) ||
+            b.code.toLowerCase().includes(search.toLowerCase())
+        ),
     [buyers, search]
   );
 
   const totalOutstanding = buyers.reduce((s, b) => s + b.outstandingBalance, 0);
 
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top']}>
-      {/* Header */}
-      <View style={{
-        backgroundColor: Colors.headerBg,
-        paddingHorizontal: Spacing.md,
-        paddingTop: Spacing.sm,
-        paddingBottom: Spacing.md,
-      }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-          <Pressable
-            onPress={() => router.back()}
-            style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}
-            testID="buyers-back"
-          >
-            <ArrowLeft size={20} color="#FFF" />
-          </Pressable>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: '#FFF' }}>
-              Buyers / खरीदार
+  const ListHeader = (
+    <>
+      {/* Top nav bar */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+          paddingHorizontal: 20,
+          paddingVertical: 14,
+          backgroundColor: '#ffffff',
+          borderBottomWidth: 1,
+          borderBottomColor: '#E5E7EB',
+        }}
+      >
+        <Pressable
+          onPress={() => router.back()}
+          testID="buyers-back"
+          hitSlop={8}
+        >
+          <ArrowLeft size={22} color="#1a3c20" />
+        </Pressable>
+        <Text
+          style={{
+            fontSize: 20,
+            fontWeight: '800',
+            color: '#1a3c20',
+          }}
+        >
+          Buyers / ग्राहक
+        </Text>
+      </View>
+
+      {/* Page content starts here */}
+      <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
+        {/* Title stats row */}
+        <View
+          style={{
+            flexDirection: 'row',
+            justifyContent: 'space-between',
+            alignItems: 'flex-end',
+            marginBottom: 16,
+          }}
+        >
+          <View>
+            <Text
+              style={{
+                fontSize: 28,
+                fontWeight: '800',
+                color: '#071e27',
+                letterSpacing: -0.5,
+              }}
+            >
+              Buyers / ग्राहक
             </Text>
-            {totalOutstanding > 0 ? (
-              <Text style={{ fontSize: FontSize.xs, color: 'rgba(255,255,255,0.7)' }}>
-                उधारी: {toIndianCurrency(totalOutstanding)}
-              </Text>
-            ) : null}
+            <Text style={{ fontSize: 13, color: '#64748B' }}>
+              {buyers.length} active buyer accounts
+            </Text>
           </View>
-          {buyers.length > 0 ? (
-            <View style={{
-              backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: Radius.round,
-              paddingHorizontal: 10, paddingVertical: 4,
-              borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
-            }}>
-              <Text style={{ fontSize: FontSize.xs, fontWeight: '800', color: '#FFF' }}>
-                {buyers.length}
+          {totalOutstanding > 0 ? (
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text
+                style={{
+                  fontSize: 10,
+                  color: '#64748B',
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.8,
+                  textAlign: 'right',
+                }}
+              >
+                Total Receivable
+              </Text>
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: '800',
+                  color: '#ba1a1a',
+                  textAlign: 'right',
+                }}
+              >
+                {toIndianCurrency(totalOutstanding)}
               </Text>
             </View>
           ) : null}
         </View>
-      </View>
 
-      {/* Search */}
-      <View style={{
-        flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
-        paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
-        backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.border,
-      }}>
-        <Search size={16} color={Colors.textSecond} />
-        <TextInput
-          testID="buyers-search"
-          placeholder="Search by name, phone, code..."
-          placeholderTextColor={Colors.textSecond}
-          value={search}
-          onChangeText={setSearch}
+        {/* Search + Filter row */}
+        <View
           style={{
-            flex: 1, fontSize: FontSize.sm, color: Colors.text,
-            paddingVertical: 8,
+            flexDirection: 'row',
+            gap: 12,
+            marginBottom: 20,
           }}
-        />
-      </View>
-
-      {loading ? (
-        <ActivityIndicator testID="buyers-loading" color={Colors.primary} size="large" style={{ marginTop: 48 }} />
-      ) : (
-        <FlatList
-          testID="buyers-list"
-          data={sorted}
-          keyExtractor={b => b.code}
-          renderItem={({ item }: { item: Buyer }) => (
-            <Pressable
-              testID={`buyer-row-${item.code}`}
-              onPress={() => router.push(`/buyers/${item.code}` as any)}
-              style={({ pressed }) => ({
-                backgroundColor: pressed ? Colors.background : Colors.surface,
-                marginHorizontal: Spacing.md,
-                marginBottom: Spacing.sm,
-                borderRadius: Radius.md,
-                padding: Spacing.md,
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 1 },
-                shadowOpacity: 0.05,
-                shadowRadius: 3,
-                elevation: 1,
+        >
+          <View style={{ flex: 1, position: 'relative', justifyContent: 'center' }}>
+            <TextInput
+              testID="buyers-search"
+              placeholder="Search by name or code..."
+              placeholderTextColor="#c0c9bb"
+              value={search}
+              onChangeText={setSearch}
+              style={{
+                height: 56,
+                backgroundColor: '#ffffff',
                 borderWidth: 1,
-                borderColor: Colors.border,
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: Spacing.sm,
-              })}
+                borderColor: '#c0c9bb',
+                borderRadius: 14,
+                paddingLeft: 48,
+                paddingRight: 16,
+                fontSize: 15,
+                color: '#071e27',
+              }}
+            />
+            <View
+              style={{
+                position: 'absolute',
+                left: 16,
+                top: 0,
+                bottom: 0,
+                justifyContent: 'center',
+              }}
+              pointerEvents="none"
             >
-              <View style={{
-                width: 44, height: 44, borderRadius: Radius.sm,
-                backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
-              }}>
-                <Text style={{ fontSize: FontSize.xs, fontWeight: '900', color: '#FFF' }}>
-                  {item.code}
-                </Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text }}>
-                  {item.name}
-                </Text>
-                {item.phone ? (
-                  <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>{item.phone}</Text>
-                ) : null}
-              </View>
-              <View style={{ alignItems: 'flex-end' }}>
-                <View style={{
-                  paddingHorizontal: 8, paddingVertical: 3,
-                  borderRadius: Radius.round,
-                  backgroundColor: item.outstandingBalance > 0 ? '#FFEBEE' : '#E8F5E9',
-                }}>
-                  <Text style={{
-                    fontSize: 10, fontWeight: '800',
-                    color: item.outstandingBalance > 0 ? Colors.danger : Colors.success,
-                  }}>
-                    {item.outstandingBalance > 0 ? 'UDHAARI' : 'CONFIRMED'}
-                  </Text>
-                </View>
-                <Text style={{
-                  fontSize: FontSize.sm, fontWeight: '800', marginTop: 4,
-                  color: item.outstandingBalance > 0 ? Colors.danger : Colors.success,
-                }}>
-                  {item.outstandingBalance > 0 ? toIndianCurrency(item.outstandingBalance) : 'Clear'}
-                </Text>
-              </View>
-            </Pressable>
-          )}
-          contentContainerStyle={{ paddingTop: Spacing.md, paddingBottom: Spacing.xl }}
-          ListEmptyComponent={
-            <View style={{ alignItems: 'center', paddingVertical: 64 }} testID="buyers-empty">
-              <Text style={{ fontSize: 48, marginBottom: Spacing.sm }}>👥</Text>
-              <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: Colors.text }}>
-                कोई ग्राहक नहीं
-              </Text>
-              <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond, marginTop: 4, textAlign: 'center', paddingHorizontal: Spacing.lg }}>
-                Customers appear after first UDHAARI sale
+              <Search size={18} color="#717a6d" />
+            </View>
+          </View>
+          <Pressable
+            testID="buyers-filter-btn"
+            style={{
+              width: 56,
+              height: 56,
+              backgroundColor: '#ffffff',
+              borderWidth: 1,
+              borderColor: '#c0c9bb',
+              borderRadius: 14,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <SlidersHorizontal size={20} color="#41493e" />
+          </Pressable>
+        </View>
+      </View>
+    </>
+  );
+
+  const renderBuyerCard = ({ item }: { item: Buyer }) => {
+    const daysOld =
+      (Date.now() - item.lastTransactionDate) / (1000 * 60 * 60 * 24);
+
+    let statusLabel = 'Cleared / भुगतान';
+    let statusBg = '#acf4a4';
+    let statusText = '#0c5216';
+    if (item.outstandingBalance > 0 && daysOld > 7) {
+      statusLabel = 'Overdue / बकाया';
+      statusBg = '#ffdad6';
+      statusText = '#93000a';
+    } else if (item.outstandingBalance > 0) {
+      statusLabel = 'Pending / लंबित';
+      statusBg = '#ffdad6';
+      statusText = '#93000a';
+    }
+
+    const isPending = item.outstandingBalance > 0;
+
+    return (
+      <Pressable
+        testID={`buyer-row-${item.code}`}
+        onPress={() => router.push(`/buyers/${item.code}` as any)}
+        style={({ pressed }) => ({
+          backgroundColor: pressed ? '#f0f8ff' : '#ffffff',
+          borderWidth: 1,
+          borderColor: '#E5E7EB',
+          borderRadius: 16,
+          padding: 20,
+          marginBottom: 12,
+          marginHorizontal: 20,
+          elevation: 1,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.06,
+          shadowRadius: 4,
+          overflow: 'hidden',
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+        })}
+      >
+        {/* Decorative corner circle for pending/overdue */}
+        {isPending ? (
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              right: 0,
+              width: 80,
+              height: 80,
+              backgroundColor: 'rgba(255,218,214,0.15)',
+              borderBottomLeftRadius: 80,
+            }}
+            pointerEvents="none"
+          />
+        ) : null}
+
+        {/* Left side */}
+        <View style={{ flex: 1, gap: 10 }}>
+          {/* Pills row */}
+          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+            <View
+              style={{
+                backgroundColor: '#dbf1fe',
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 20,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 10,
+                  fontWeight: '700',
+                  color: '#003d65',
+                  letterSpacing: 1,
+                  textTransform: 'uppercase',
+                }}
+              >
+                {item.code}
               </Text>
             </View>
-          }
-        />
-      )}
+            <View
+              style={{
+                backgroundColor: statusBg,
+                paddingHorizontal: 10,
+                paddingVertical: 4,
+                borderRadius: 20,
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 10,
+                  fontWeight: '700',
+                  color: statusText,
+                  letterSpacing: 1,
+                }}
+              >
+                {statusLabel}
+              </Text>
+            </View>
+          </View>
+
+          {/* Name */}
+          <Text
+            style={{
+              fontSize: 20,
+              fontWeight: '700',
+              color: '#071e27',
+              marginTop: 2,
+            }}
+          >
+            {item.name}
+          </Text>
+
+          {/* Phone or No contact */}
+          <Text style={{ fontSize: 13, color: '#41493e' }}>
+            {item.phone ? item.phone : 'No contact'}
+          </Text>
+        </View>
+
+        {/* Right side */}
+        <View style={{ alignItems: 'flex-end', gap: 4, paddingLeft: 12 }}>
+          {/* Balance label */}
+          {item.outstandingBalance > 0 ? (
+            <Text
+              style={{
+                fontSize: 10,
+                color: '#64748B',
+                opacity: 0.7,
+              }}
+            >
+              Balance Due
+            </Text>
+          ) : (
+            <Text style={{ fontSize: 10, color: '#64748B', opacity: 0.7 }}>
+              Balance
+            </Text>
+          )}
+
+          {/* Amount */}
+          {item.outstandingBalance > 0 ? (
+            <Text
+              style={{
+                fontSize: 24,
+                fontWeight: '800',
+                color: '#ba1a1a',
+              }}
+            >
+              {toIndianCurrency(item.outstandingBalance)}
+            </Text>
+          ) : (
+            <Text
+              style={{
+                fontSize: 22,
+                fontWeight: '700',
+                color: '#717a6d',
+              }}
+            >
+              ₹ 0.00
+            </Text>
+          )}
+
+          {/* Last transaction */}
+          {item.lastTransactionDate > 0 ? (
+            <View
+              style={{
+                flexDirection: 'row',
+                gap: 4,
+                alignItems: 'center',
+              }}
+            >
+              <Clock size={13} color="#717a6d" />
+              <Text style={{ fontSize: 11, color: '#717a6d' }}>
+                Last: {toIndianDate(item.lastTransactionDate)}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+      </Pressable>
+    );
+  };
+
+  return (
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: '#f3faff' }}
+      edges={['top']}
+    >
+      <View style={{ flex: 1 }}>
+        {loading ? (
+          <>
+            {ListHeader}
+            <View
+              testID="buyers-loading"
+              style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <ActivityIndicator color="#00450d" size="large" />
+            </View>
+          </>
+        ) : (
+          <FlatList
+            testID="buyers-list"
+            data={sorted}
+            keyExtractor={(b) => b.code}
+            renderItem={renderBuyerCard}
+            ListHeaderComponent={ListHeader}
+            contentContainerStyle={{ paddingBottom: 100 }}
+            ListEmptyComponent={
+              <View
+                testID="buyers-empty"
+                style={{
+                  alignItems: 'center',
+                  paddingVertical: 64,
+                  paddingHorizontal: 32,
+                }}
+              >
+                <Users size={56} color="#c0c9bb" />
+                <Text
+                  style={{
+                    fontSize: 20,
+                    fontWeight: '800',
+                    color: '#071e27',
+                    marginTop: 16,
+                  }}
+                >
+                  कोई ग्राहक नहीं
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    color: '#64748B',
+                    textAlign: 'center',
+                    marginTop: 8,
+                  }}
+                >
+                  Customers appear after first UDHAARI sale
+                </Text>
+              </View>
+            }
+          />
+        )}
+
+        {/* FAB */}
+        <View
+          testID="add-buyer-fab"
+          style={{
+            position: 'absolute',
+            bottom: 24,
+            right: 20,
+            width: 60,
+            height: 60,
+            borderRadius: 30,
+            backgroundColor: '#1b5e20',
+            alignItems: 'center',
+            justifyContent: 'center',
+            elevation: 8,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.2,
+            shadowRadius: 8,
+          }}
+        >
+          <UserPlus size={26} color="#ffffff" />
+        </View>
+      </View>
     </SafeAreaView>
   );
 }
