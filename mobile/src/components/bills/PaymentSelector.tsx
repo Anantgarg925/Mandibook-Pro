@@ -28,7 +28,7 @@ export default function PaymentSelector({ selected, onSelect, upiRef, onUpiRefCh
 
   useEffect(() => {
     upiHeight.value = withTiming(selected === 'UPI' ? 60 : 0, { duration: 260 });
-  }, [selected]);
+  }, [selected, upiHeight]);
 
   const upiStyle = useAnimatedStyle(() => ({
     height: upiHeight.value,

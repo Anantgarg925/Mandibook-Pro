@@ -41,7 +41,7 @@ export default function InventoryBar({ totalKg, confirmedKg, provisionalKg, comp
 
   const provisionalStyle = useAnimatedStyle(() => ({
     width: provisionalWidth.value,
-    left: confirmedWidth.value,
+    transform: [{ translateX: confirmedWidth.value }],
   }));
 
   const onLayout = (e: LayoutChangeEvent) => {
