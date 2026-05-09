@@ -38,15 +38,17 @@ export function AdminPinView({ visible, onHide, onSuccess, onCancel, correctPin 
   const [error, setError] = useState(false);
   const opacity = useSharedValue(0);
   const animRef = useRef(false);
+  const wasVisible = useRef(false);
   const shakeX = useSharedValue(0);
 
   useEffect(() => {
     if (visible) {
+      wasVisible.current = true;
+      animRef.current = false;
       setEntered([]);
       setError(false);
-      animRef.current = false;
       opacity.value = withTiming(1, { duration: 380 });
-    } else if (!animRef.current) {
+    } else if (wasVisible.current && !animRef.current) {
       animRef.current = true;
       const hide = onHide;
       opacity.value = withTiming(0, { duration: 300 }, (finished) => {

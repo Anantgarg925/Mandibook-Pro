@@ -153,7 +153,7 @@ export default function HomeScreen() {
   const [launchVisible, setLaunchVisible] = useState(false);
   const [launchGone, setLaunchGone] = useState(false);
   const [pinVisible, setPinVisible] = useState(false);
-  const [pinGone, setPinGone] = useState(false);
+  const [pinGone, setPinGone] = useState(true);
 
   useEffect(() => {
     const timer = setTimeout(() => setMinTimeElapsed(true), 3000);
@@ -366,7 +366,7 @@ export default function HomeScreen() {
           visible={launchVisible}
           shopName={shop?.firmName ?? ''}
           onHide={() => setLaunchGone(true)}
-          onAdminPress={() => setPinVisible(true)}
+          onAdminPress={() => { setPinGone(false); setPinVisible(true); }}
           onMemberPress={() => { setLaunchGone(true); router.push('/authorization' as any); }}
         />
       ) : null}
