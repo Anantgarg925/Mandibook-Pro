@@ -8,9 +8,9 @@ import {
   Platform,
   Pressable,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Truck } from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useShop } from '@/context/ShopContext';
@@ -18,44 +18,148 @@ import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { toIndianNumber } from '@/lib/formatters';
 import type { GradeInventory } from '@/types/truck';
 
+// ─── field input style ───────────────────────────────────────────────────────
 const inputStyle = {
   height: 56,
   borderWidth: 1,
-  borderColor: Colors.border,
-  borderRadius: Radius.sm,
-  paddingHorizontal: Spacing.md,
-  fontSize: FontSize.md,
-  backgroundColor: Colors.surface,
-  color: Colors.text,
+  borderColor: '#c0c9bb',
+  borderRadius: 10,
+  paddingHorizontal: 14,
+  fontSize: 16,
+  color: '#00450d',
+  fontWeight: '700' as const,
+  backgroundColor: '#fff',
 };
 
-function SectionLabel({ text }: { text: string }) {
+// ─── two-column field wrapper ────────────────────────────────────────────────
+function GridField({
+  label,
+  labelHi,
+  children,
+}: {
+  label: string;
+  labelHi: string;
+  children: React.ReactNode;
+}) {
   return (
-    <Text
-      style={{
-        fontSize: FontSize.sm,
-        fontWeight: '700',
-        color: Colors.textSecond,
-        textTransform: 'uppercase',
-        letterSpacing: 0.8,
-        marginBottom: Spacing.sm,
-        marginTop: Spacing.lg,
-      }}
-    >
-      {text}
-    </Text>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <View style={{ marginBottom: Spacing.sm }}>
-      <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond, marginBottom: 6 }}>{label}</Text>
+    <View style={{ width: '47%' }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'baseline',
+          justifyContent: 'space-between',
+          marginBottom: 6,
+        }}
+      >
+        <Text style={{ fontSize: 12, fontWeight: '600', color: '#64748B' }}>{label}</Text>
+        <Text style={{ fontSize: 10, color: '#94A3B8', marginLeft: 4 }}>{labelHi}</Text>
+      </View>
       {children}
     </View>
   );
 }
 
+// ─── bottom action bar ───────────────────────────────────────────────────────
+function BottomBar({
+  totalEntered,
+  totalKgNum,
+  diff,
+  formComplete,
+  isPending,
+  onSubmit,
+}: {
+  totalEntered: number;
+  totalKgNum: number;
+  diff: number;
+  formComplete: boolean;
+  isPending: boolean;
+  onSubmit: () => void;
+}) {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: '#fff',
+        borderTopWidth: 1,
+        borderTopColor: '#E5E7EB',
+        padding: 16,
+        paddingBottom: insets.bottom + 16,
+      }}
+    >
+      {/* Row 1: live breakdown */}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 12,
+        }}
+      >
+        <View>
+          <Text
+            style={{
+              fontSize: 10,
+              color: '#94A3B8',
+              textTransform: 'uppercase',
+              letterSpacing: 0.8,
+              marginBottom: 2,
+            }}
+          >
+            Live Breakdown
+          </Text>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: '#071e27' }}>
+            Total Entered: {toIndianNumber(totalEntered)} kg / Truck: {toIndianNumber(totalKgNum)} kg
+          </Text>
+        </View>
+
+        {diff > 0 && totalKgNum > 0 ? (
+          <View
+            style={{
+              backgroundColor: '#FFF3E0',
+              borderRadius: 8,
+              padding: 8,
+            }}
+          >
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#7e5700' }}>
+              ⚠ {toIndianNumber(diff)} kg Mismatch
+            </Text>
+          </View>
+        ) : null}
+      </View>
+
+      {/* Row 2: submit button */}
+      <Pressable
+        testID="submit-truck-button"
+        onPress={onSubmit}
+        disabled={!formComplete || isPending}
+        style={{
+          height: 56,
+          borderRadius: 12,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor:
+            formComplete && !isPending ? '#00450d' : 'transparent',
+          borderWidth: formComplete && !isPending ? 0 : 1,
+          borderColor: '#E5E7EB',
+        }}
+      >
+        <Text style={{ fontSize: 17, fontWeight: '800', color: '#fff' }}>
+          {isPending ? 'Registering…' : 'Register Truck'}
+        </Text>
+        <Text style={{ fontSize: 10, color: '#fff', opacity: 0.85 }}>
+          {isPending ? 'रजिस्टर हो रही है…' : 'गाड़ी रजिस्टर करें'}
+        </Text>
+      </Pressable>
+    </View>
+  );
+}
+
+// ─── main screen ─────────────────────────────────────────────────────────────
 export default function RegisterTruckScreen() {
   const router = useRouter();
   const { shop } = useShop();
@@ -71,10 +175,13 @@ export default function RegisterTruckScreen() {
   const [success, setSuccess] = useState(false);
 
   const grades = shop?.grades ?? [];
-  const totalEntered = grades.reduce((s, g) => s + (parseFloat(gradeWeights[g.code] ?? '0') || 0), 0);
+  const totalEntered = grades.reduce(
+    (s, g) => s + (parseFloat(gradeWeights[g.code] ?? '0') || 0),
+    0
+  );
   const totalKgNum = parseFloat(totalKg) || 0;
   const diff = Math.abs(totalKgNum - totalEntered);
-  const formComplete = truckNumber.trim() && senderName.trim() && totalKgNum > 0;
+  const formComplete = truckNumber.trim() !== '' && senderName.trim() !== '' && totalKgNum > 0;
 
   const mutation = useMutation({
     mutationFn: (payload: object) => api.post('/api/trucks', payload),
@@ -127,6 +234,7 @@ export default function RegisterTruckScreen() {
     mutation.reset();
   };
 
+  // ── success screen (unchanged) ──────────────────────────────────────────────
   if (success) {
     return (
       <View
@@ -199,30 +307,28 @@ export default function RegisterTruckScreen() {
     );
   }
 
+  // ── registration form ───────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#F0F4F0' }} edges={['top']}>
       {/* Header */}
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          gap: Spacing.sm,
-          paddingHorizontal: Spacing.md,
-          paddingVertical: Spacing.sm,
-          backgroundColor: Colors.surface,
+          gap: 10,
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          backgroundColor: '#fff',
           borderBottomWidth: 1,
-          borderBottomColor: Colors.border,
+          borderBottomColor: '#E5E7EB',
         }}
       >
         <Pressable testID="back-from-register" onPress={() => router.back()} style={{ padding: 4 }}>
-          <ArrowLeft size={24} color={Colors.text} />
+          <ArrowLeft size={24} color="#1a3c20" />
         </Pressable>
-        <View>
-          <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: Colors.text }}>
-            नई गाड़ी
-          </Text>
-          <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>Register Truck</Text>
-        </View>
+        <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: '#1a3c20' }}>
+          Register New Truck / नई गाड़ी
+        </Text>
       </View>
 
       <KeyboardAvoidingView
@@ -230,202 +336,206 @@ export default function RegisterTruckScreen() {
         style={{ flex: 1 }}
       >
         <ScrollView
-          contentContainerStyle={{ padding: Spacing.md, paddingBottom: 100 }}
+          contentContainerStyle={{ paddingBottom: 200 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <SectionLabel text="Truck Details / गाड़ी की जानकारी" />
+          {/* ── Truck Details card ─────────────────────────────────────────── */}
+          <View
+            style={{
+              backgroundColor: '#fff',
+              borderWidth: 1,
+              borderColor: '#E5E7EB',
+              borderRadius: 12,
+              padding: 16,
+              margin: 16,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: 12,
+              }}
+            >
+              {/* Truck Number */}
+              <GridField label="Truck Number" labelHi="गाड़ी नंबर">
+                <TextInput
+                  testID="truck-number-input"
+                  style={inputStyle}
+                  placeholder="e.g. RJ 14 GB 5500"
+                  placeholderTextColor="#c0c9bb"
+                  value={truckNumber}
+                  onChangeText={(v) => setTruckNumber(v.toUpperCase())}
+                  autoCapitalize="characters"
+                />
+              </GridField>
 
-          <Field label="Truck Number *">
-            <TextInput
-              testID="truck-number-input"
-              style={inputStyle}
-              placeholder="MH 12 AB 3456"
-              placeholderTextColor={Colors.border}
-              value={truckNumber}
-              onChangeText={(v) => setTruckNumber(v.toUpperCase())}
-              autoCapitalize="characters"
-            />
-          </Field>
+              {/* Consignment No */}
+              <GridField label="Consignment No" labelHi="बिल्टी नंबर">
+                <TextInput
+                  testID="chl-input"
+                  style={inputStyle}
+                  placeholder="CR-8892"
+                  placeholderTextColor="#c0c9bb"
+                  value={chlNumber}
+                  onChangeText={setChlNumber}
+                />
+              </GridField>
 
-          <Field label="Sender Name / भेजने वाले का नाम *">
-            <TextInput
-              testID="sender-name-input"
-              style={inputStyle}
-              placeholder="Ranjit Singh"
-              placeholderTextColor={Colors.border}
-              value={senderName}
-              onChangeText={setSenderName}
-            />
-          </Field>
+              {/* Sender Name */}
+              <GridField label="Sender Name" labelHi="भेजने वाले का नाम">
+                <TextInput
+                  testID="sender-name-input"
+                  style={inputStyle}
+                  placeholder="Kishan Lal & Sons"
+                  placeholderTextColor="#c0c9bb"
+                  value={senderName}
+                  onChangeText={setSenderName}
+                />
+              </GridField>
 
-          <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-            <View style={{ flex: 1 }}>
-              <Field label="Sender Code">
+              {/* Short Code */}
+              <GridField label="Short Code" labelHi="शॉर्ट कोड">
                 <TextInput
                   testID="sender-code-input"
                   style={inputStyle}
-                  placeholder="SDFC"
-                  placeholderTextColor={Colors.border}
+                  placeholder="KL-JP"
+                  placeholderTextColor="#c0c9bb"
                   value={senderCode}
                   onChangeText={(v) => setSenderCode(v.toUpperCase())}
                   autoCapitalize="characters"
                 />
-              </Field>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Field label="CHL / Consignment No.">
-                <TextInput
-                  testID="chl-input"
-                  style={inputStyle}
-                  placeholder="CHL-2024-001"
-                  placeholderTextColor={Colors.border}
-                  value={chlNumber}
-                  onChangeText={setChlNumber}
-                />
-              </Field>
-            </View>
-          </View>
+              </GridField>
 
-          <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-            <View style={{ flex: 1 }}>
-              <Field label="Total Weight kg *">
+              {/* Total Weight */}
+              <GridField label="Total Weight (kg)" labelHi="कुल वजन (kg)">
                 <TextInput
                   testID="total-kg-input"
                   style={inputStyle}
                   placeholder="23327"
-                  placeholderTextColor={Colors.border}
+                  placeholderTextColor="#c0c9bb"
                   value={totalKg}
                   onChangeText={setTotalKg}
                   keyboardType="numeric"
                 />
-              </Field>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Field label="Freight Amount ₹">
+              </GridField>
+
+              {/* Freight */}
+              <GridField label="Freight (₹)" labelHi="भाड़ा (₹)">
                 <TextInput
                   testID="freight-input"
                   style={inputStyle}
-                  placeholder="0"
-                  placeholderTextColor={Colors.border}
+                  placeholder="0.00"
+                  placeholderTextColor="#c0c9bb"
                   value={freightAmount}
                   onChangeText={setFreightAmount}
                   keyboardType="numeric"
                 />
-              </Field>
+              </GridField>
             </View>
           </View>
 
-          <SectionLabel text="ग्रेड अनुमान / Grade Estimate (Optional)" />
-          <Text style={{ fontSize: 12, color: Colors.textSecond, marginBottom: Spacing.sm, marginTop: -8 }}>
-            अभी छोड़ सकते हैं — बाद में ट्रक डिटेल से अपडेट करें
-          </Text>
-
-          {grades.map((grade) => (
-            <View
-              key={grade.code}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                paddingVertical: 10,
-                borderBottomWidth: 1,
-                borderBottomColor: Colors.border,
-              }}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text }}>
-                  {grade.code}
-                </Text>
-                <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>{grade.name}</Text>
-              </View>
-              <TextInput
-                testID={`grade-weight-${grade.code}`}
-                style={{
-                  width: 100,
-                  height: 44,
-                  borderWidth: 1,
-                  borderColor: Colors.border,
-                  borderRadius: Radius.sm,
-                  paddingHorizontal: Spacing.sm,
-                  fontSize: FontSize.md,
-                  color: Colors.text,
-                  textAlign: 'right',
-                  backgroundColor: Colors.surface,
-                }}
-                placeholder="0"
-                placeholderTextColor={Colors.border}
-                keyboardType="numeric"
-                value={gradeWeights[grade.code] ?? ''}
-                onChangeText={(v) => setGradeWeights((prev) => ({ ...prev, [grade.code]: v }))}
-              />
-            </View>
-          ))}
-
-          {/* Live total bar */}
+          {/* ── Inventory section header ───────────────────────────────────── */}
           <View
             style={{
-              marginTop: Spacing.md,
-              padding: Spacing.md,
-              backgroundColor: Colors.surface,
-              borderRadius: Radius.md,
-              borderWidth: 1,
-              borderColor: Colors.border,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 16,
+              marginBottom: 12,
             }}
           >
-            <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond, marginBottom: 6 }}>
-              दर्ज: {toIndianNumber(totalEntered)} kg &nbsp;/&nbsp; कुल: {toIndianNumber(totalKgNum)} kg
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#00450d' }}>
+              Inventory Breakdown / माल का विवरण
             </Text>
-            <View style={{ height: 8, borderRadius: 4, backgroundColor: Colors.border, overflow: 'hidden' }}>
-              <View
-                style={{
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: Colors.primary,
-                  width: totalKgNum > 0 ? `${Math.min((totalEntered / totalKgNum) * 100, 100)}%` : '0%',
-                }}
-              />
-            </View>
-            {diff > 100 ? (
-              <Text style={{ fontSize: FontSize.xs, color: Colors.warning, marginTop: 6 }}>
-                ⚠ अंतर: {toIndianNumber(diff)} kg — फिर भी जारी रखें?
+            <View
+              style={{
+                backgroundColor: '#dbf1fe',
+                borderRadius: 20,
+                paddingHorizontal: 12,
+                paddingVertical: 4,
+              }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: '600', color: '#003d65' }}>
+                {grades.length} Grades
               </Text>
-            ) : null}
+            </View>
+          </View>
+
+          {/* ── Grade Grid ────────────────────────────────────────────────── */}
+          <View
+            style={{
+              flexDirection: 'row',
+              flexWrap: 'wrap',
+              gap: 12,
+              paddingHorizontal: 16,
+            }}
+          >
+            {grades.map((grade) => (
+              <View
+                key={grade.code}
+                style={{
+                  width: '47%',
+                  backgroundColor: '#fff',
+                  borderWidth: 1,
+                  borderColor: '#E5E7EB',
+                  borderRadius: 12,
+                  padding: 14,
+                  elevation: 1,
+                }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#071e27' }}>
+                  {grade.name}
+                </Text>
+                <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                  {grade.code}
+                </Text>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    gap: 8,
+                    marginTop: 10,
+                  }}
+                >
+                  <TextInput
+                    testID={`grade-weight-${grade.code}`}
+                    style={{
+                      flex: 1,
+                      height: 48,
+                      borderBottomWidth: 1,
+                      borderBottomColor: '#c0c9bb',
+                      textAlign: 'right',
+                      fontSize: 18,
+                      fontWeight: '700',
+                      color: '#00450d',
+                      backgroundColor: 'transparent',
+                    }}
+                    placeholder="0"
+                    placeholderTextColor="#c0c9bb"
+                    keyboardType="numeric"
+                    value={gradeWeights[grade.code] ?? ''}
+                    onChangeText={(v) =>
+                      setGradeWeights((prev) => ({ ...prev, [grade.code]: v }))
+                    }
+                  />
+                  <Text style={{ fontSize: 13, color: '#64748B', fontWeight: '600' }}>kg</Text>
+                </View>
+              </View>
+            ))}
           </View>
         </ScrollView>
 
-        {/* Submit button */}
-        <View
-          style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            padding: Spacing.md,
-            backgroundColor: Colors.background,
-            borderTopWidth: 1,
-            borderTopColor: Colors.border,
-          }}
-        >
-          <Pressable
-            testID="submit-truck-button"
-            onPress={handleSubmit}
-            disabled={!formComplete || mutation.isPending}
-            style={{
-              height: 56,
-              borderRadius: Radius.md,
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexDirection: 'row',
-              gap: Spacing.sm,
-              backgroundColor: formComplete && !mutation.isPending ? Colors.primary : Colors.border,
-            }}
-          >
-            <Truck size={20} color="#FFF" />
-            <Text style={{ fontSize: FontSize.md, color: '#FFF', fontWeight: '700' }}>
-              {mutation.isPending ? 'रजिस्टर हो रही है…' : 'गाड़ी रजिस्टर करें'}
-            </Text>
-          </Pressable>
-        </View>
+        {/* ── Fixed bottom action bar ────────────────────────────────────── */}
+        <BottomBar
+          totalEntered={totalEntered}
+          totalKgNum={totalKgNum}
+          diff={diff}
+          formComplete={formComplete}
+          isPending={mutation.isPending}
+          onSubmit={handleSubmit}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
