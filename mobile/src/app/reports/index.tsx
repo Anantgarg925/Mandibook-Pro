@@ -202,7 +202,7 @@ export default function DaySummaryScreen() {
           <View style={{ flex: 1, marginRight: 12 }}>
             <Text style={{
               fontSize: 26,
-              fontWeight: '800',
+              fontWeight: '700',
               color: '#00450d',
               letterSpacing: -0.5,
             }}>
@@ -283,7 +283,7 @@ export default function DaySummaryScreen() {
                 >
                   <Text style={{
                     fontSize: 13,
-                    fontWeight: active ? '700' : '500',
+                    fontWeight: active ? '700' : '400',
                     color: active ? '#ffffff' : '#64748B',
                   }}>
                     {TAB_LABELS[key]}
@@ -320,7 +320,7 @@ export default function DaySummaryScreen() {
                     borderLeftWidth: 3,
                     borderLeftColor: '#00450d',
                   }}>
-                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#071e27' }}>
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#071e27' }}>
                       {t.truckNumber}
                     </Text>
                     <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
@@ -401,16 +401,16 @@ export default function DaySummaryScreen() {
                               {row.gradeName}
                             </Text>
                           </View>
-                          <Text style={{ width: 50, fontSize: 14, fontWeight: '600', color: '#071e27', textAlign: 'right' }}>
+                          <Text style={{ width: 50, fontSize: 14, fontWeight: '700', color: '#071e27', textAlign: 'right' }}>
                             {row.sacks}
                           </Text>
-                          <Text style={{ width: 80, fontSize: 14, fontWeight: '600', color: '#071e27', textAlign: 'right' }}>
+                          <Text style={{ width: 80, fontSize: 14, fontWeight: '700', color: '#071e27', textAlign: 'right' }}>
                             {row.weight.toFixed(0)} kg
                           </Text>
-                          <Text style={{ width: 70, fontSize: 14, fontWeight: '600', color: '#071e27', textAlign: 'right' }}>
+                          <Text style={{ width: 70, fontSize: 14, fontWeight: '700', color: '#071e27', textAlign: 'right' }}>
                             {'\u20B9'}{row.avgRate.toFixed(0)}
                           </Text>
-                          <Text style={{ width: 90, fontSize: 14, fontWeight: '800', color: '#00450d', textAlign: 'right' }}>
+                          <Text style={{ width: 90, fontSize: 14, fontWeight: '700', color: '#00450d', textAlign: 'right' }}>
                             {toIndianCurrency(row.gross)}
                           </Text>
                         </View>
@@ -424,19 +424,19 @@ export default function DaySummaryScreen() {
                         paddingHorizontal: 12,
                         paddingVertical: 12,
                       }}>
-                        <Text style={{ flex: 2, fontSize: 13, fontWeight: '900', color: '#ffffff' }}>
+                        <Text style={{ flex: 2, fontSize: 13, fontWeight: '700', color: '#ffffff' }}>
                           Total
                         </Text>
-                        <Text style={{ width: 50, fontSize: 13, fontWeight: '900', color: '#ffffff', textAlign: 'right' }}>
+                        <Text style={{ width: 50, fontSize: 13, fontWeight: '700', color: '#ffffff', textAlign: 'right' }}>
                           {totalSacks}
                         </Text>
-                        <Text style={{ width: 80, fontSize: 13, fontWeight: '900', color: '#ffffff', textAlign: 'right' }}>
+                        <Text style={{ width: 80, fontSize: 13, fontWeight: '700', color: '#ffffff', textAlign: 'right' }}>
                           {totalWeight.toFixed(0)} kg
                         </Text>
-                        <Text style={{ width: 70, fontSize: 13, fontWeight: '900', color: '#ffffff', textAlign: 'right' }}>
+                        <Text style={{ width: 70, fontSize: 13, fontWeight: '700', color: '#ffffff', textAlign: 'right' }}>
                           {'\u20B9'}{totalAvgRate.toFixed(0)}
                         </Text>
-                        <Text style={{ width: 90, fontSize: 13, fontWeight: '900', color: '#ffffff', textAlign: 'right' }}>
+                        <Text style={{ width: 90, fontSize: 13, fontWeight: '700', color: '#ffffff', textAlign: 'right' }}>
                           {toIndianCurrency(totalGross)}
                         </Text>
                       </View>
@@ -491,14 +491,14 @@ export default function DaySummaryScreen() {
                   {/* Net row */}
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
                     <View>
-                      <Text style={{ fontSize: 16, fontWeight: '800', color: '#00450d' }}>
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: '#00450d' }}>
                         Net to Sender
                       </Text>
                       <Text style={{ fontSize: 11, color: '#41493e', marginTop: 2 }}>
                         भेजने वाले को शुद्ध देय
                       </Text>
                     </View>
-                    <Text style={{ fontSize: 24, fontWeight: '900', color: '#00450d' }}>
+                    <Text style={{ fontSize: 24, fontWeight: '700', color: '#00450d' }}>
                       {toIndianCurrency(netToSender)}
                     </Text>
                   </View>
@@ -524,7 +524,7 @@ export default function DaySummaryScreen() {
                   >
                     <FileText size={20} color="#ffffff" />
                     <View>
-                      <Text style={{ fontSize: 15, fontWeight: '800', color: '#ffffff' }}>
+                      <Text style={{ fontSize: 15, fontWeight: '700', color: '#ffffff' }}>
                         Export PDF
                       </Text>
                       <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>
@@ -550,7 +550,7 @@ export default function DaySummaryScreen() {
                   >
                     <Share2 size={20} color="#ffffff" />
                     <View>
-                      <Text style={{ fontSize: 15, fontWeight: '800', color: '#ffffff' }}>
+                      <Text style={{ fontSize: 15, fontWeight: '700', color: '#ffffff' }}>
                         Share Report
                       </Text>
                       <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>
@@ -610,10 +610,10 @@ export default function DaySummaryScreen() {
                     paddingHorizontal: 16,
                     paddingVertical: 18,
                   }}>
-                    <Text style={{ fontSize: 16, fontWeight: '900', color: '#00450d' }}>
+                    <Text style={{ fontSize: 16, fontWeight: '700', color: '#00450d' }}>
                       NET TO SENDER
                     </Text>
-                    <Text style={{ fontSize: 22, fontWeight: '900', color: '#00450d' }}>
+                    <Text style={{ fontSize: 22, fontWeight: '700', color: '#00450d' }}>
                       {toIndianCurrency(netToSender)}
                     </Text>
                   </View>
@@ -643,7 +643,7 @@ export default function DaySummaryScreen() {
                       alignItems: 'center',
                     }}>
                       <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 4 }}>{card.label}</Text>
-                      <Text style={{ fontSize: 13, fontWeight: '900', color: card.color }}>
+                      <Text style={{ fontSize: 13, fontWeight: '700', color: card.color }}>
                         {toIndianCurrency(card.amount)}
                       </Text>
                       <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>{card.count} bills</Text>
@@ -679,7 +679,7 @@ export default function DaySummaryScreen() {
                           <Text style={{ fontSize: 14, fontWeight: '700', color: '#071e27' }}>{inq.customerName}</Text>
                           <Text style={{ fontSize: 12, color: '#64748B' }}>#{inq.slipNumber} · {inq.grade}</Text>
                         </View>
-                        <Text style={{ fontSize: 14, fontWeight: '800', color: '#ba1a1a' }}>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#ba1a1a' }}>
                           {toIndianCurrency(inq.netAmount)}
                         </Text>
                       </View>
@@ -804,10 +804,10 @@ export default function DaySummaryScreen() {
                   shadowRadius: 6,
                   elevation: 10,
                 }}>
-                  <Text style={{ fontSize: 16, fontWeight: '800', color: '#071e27' }}>बैलेंस</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: '#071e27' }}>बैलेंस</Text>
                   <Text style={{
                     fontSize: 22,
-                    fontWeight: '900',
+                    fontWeight: '700',
                     color: closingBalance >= 0 ? '#00450d' : '#ba1a1a',
                   }}>
                     {toIndianCurrency(closingBalance)}
@@ -840,7 +840,7 @@ export default function DaySummaryScreen() {
             borderTopRightRadius: 20,
             padding: Spacing.md,
           }}>
-            <Text style={{ fontSize: FontSize.md, fontWeight: '800', marginBottom: Spacing.md }}>Export Report</Text>
+            <Text style={{ fontSize: FontSize.md, fontWeight: '700', marginBottom: Spacing.md }}>Export Report</Text>
             <Pressable
               testID="export-pdf-btn"
               onPress={handleExport}
@@ -883,7 +883,7 @@ export default function DaySummaryScreen() {
             borderTopRightRadius: 20,
             padding: Spacing.md,
           }}>
-            <Text style={{ fontSize: FontSize.md, fontWeight: '800', marginBottom: Spacing.md }}>Add Cash Entry</Text>
+            <Text style={{ fontSize: FontSize.md, fontWeight: '700', marginBottom: Spacing.md }}>Add Cash Entry</Text>
 
             {/* Type toggle */}
             <View style={{ flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md }}>
@@ -966,7 +966,7 @@ export default function DaySummaryScreen() {
                 justifyContent: 'center',
               })}
             >
-              <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: '#FFF' }}>
+              <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: '#FFF' }}>
                 {savingEntry ? 'Saving...' : 'Save Entry'}
               </Text>
             </Pressable>

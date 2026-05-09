@@ -7,7 +7,7 @@ import {
   TextInput,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   ArrowLeft,
@@ -23,6 +23,7 @@ import type { Buyer } from '@/types/inquiry';
 
 export default function BuyerListScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { buyers, loading } = useBuyers();
   const [search, setSearch] = useState('');
 
@@ -67,7 +68,7 @@ export default function BuyerListScreen() {
         <Text
           style={{
             fontSize: 20,
-            fontWeight: '800',
+            fontWeight: '700',
             color: '#1a3c20',
           }}
         >
@@ -90,7 +91,7 @@ export default function BuyerListScreen() {
             <Text
               style={{
                 fontSize: 28,
-                fontWeight: '800',
+                fontWeight: '700',
                 color: '#071e27',
                 letterSpacing: -0.5,
               }}
@@ -117,7 +118,7 @@ export default function BuyerListScreen() {
               <Text
                 style={{
                   fontSize: 20,
-                  fontWeight: '800',
+                  fontWeight: '700',
                   color: '#ba1a1a',
                   textAlign: 'right',
                 }}
@@ -337,7 +338,7 @@ export default function BuyerListScreen() {
             <Text
               style={{
                 fontSize: 24,
-                fontWeight: '800',
+                fontWeight: '700',
                 color: '#ba1a1a',
               }}
             >
@@ -412,7 +413,7 @@ export default function BuyerListScreen() {
                 <Text
                   style={{
                     fontSize: 20,
-                    fontWeight: '800',
+                    fontWeight: '700',
                     color: '#071e27',
                     marginTop: 16,
                   }}
@@ -439,7 +440,7 @@ export default function BuyerListScreen() {
           testID="add-buyer-fab"
           style={{
             position: 'absolute',
-            bottom: 24,
+            bottom: 24 + insets.bottom,
             right: 20,
             width: 60,
             height: 60,

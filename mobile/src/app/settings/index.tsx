@@ -81,7 +81,7 @@ function Section({ title, items }: { title: string; items: SettingsItem[] }) {
                 style={{
                   flex: 1,
                   fontSize: FontSize.sm,
-                  fontWeight: '600',
+                  fontWeight: '700',
                   color: item.danger ? Colors.danger : Colors.text,
                 }}
               >
@@ -150,7 +150,7 @@ export default function SettingsScreen() {
             <ArrowLeft size={24} color={Colors.text} />
           </Pressable>
         ) : null}
-        <Text style={{ flex: 1, fontSize: FontSize.lg, fontWeight: '800', color: Colors.text }}>
+        <Text style={{ flex: 1, fontSize: FontSize.lg, fontWeight: '700', color: Colors.text }}>
           Settings / सेटिंग्स
         </Text>
       </View>

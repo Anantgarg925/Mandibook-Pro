@@ -6,8 +6,9 @@ import {
   ScrollView,
   ActivityIndicator,
   Share,
+  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Plus, Settings, Share2, FileText } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
@@ -35,6 +36,7 @@ const STATUS_BG: Record<string, string> = {
 
 export default function TruckDetailScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { shop } = useShop();
   const [tab, setTab] = useState<BillTab>('all');
@@ -92,7 +94,7 @@ export default function TruckDetailScreen() {
           <ArrowLeft size={22} color="#1a3c20" />
         </Pressable>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: '#1a3c20', letterSpacing: 0.3 }}>
+          <Text style={{ fontSize: FontSize.lg, fontWeight: '700', color: '#1a3c20', letterSpacing: Platform.OS === 'android' ? 0 : 0.3 }}>
             {truck.truckNumber}
           </Text>
           <Text style={{ fontSize: FontSize.xs, color: '#64748B', marginTop: 1 }}>
@@ -153,7 +155,7 @@ export default function TruckDetailScreen() {
                 justifyContent: 'center',
               }}
             >
-              <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: Colors.primary, letterSpacing: 0.2 }}>
+              <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.primary, letterSpacing: Platform.OS === 'android' ? 0 : 0.2 }}>
                 {isActive ? 'Active' : 'Closed'}
               </Text>
               <Text style={{ fontSize: 10, color: Colors.primary, marginTop: 1 }}>
@@ -171,7 +173,7 @@ export default function TruckDetailScreen() {
             </Text>
             <View style={{ alignItems: 'flex-end' }}>
               <Text style={{ fontSize: FontSize.xs, color: '#64748B' }}>Total Load</Text>
-              <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: Colors.primary }}>
+              <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.primary }}>
                 {toIndianWeight(totalKg)}
               </Text>
             </View>
@@ -265,7 +267,7 @@ export default function TruckDetailScreen() {
               fontWeight: '700',
               color: '#64748B',
               textTransform: 'uppercase',
-              letterSpacing: 1.2,
+              letterSpacing: Platform.OS === 'android' ? 0 : 1.2,
               marginBottom: Spacing.sm,
             }}
           >
@@ -424,7 +426,7 @@ export default function TruckDetailScreen() {
         onPress={() => router.push({ pathname: '/bills/new', params: { truckId: id } })}
         style={({ pressed }) => ({
           position: 'absolute',
-          bottom: 24,
+          bottom: 24 + insets.bottom,
           right: 24,
           width: 60,
           height: 60,
@@ -472,10 +474,10 @@ function GradeRow({
       <Text style={{ width: 90, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' }}>
         {toIndianWeight(grade.totalKg)}
       </Text>
-      <Text style={{ width: 90, fontSize: FontSize.sm, color: Colors.primary, fontWeight: '600', textAlign: 'right' }}>
+      <Text style={{ width: 90, fontSize: FontSize.sm, color: Colors.primary, fontWeight: '700', textAlign: 'right' }}>
         {toIndianWeight(grade.confirmedKg)}
       </Text>
-      <Text style={{ width: 90, fontSize: FontSize.sm, color: '#7e5700', fontWeight: '600', textAlign: 'right' }}>
+      <Text style={{ width: 90, fontSize: FontSize.sm, color: '#7e5700', fontWeight: '700', textAlign: 'right' }}>
         {toIndianWeight(grade.provisionalKg)}
       </Text>
       <View
@@ -554,7 +556,7 @@ function BillCard({ bill, onPress }: { bill: Inquiry; onPress: () => void }) {
       {/* Right: amount + bags */}
       <View style={{ alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
         {bill.netAmount > 0 ? (
-          <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: Colors.text }}>
+          <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: Colors.text }}>
             {toIndianCurrency(bill.netAmount)}
           </Text>
         ) : null}

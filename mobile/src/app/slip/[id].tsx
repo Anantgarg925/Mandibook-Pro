@@ -107,7 +107,7 @@ export default function SlipPreviewScreen() {
         </Pressable>
 
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 17, fontWeight: '800', color: '#071e27' }}>
+          <Text style={{ fontSize: 17, fontWeight: '700', color: '#071e27' }}>
             Delivery Slip
           </Text>
           <Text style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>
@@ -181,9 +181,9 @@ export default function SlipPreviewScreen() {
               style={{
                 textAlign: 'center',
                 fontSize: 20,
-                fontWeight: '900',
+                fontWeight: '700',
                 color: '#00450d',
-                letterSpacing: 0.5,
+                letterSpacing: Platform.OS === 'android' ? 0 : 0.5,
                 marginBottom: 4,
               }}
             >
@@ -236,7 +236,7 @@ export default function SlipPreviewScreen() {
             <View
               style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}
             >
-              <Text style={{ fontSize: 13, fontWeight: '800', color: '#071e27' }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#071e27' }}>
                 No. {inquiry.slipNumber}
               </Text>
               <Text style={{ fontSize: 11, color: '#64748B' }}>
@@ -347,7 +347,7 @@ export default function SlipPreviewScreen() {
                 style={{
                   width: 70,
                   fontSize: 14,
-                  fontWeight: '800',
+                  fontWeight: '700',
                   color: '#00450d',
                   textAlign: 'right',
                 }}
@@ -428,7 +428,7 @@ export default function SlipPreviewScreen() {
                   {'\u0915\u0941\u0932 \u0930\u093E\u0936\u093F'}
                 </Text>
               </View>
-              <Text style={{ fontSize: 22, fontWeight: '900', color: '#1b5e20' }}>
+              <Text style={{ fontSize: 22, fontWeight: '700', color: '#1b5e20' }}>
                 {toIndianCurrency(inquiry.netAmount)}
               </Text>
             </View>
@@ -463,7 +463,7 @@ export default function SlipPreviewScreen() {
               <Text
                 style={{
                   fontSize: 20,
-                  fontWeight: '800',
+                  fontWeight: '700',
                   color: '#00450d',
                   textAlign: 'center',
                 }}
@@ -635,7 +635,7 @@ export default function SlipPreviewScreen() {
         >
           <CheckCircle size={22} color="#FFFFFF" />
           <View>
-            <Text style={{ fontSize: 16, fontWeight: '800', color: '#FFFFFF' }}>
+            <Text style={{ fontSize: 16, fontWeight: '700', color: '#FFFFFF' }}>
               Authorize Next
             </Text>
             <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>

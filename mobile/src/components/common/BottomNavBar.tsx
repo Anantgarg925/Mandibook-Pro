@@ -38,6 +38,7 @@ export function BottomNavBar() {
         borderTopColor: Colors.border,
         paddingBottom: insets.bottom,
         height: 60 + insets.bottom,
+        elevation: 10,
       }}
     >
       {TABS.map(tab => {

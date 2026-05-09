@@ -52,12 +52,12 @@ function BillCard({ item, onPress }: { item: Inquiry; onPress: () => void }) {
               borderRadius: Radius.round,
               backgroundColor: STATUS_BG[item.status] ?? '#F5F5F5',
             }}>
-              <Text style={{ fontSize: 10, fontWeight: '800', color: STATUS_COLOR[item.status] ?? Colors.textSecond }}>
+              <Text style={{ fontSize: 10, fontWeight: '700', color: STATUS_COLOR[item.status] ?? Colors.textSecond }}>
                 {item.status}
               </Text>
             </View>
           </View>
-          <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: Colors.text }} numberOfLines={1}>
+          <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: Colors.text }} numberOfLines={1}>
             {item.customerName}
           </Text>
           <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 2 }}>
@@ -65,7 +65,7 @@ function BillCard({ item, onPress }: { item: Inquiry; onPress: () => void }) {
           </Text>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
-          <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: Colors.text }}>
+          <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text }}>
             {toIndianCurrency(item.netAmount)}
           </Text>
           <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 2 }}>
@@ -106,7 +106,7 @@ export default function BillsScreen() {
       }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View>
-            <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: '#FFF' }}>Pending Bills</Text>
+            <Text style={{ fontSize: FontSize.lg, fontWeight: '700', color: '#FFF' }}>Pending Bills</Text>
             <Text style={{ fontSize: FontSize.xs, color: 'rgba(255,255,255,0.7)' }}>पेंडिंग बिल ({inquiries.length})</Text>
           </View>
           <Pressable
@@ -150,7 +150,7 @@ export default function BillsScreen() {
           >
             <Text style={{
               fontSize: FontSize.xs,
-              fontWeight: activeFilter === key ? '800' : '500',
+              fontWeight: activeFilter === key ? '700' : '400',
               color: activeFilter === key ? Colors.primary : Colors.textSecond,
             }}>
               {label}
@@ -181,7 +181,7 @@ export default function BillsScreen() {
           ListEmptyComponent={
             <View testID="bills-empty" style={{ alignItems: 'center', paddingVertical: 64 }}>
               <Text style={{ fontSize: 40, marginBottom: Spacing.sm }}>📋</Text>
-              <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: Colors.text }}>कोई बिल नहीं</Text>
+              <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: Colors.text }}>कोई बिल नहीं</Text>
               <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond, marginTop: 4 }}>No bills in this filter</Text>
             </View>
           }

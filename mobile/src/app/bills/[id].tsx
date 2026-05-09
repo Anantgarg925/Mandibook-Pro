@@ -70,7 +70,7 @@ export default function BillDetailScreen() {
         <Pressable testID="back-from-bill-detail" onPress={() => router.back()} style={{ padding: 4 }}>
           <ArrowLeft size={24} color={Colors.text} />
         </Pressable>
-        <Text style={{ flex: 1, fontSize: FontSize.lg, fontWeight: '800', color: Colors.text }}>
+        <Text style={{ flex: 1, fontSize: FontSize.lg, fontWeight: '700', color: Colors.text }}>
           Slip #{inquiry.slipNumber}
         </Text>
         <View
@@ -124,7 +124,7 @@ export default function BillDetailScreen() {
             elevation: 2,
           }}
         >
-          <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: Colors.text, marginBottom: Spacing.sm }}>
+          <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text, marginBottom: Spacing.sm }}>
             {inquiry.grade} — {inquiry.gradeName}
           </Text>
           <Row label="Sacks" value={String(inquiry.sacks)} />
@@ -225,7 +225,7 @@ export default function BillDetailScreen() {
           })}
         >
           <FileText size={18} color="#FFF" />
-          <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: '#FFF' }}>
+          <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: '#FFF' }}>
             View Delivery Slip / डिलीवरी स्लिप
           </Text>
         </Pressable>
@@ -252,7 +252,7 @@ function Row({
         style={{
           fontSize: FontSize.sm,
           color: valueColor ?? Colors.text,
-          fontWeight: bold ? '800' : '600',
+          fontWeight: bold ? '700' : '400',
         }}
       >
         {value}

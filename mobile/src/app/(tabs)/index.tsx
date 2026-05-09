@@ -7,8 +7,9 @@ import {
   ActivityIndicator,
   TextInput,
   Animated,
+  Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useLaunch } from '@/context/LaunchContext';
 import * as SplashScreen from 'expo-splash-screen';
@@ -70,7 +71,7 @@ function MetricCard({
           fontSize: FontSize.xs,
           color: amber ? Colors.warning : Colors.textSecond,
           marginBottom: 2,
-          fontWeight: '600',
+          fontWeight: '700',
           textTransform: 'uppercase',
           letterSpacing: 0.4,
         }}
@@ -94,7 +95,7 @@ function MetricCard({
       <Text
         style={{
           fontSize: FontSize.xl,
-          fontWeight: '800',
+          fontWeight: '700',
           color: amber ? Colors.warning : Colors.text,
         }}
       >
@@ -168,7 +169,7 @@ function TruckCard({ truck, onPress }: { truck: any; onPress: () => void }) {
             <Text
               style={{
                 fontSize: FontSize.sm,
-                fontWeight: '800',
+                fontWeight: '700',
                 color: Colors.text,
               }}
               numberOfLines={1}
@@ -184,7 +185,7 @@ function TruckCard({ truck, onPress }: { truck: any; onPress: () => void }) {
           </View>
         </View>
         <View style={{ alignItems: 'flex-end' }}>
-          <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: Colors.primary }}>
+          <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: Colors.primary }}>
             {Math.round((availableKg / 1000) * 10) / 10} t
           </Text>
           <Text style={{ fontSize: 10, color: Colors.textSecond }}>Available</Text>
@@ -258,7 +259,7 @@ function BillRow({ item, onPress }: { item: Inquiry; onPress: () => void }) {
           justifyContent: 'center',
         }}
       >
-        <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: Colors.primary }}>
+        <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.primary }}>
           {initials}
         </Text>
       </View>
@@ -354,6 +355,7 @@ function PulseDot() {
 
 export default function HomeScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { launchComplete, setLaunchComplete } = useLaunch();
   const { shop, loading: shopLoading } = useShop();
   const { inquiries, pending, confirmed, loading: billsLoading } = useInquiries();
@@ -458,7 +460,7 @@ export default function HomeScreen() {
                     <Text
                       style={{
                         fontSize: FontSize.sm,
-                        fontWeight: '800',
+                        fontWeight: '700',
                         color: Colors.primary,
                       }}
                     >
@@ -469,7 +471,7 @@ export default function HomeScreen() {
                     <Text
                       style={{
                         fontSize: FontSize.md,
-                        fontWeight: '800',
+                        fontWeight: '700',
                         color: Colors.text,
                       }}
                     >
@@ -584,7 +586,7 @@ export default function HomeScreen() {
                     <Text
                       style={{
                         fontSize: FontSize.md,
-                        fontWeight: '800',
+                        fontWeight: '700',
                         color: Colors.text,
                       }}
                     >
@@ -657,7 +659,7 @@ export default function HomeScreen() {
               }}
             >
               <View>
-                <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: Colors.text }}>
+                <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: Colors.text }}>
                   Live Bill Feed
                 </Text>
                 <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>
@@ -713,7 +715,7 @@ export default function HomeScreen() {
         onPress={() => router.push('/bills/new')}
         style={({ pressed }) => ({
           position: 'absolute',
-          bottom: 24,
+          bottom: 24 + insets.bottom,
           right: 20,
           flexDirection: 'row',
           alignItems: 'center',
@@ -730,7 +732,7 @@ export default function HomeScreen() {
         })}
       >
         <Plus size={18} color="#FFF" strokeWidth={3} />
-        <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '800' }}>नया बिल</Text>
+        <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>नया बिल</Text>
       </Pressable>
 
       {!splashGone && (
