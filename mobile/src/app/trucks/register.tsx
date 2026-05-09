@@ -42,7 +42,7 @@ function GridField({
   children: React.ReactNode;
 }) {
   return (
-    <View style={{ width: '47%' }}>
+    <View style={{ width: '47%', marginRight: 12, marginBottom: 12 }}>
       <View
         style={{
           flexDirection: 'row',
@@ -89,6 +89,7 @@ function BottomBar({
         borderTopColor: '#E5E7EB',
         padding: 16,
         paddingBottom: insets.bottom + 16,
+        elevation: 10,
       }}
     >
       {/* Row 1: live breakdown */}
@@ -355,7 +356,6 @@ export default function RegisterTruckScreen() {
               style={{
                 flexDirection: 'row',
                 flexWrap: 'wrap',
-                gap: 12,
               }}
             >
               {/* Truck Number */}
@@ -468,7 +468,6 @@ export default function RegisterTruckScreen() {
             style={{
               flexDirection: 'row',
               flexWrap: 'wrap',
-              gap: 12,
               paddingHorizontal: 16,
             }}
           >
@@ -483,6 +482,8 @@ export default function RegisterTruckScreen() {
                   borderRadius: 12,
                   padding: 14,
                   elevation: 1,
+                  marginRight: 12,
+                  marginBottom: 12,
                 }}
               >
                 <Text style={{ fontSize: 14, fontWeight: '700', color: '#071e27' }}>

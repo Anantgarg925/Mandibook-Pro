@@ -362,6 +362,7 @@ export default function NewBillScreen() {
                   borderBottomLeftRadius: Radius.sm,
                   borderBottomRightRadius: Radius.sm,
                   marginBottom: Spacing.sm,
+                  elevation: 20,
                 }}
               >
                 {buyerSuggestions.map((b) => (
@@ -578,6 +579,7 @@ export default function NewBillScreen() {
             backgroundColor: Colors.background,
             borderTopWidth: 1,
             borderTopColor: Colors.border,
+            elevation: 10,
           }}
         >
           <Pressable
@@ -627,6 +629,7 @@ export default function NewBillScreen() {
               borderTopRightRadius: 20,
               maxHeight: '70%',
               paddingTop: Spacing.md,
+              elevation: 20,
             }}
           >
             <Text

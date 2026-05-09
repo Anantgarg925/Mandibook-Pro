@@ -249,13 +249,15 @@ export default function BuyerListScreen() {
         {/* Left side */}
         <View style={{ flex: 1, gap: 10 }}>
           {/* Pills row */}
-          <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
             <View
               style={{
                 backgroundColor: '#dbf1fe',
                 paddingHorizontal: 10,
                 paddingVertical: 4,
                 borderRadius: 20,
+                marginRight: 8,
+                marginBottom: 4,
               }}
             >
               <Text
@@ -276,6 +278,8 @@ export default function BuyerListScreen() {
                 paddingHorizontal: 10,
                 paddingVertical: 4,
                 borderRadius: 20,
+                marginRight: 8,
+                marginBottom: 4,
               }}
             >
               <Text
