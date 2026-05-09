@@ -1,12 +1,18 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  ActivityIndicator,
+  Share,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Plus, Pencil } from 'lucide-react-native';
+import { ArrowLeft, Plus, Settings, Share2, FileText } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useShop } from '@/context/ShopContext';
-import InventoryBar from '@/components/truck/InventoryBar';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { toIndianWeight, toIndianDate, toIndianCurrency } from '@/lib/formatters';
 import type { Truck, GradeInventory } from '@/types/truck';
@@ -15,9 +21,9 @@ import type { Inquiry } from '@/types/inquiry';
 type BillTab = 'all' | 'confirmed';
 
 const STATUS_COLOR: Record<string, string> = {
-  PENDING: Colors.warning,
-  CONFIRMED: Colors.success,
-  CANCELLED: Colors.danger,
+  PENDING: '#7e5700',
+  CONFIRMED: Colors.primary,
+  CANCELLED: '#B71C1C',
 };
 
 const STATUS_BG: Record<string, string> = {
@@ -49,15 +55,24 @@ export default function TruckDetailScreen() {
 
   if (!truck) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background, alignItems: 'center', justifyContent: 'center' }} edges={['top']}>
-        <Text style={{ color: Colors.textSecond }}>Loading…</Text>
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: Colors.background, alignItems: 'center', justifyContent: 'center' }}
+        edges={['top']}
+      >
+        <ActivityIndicator color={Colors.primary} />
       </SafeAreaView>
     );
   }
 
   const totalConfirmed = truck.gradeInventory.reduce((s, g) => s + g.confirmedKg, 0);
   const totalProvisional = truck.gradeInventory.reduce((s, g) => s + g.provisionalKg, 0);
+  const totalKg = truck.totalKg;
   const isActive = truck.status === 'ACTIVE';
+
+  const confirmedPct = totalKg > 0 ? totalConfirmed / totalKg : 0;
+  const provisionalPct = totalKg > 0 ? totalProvisional / totalKg : 0;
+  const availableKg = Math.max(0, totalKg - totalConfirmed - totalProvisional);
+  const availablePct = totalKg > 0 ? availableKg / totalKg : 0;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top']}>
@@ -66,211 +81,336 @@ export default function TruckDetailScreen() {
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          gap: Spacing.sm,
           paddingHorizontal: Spacing.md,
           paddingVertical: Spacing.sm,
-          backgroundColor: Colors.surface,
+          backgroundColor: '#FFFFFF',
           borderBottomWidth: 1,
-          borderBottomColor: Colors.border,
+          borderBottomColor: '#E5E7EB',
         }}
       >
-        <Pressable testID="back-from-detail" onPress={() => router.back()} style={{ padding: 4 }}>
-          <ArrowLeft size={24} color={Colors.text} />
+        <Pressable testID="back-from-detail" onPress={() => router.back()} style={{ padding: 4, marginRight: Spacing.sm }}>
+          <ArrowLeft size={22} color="#1a3c20" />
         </Pressable>
-        <Text style={{ fontSize: FontSize.lg, fontWeight: '900', color: Colors.text, flex: 1, letterSpacing: 0.5 }}>
-          {truck.truckNumber}
-        </Text>
-        <View
-          style={{
-            paddingHorizontal: Spacing.sm,
-            paddingVertical: 4,
-            borderRadius: Radius.round,
-            backgroundColor: isActive ? '#E8F5E9' : '#F5F5F5',
-          }}
-        >
-          <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: isActive ? Colors.success : Colors.textSecond }}>
-            {truck.status}
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: '#1a3c20', letterSpacing: 0.3 }}>
+            {truck.truckNumber}
+          </Text>
+          <Text style={{ fontSize: FontSize.xs, color: '#64748B', marginTop: 1 }}>
+            {truck.senderName}
           </Text>
         </View>
+        <Pressable
+          onPress={() =>
+            Share.share({ message: `Truck: ${truck.truckNumber}\nSender: ${truck.senderName}\nCHL: ${truck.chlNumber}` })
+          }
+          style={{ padding: 8, marginRight: 4 }}
+        >
+          <Share2 size={20} color="#64748B" />
+        </Pressable>
+        <Pressable
+          testID="edit-grades-button"
+          onPress={() => router.push({ pathname: '/trucks/edit-grades', params: { truckId: id } })}
+          style={{ padding: 8 }}
+        >
+          <Settings size={20} color="#64748B" />
+        </Pressable>
       </View>
 
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: 100 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Summary card */}
+      <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+        {/* Quick Stats Card */}
         <View
           style={{
             margin: Spacing.md,
-            backgroundColor: Colors.surface,
-            borderRadius: Radius.md,
+            backgroundColor: '#FFFFFF',
+            borderRadius: Radius.lg,
+            borderWidth: 1,
+            borderColor: '#E5E7EB',
             padding: Spacing.md,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.07,
-            shadowRadius: 6,
-            elevation: 2,
           }}
         >
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.md, marginBottom: Spacing.md }}>
-            <InfoCell label="Sender" value={truck.senderName} />
-            <InfoCell label="CHL #" value={truck.chlNumber || '—'} />
-            <InfoCell label="Date" value={toIndianDate(truck.date)} />
-            <InfoCell label="Total" value={toIndianWeight(truck.totalKg)} />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <View style={{ gap: Spacing.sm }}>
+              <View>
+                <Text style={{ fontSize: FontSize.xs, color: '#64748B', marginBottom: 2 }}>Consignment</Text>
+                <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text }}>
+                  #{truck.chlNumber || '—'}
+                </Text>
+              </View>
+              <View>
+                <Text style={{ fontSize: FontSize.xs, color: '#64748B', marginBottom: 2 }}>Date / तिथि</Text>
+                <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text }}>
+                  {toIndianDate(truck.date)}
+                </Text>
+              </View>
+            </View>
+            <View
+              style={{
+                paddingHorizontal: 14,
+                paddingVertical: 8,
+                borderRadius: Radius.md,
+                backgroundColor: '#E8F5E9',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: Colors.primary, letterSpacing: 0.2 }}>
+                {isActive ? 'Active' : 'Closed'}
+              </Text>
+              <Text style={{ fontSize: 10, color: Colors.primary, marginTop: 1 }}>
+                {isActive ? 'सक्रिय' : 'बंद'}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Inventory Status Section */}
+        <View style={{ paddingHorizontal: Spacing.md, marginBottom: Spacing.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.sm }}>
+            <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: Colors.text }}>
+              Inventory Status / स्टॉक स्थिति
+            </Text>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={{ fontSize: FontSize.xs, color: '#64748B' }}>Total Load</Text>
+              <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: Colors.primary }}>
+                {toIndianWeight(totalKg)}
+              </Text>
+            </View>
           </View>
 
-          {/* Large inventory bar */}
-          <InventoryBar
-            totalKg={truck.totalKg}
-            confirmedKg={totalConfirmed}
-            provisionalKg={totalProvisional}
-          />
-        </View>
-
-        {/* Grade breakdown table */}
-        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, marginBottom: Spacing.xs }}>
-          <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.textSecond, textTransform: 'uppercase', letterSpacing: 0.8 }}>
-            Grade Breakdown
-          </Text>
-          <Pressable
-            testID="edit-grades-button"
-            onPress={() => router.push({ pathname: '/trucks/edit-grades', params: { truckId: id } })}
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6, borderRadius: Radius.sm, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border }}
+          {/* Segmented progress bar */}
+          <View
+            style={{
+              height: 56,
+              borderRadius: 12,
+              overflow: 'hidden',
+              flexDirection: 'row',
+              backgroundColor: '#c7dde9',
+            }}
           >
-            <Pencil size={14} color={Colors.primary} />
-            <Text style={{ fontSize: FontSize.xs, color: Colors.primary, fontWeight: '700' }}>Edit</Text>
-          </Pressable>
+            {confirmedPct > 0 && (
+              <View
+                style={{
+                  width: `${confirmedPct * 100}%`,
+                  backgroundColor: Colors.primary,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: '#FFFFFF' }} numberOfLines={1}>
+                  {toIndianWeight(totalConfirmed)}
+                </Text>
+              </View>
+            )}
+            {provisionalPct > 0 && (
+              <View
+                style={{
+                  width: `${provisionalPct * 100}%`,
+                  backgroundColor: '#7e5700',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: '#FFFFFF' }} numberOfLines={1}>
+                  {toIndianWeight(totalProvisional)}
+                </Text>
+              </View>
+            )}
+            {availablePct > 0 && (
+              <View
+                style={{
+                  flex: 1,
+                  backgroundColor: '#c7dde9',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: '#41493e' }} numberOfLines={1}>
+                  {toIndianWeight(availableKg)}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Legend */}
+          <View style={{ flexDirection: 'row', marginTop: Spacing.sm, gap: 4 }}>
+            <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.primary }} />
+                <Text style={{ fontSize: 9, fontWeight: '700', color: Colors.text, textTransform: 'uppercase', letterSpacing: 0.4 }}>Confirmed</Text>
+              </View>
+              <Text style={{ fontSize: 9, color: '#64748B' }}>पुष्टि की गई बिक्री</Text>
+            </View>
+            <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#7e5700' }} />
+                <Text style={{ fontSize: 9, fontWeight: '700', color: Colors.text, textTransform: 'uppercase', letterSpacing: 0.4 }}>Provisional</Text>
+              </View>
+              <Text style={{ fontSize: 9, color: '#64748B' }}>अनंतिम</Text>
+            </View>
+            <View style={{ flex: 1, alignItems: 'center', gap: 3 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#c7dde9' }} />
+                <Text style={{ fontSize: 9, fontWeight: '700', color: Colors.text, textTransform: 'uppercase', letterSpacing: 0.4 }}>Available</Text>
+              </View>
+              <Text style={{ fontSize: 9, color: '#64748B' }}>उपलब्ध</Text>
+            </View>
+          </View>
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
-          <View style={{ paddingHorizontal: Spacing.md }}>
-            {/* Table header */}
-            <View style={{ flexDirection: 'row', paddingVertical: 8, borderBottomWidth: 2, borderBottomColor: Colors.border }}>
-              {['Grade', 'Total', 'Confirmed', 'Provisional', 'Left'].map((h) => (
-                <Text
-                  key={h}
+        {/* Grade Table */}
+        <View style={{ paddingHorizontal: Spacing.md, marginBottom: Spacing.lg }}>
+          <Text
+            style={{
+              fontSize: FontSize.xs,
+              fontWeight: '700',
+              color: '#64748B',
+              textTransform: 'uppercase',
+              letterSpacing: 1.2,
+              marginBottom: Spacing.sm,
+            }}
+          >
+            Stock by Grade / ग्रेड के अनुसार स्टॉक
+          </Text>
+
+          <View
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: Radius.lg,
+              borderWidth: 1,
+              borderColor: '#E5E7EB',
+              overflow: 'hidden',
+            }}
+          >
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
+              <View>
+                {/* Table header */}
+                <View
                   style={{
-                    width: h === 'Grade' ? 90 : 100,
-                    fontSize: FontSize.xs,
-                    fontWeight: '700',
-                    color: Colors.textSecond,
-                    textAlign: h === 'Grade' ? 'left' : 'right',
+                    flexDirection: 'row',
+                    backgroundColor: '#f3faff',
+                    paddingVertical: 10,
+                    paddingHorizontal: Spacing.sm,
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#E5E7EB',
                   }}
                 >
-                  {h}
-                </Text>
-              ))}
-            </View>
+                  {[
+                    { label: 'Grade', width: 90, align: 'left' as const },
+                    { label: 'Total', width: 90, align: 'right' as const },
+                    { label: 'Conf.', width: 90, align: 'right' as const },
+                    { label: 'Prov.', width: 90, align: 'right' as const },
+                    { label: 'Avail.', width: 90, align: 'right' as const },
+                  ].map((col) => (
+                    <Text
+                      key={col.label}
+                      style={{
+                        width: col.width,
+                        fontSize: FontSize.xs,
+                        fontWeight: '700',
+                        color: '#64748B',
+                        textAlign: col.align,
+                        textTransform: 'uppercase',
+                        letterSpacing: 0.4,
+                      }}
+                    >
+                      {col.label}
+                    </Text>
+                  ))}
+                </View>
 
-            {truck.gradeInventory.map((g) => {
-              const left = g.totalKg - g.confirmedKg - g.provisionalKg;
-              const pct = g.totalKg > 0 ? left / g.totalKg : 0;
-              const leftColor =
-                pct > 0.5 ? Colors.success : pct > 0.25 ? Colors.primary : Colors.danger;
-              return (
-                <GradeRow key={g.code} grade={g} left={left} leftColor={leftColor} />
-              );
-            })}
+                {truck.gradeInventory.map((g, i) => {
+                  const left = g.totalKg - g.confirmedKg - g.provisionalKg;
+                  return (
+                    <GradeRow
+                      key={g.code}
+                      grade={g}
+                      left={left}
+                      isLast={i === truck.gradeInventory.length - 1}
+                    />
+                  );
+                })}
+              </View>
+            </ScrollView>
           </View>
-        </ScrollView>
+        </View>
 
-        {/* Bill tabs */}
-        <View style={{ marginHorizontal: Spacing.md, marginTop: Spacing.lg }}>
+        {/* Bills Section */}
+        <View style={{ paddingHorizontal: Spacing.md }}>
+          {/* Tab pills */}
           <View
             style={{
               flexDirection: 'row',
-              backgroundColor: Colors.border,
-              borderRadius: Radius.round,
-              padding: 3,
+              backgroundColor: '#e6f6ff',
+              borderRadius: Radius.lg,
+              padding: 4,
               marginBottom: Spacing.md,
-              alignSelf: 'flex-start',
             }}
           >
-            {([['all', '📋 सभी बिल'], ['confirmed', '✅ कन्फर्म']] as [BillTab, string][]).map(([key, label]) => (
+            {([
+              ['all', 'सभी बिल', 'All Bills'],
+              ['confirmed', 'कन्फर्म', 'Confirmed'],
+            ] as [BillTab, string, string][]).map(([key, hindi, english]) => (
               <Pressable
                 key={key}
                 testID={`tab-${key}`}
                 onPress={() => setTab(key)}
                 style={{
-                  paddingVertical: 8,
-                  paddingHorizontal: Spacing.md,
-                  borderRadius: Radius.round,
-                  backgroundColor: tab === key ? Colors.surface : 'transparent',
+                  flex: 1,
+                  alignItems: 'center',
+                  paddingVertical: 10,
+                  borderRadius: Radius.md,
+                  backgroundColor: tab === key ? '#FFFFFF' : 'transparent',
+                  shadowColor: tab === key ? '#000' : 'transparent',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: tab === key ? 0.1 : 0,
+                  shadowRadius: 3,
+                  elevation: tab === key ? 2 : 0,
                 }}
               >
                 <Text
                   style={{
                     fontSize: FontSize.sm,
                     fontWeight: '700',
-                    color: tab === key ? Colors.text : Colors.textSecond,
+                    color: tab === key ? Colors.primary : '#64748B',
                   }}
                 >
-                  {label}
+                  {english}
+                </Text>
+                <Text style={{ fontSize: 10, color: tab === key ? Colors.primary : '#94A3B8', marginTop: 1 }}>
+                  {hindi}
                 </Text>
               </Pressable>
             ))}
           </View>
 
+          {/* Bill list */}
           {billsLoading ? (
             <ActivityIndicator testID="truck-bills-loading" color={Colors.primary} style={{ marginVertical: Spacing.lg }} />
           ) : (() => {
-            const filtered = tab === 'confirmed'
-              ? truckBills.filter((b) => b.status === 'CONFIRMED')
-              : truckBills;
+            const filtered =
+              tab === 'confirmed'
+                ? truckBills.filter((b) => b.status === 'CONFIRMED')
+                : truckBills;
+
             if (filtered.length === 0) {
               return (
                 <View testID="bills-empty" style={{ alignItems: 'center', paddingVertical: Spacing.xl }}>
-                  <Text style={{ fontSize: 40, marginBottom: Spacing.sm }}>📄</Text>
-                  <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond }}>
+                  <FileText size={40} color={Colors.border} />
+                  <Text style={{ fontSize: FontSize.sm, color: '#64748B', marginTop: Spacing.sm }}>
                     {tab === 'all' ? 'No bills yet' : 'No confirmed bills'}
                   </Text>
                 </View>
               );
             }
+
             return (
-              <View style={{ backgroundColor: Colors.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden' }}>
-                {filtered.map((bill, i) => (
-                  <Pressable
+              <View style={{ gap: Spacing.sm }}>
+                {filtered.map((bill) => (
+                  <BillCard
                     key={bill.id}
-                    testID={`truck-bill-${bill.id}`}
+                    bill={bill}
                     onPress={() => router.push(`/bills/${bill.id}` as any)}
-                    style={({ pressed }) => ({
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      paddingVertical: 12,
-                      paddingHorizontal: Spacing.md,
-                      backgroundColor: pressed ? Colors.background : Colors.surface,
-                      borderBottomWidth: i < filtered.length - 1 ? 1 : 0,
-                      borderBottomColor: Colors.border,
-                      gap: Spacing.sm,
-                    })}
-                  >
-                    <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: '#E8F5E9', alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ fontSize: FontSize.xs, fontWeight: '800', color: Colors.primary }}>
-                        {bill.customerName.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase()}
-                      </Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text }} numberOfLines={1}>
-                        {bill.customerName}
-                      </Text>
-                      <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>
-                        {bill.grade} · {bill.sacks} bags
-                      </Text>
-                    </View>
-                    <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                      <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.round, backgroundColor: STATUS_BG[bill.status] ?? '#F5F5F5' }}>
-                        <Text style={{ fontSize: 10, fontWeight: '700', color: STATUS_COLOR[bill.status] ?? Colors.textSecond }}>
-                          {bill.status}
-                        </Text>
-                      </View>
-                      {bill.netAmount > 0 ? (
-                        <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: Colors.text }}>
-                          {toIndianCurrency(bill.netAmount)}
-                        </Text>
-                      ) : null}
-                    </View>
-                  </Pressable>
+                  />
                 ))}
               </View>
             );
@@ -305,47 +445,123 @@ export default function TruckDetailScreen() {
   );
 }
 
-function InfoCell({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={{ minWidth: 80 }}>
-      <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>{label}</Text>
-      <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text }}>{value}</Text>
-    </View>
-  );
-}
-
 function GradeRow({
   grade,
   left,
-  leftColor,
+  isLast,
 }: {
   grade: GradeInventory;
   left: number;
-  leftColor: string;
+  isLast: boolean;
 }) {
   return (
     <View
       style={{
         flexDirection: 'row',
-        paddingVertical: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.border,
+        paddingVertical: 12,
+        paddingHorizontal: Spacing.sm,
+        borderBottomWidth: isLast ? 0 : 1,
+        borderBottomColor: '#E5E7EB',
+        alignItems: 'center',
       }}
     >
       <View style={{ width: 90 }}>
         <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text }}>{grade.code}</Text>
-        <Text style={{ fontSize: 10, color: Colors.textSecond }}>{grade.name}</Text>
+        <Text style={{ fontSize: 10, color: '#64748B' }} numberOfLines={1}>{grade.name}</Text>
       </View>
-      <Text style={[cell, { color: Colors.text }]}>{toIndianWeight(grade.totalKg)}</Text>
-      <Text style={[cell, { color: Colors.success }]}>{toIndianWeight(grade.confirmedKg)}</Text>
-      <Text style={[cell, { color: Colors.warning }]}>{toIndianWeight(grade.provisionalKg)}</Text>
-      <Text style={[cell, { color: leftColor, fontWeight: '700' }]}>{toIndianWeight(left)}</Text>
+      <Text style={{ width: 90, fontSize: FontSize.sm, color: Colors.text, textAlign: 'right' }}>
+        {toIndianWeight(grade.totalKg)}
+      </Text>
+      <Text style={{ width: 90, fontSize: FontSize.sm, color: Colors.primary, fontWeight: '600', textAlign: 'right' }}>
+        {toIndianWeight(grade.confirmedKg)}
+      </Text>
+      <Text style={{ width: 90, fontSize: FontSize.sm, color: '#7e5700', fontWeight: '600', textAlign: 'right' }}>
+        {toIndianWeight(grade.provisionalKg)}
+      </Text>
+      <View
+        style={{
+          width: 90,
+          backgroundColor: '#E8F5E9',
+          borderRadius: Radius.sm,
+          paddingVertical: 3,
+          paddingHorizontal: 6,
+          alignItems: 'flex-end',
+        }}
+      >
+        <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.primary }}>
+          {toIndianWeight(left)}
+        </Text>
+      </View>
     </View>
   );
 }
 
-const cell = {
-  width: 100,
-  fontSize: FontSize.sm as number,
-  textAlign: 'right' as const,
-};
+function BillCard({ bill, onPress }: { bill: Inquiry; onPress: () => void }) {
+  return (
+    <Pressable
+      testID={`truck-bill-${bill.id}`}
+      onPress={onPress}
+      style={({ pressed }) => ({
+        backgroundColor: pressed ? '#F8FAFC' : '#FFFFFF',
+        borderRadius: Radius.lg,
+        borderWidth: 1,
+        borderColor: '#E5E7EB',
+        padding: Spacing.md,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
+      })}
+    >
+      {/* Icon circle */}
+      <View
+        style={{
+          width: 56,
+          height: 56,
+          borderRadius: 28,
+          backgroundColor: '#dbf1fe',
+          alignItems: 'center',
+          justifyContent: 'center',
+          flexShrink: 0,
+        }}
+      >
+        <FileText size={24} color={Colors.primary} />
+      </View>
+
+      {/* Center info */}
+      <View style={{ flex: 1, gap: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, flexWrap: 'wrap' }}>
+          <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text }} numberOfLines={1}>
+            {bill.customerName}
+          </Text>
+          <View
+            style={{
+              paddingHorizontal: 8,
+              paddingVertical: 2,
+              borderRadius: Radius.round,
+              backgroundColor: STATUS_BG[bill.status] ?? '#F5F5F5',
+            }}
+          >
+            <Text style={{ fontSize: 10, fontWeight: '700', color: STATUS_COLOR[bill.status] ?? '#64748B' }}>
+              {bill.status === 'CONFIRMED' ? 'CONFIRMED' : bill.status === 'PENDING' ? 'PENDING' : bill.status}
+            </Text>
+          </View>
+        </View>
+        <Text style={{ fontSize: FontSize.xs, color: '#64748B' }}>
+          Bill #{bill.slipNumber} · {bill.grade}
+        </Text>
+      </View>
+
+      {/* Right: amount + bags */}
+      <View style={{ alignItems: 'flex-end', gap: 3, flexShrink: 0 }}>
+        {bill.netAmount > 0 ? (
+          <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: Colors.text }}>
+            {toIndianCurrency(bill.netAmount)}
+          </Text>
+        ) : null}
+        <Text style={{ fontSize: FontSize.xs, color: '#94A3B8' }}>
+          {bill.sacks} bags · {bill.grade}
+        </Text>
+      </View>
+    </Pressable>
+  );
+}
