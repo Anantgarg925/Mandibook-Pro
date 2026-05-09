@@ -18,8 +18,8 @@ export default function TabLayout() {
           ? {
               borderTopColor: Colors.border,
               backgroundColor: Colors.surface,
-              height: Platform.OS === 'android' ? 56 : 60,
               paddingBottom: Platform.OS === 'android' ? 4 : 8,
+              paddingTop: 4,
             }
           : { display: 'none' },
         headerShown: useClientOnlyValue(false, true),

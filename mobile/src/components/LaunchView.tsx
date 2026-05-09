@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, Image, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { View, Text, Image, StyleSheet, Pressable, ScrollView, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
@@ -160,6 +160,11 @@ export function LaunchView({ visible, onHide, onAdminPress, onMemberPress, shopN
   );
 }
 
+const letterSpacingBrandName = Platform.OS === 'android' ? 0 : -0.5;
+const letterSpacingFooterEnglish = Platform.OS === 'android' ? 0.5 : 3;
+const letterSpacingBentoTitle = Platform.OS === 'android' ? 0 : 0.8;
+const letterSpacingFooterPowered = Platform.OS === 'android' ? 0 : 0.5;
+
 const styles = StyleSheet.create({
   container: {
     zIndex: 9998,
@@ -190,9 +195,9 @@ const styles = StyleSheet.create({
   },
   brandName: {
     fontSize: 24,
-    fontWeight: '900',
+    fontWeight: '700',
     color: '#00450d',
-    letterSpacing: -0.5,
+    letterSpacing: letterSpacingBrandName,
     marginBottom: 4,
   },
   brandUnderline: {
@@ -216,7 +221,7 @@ const styles = StyleSheet.create({
   },
   dateText: {
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#41493e',
   },
   content: {
@@ -257,7 +262,7 @@ const styles = StyleSheet.create({
   },
   adminBtnTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#fff',
   },
   adminBtnSub: {
@@ -295,7 +300,7 @@ const styles = StyleSheet.create({
   },
   memberBtnTitle: {
     fontSize: 18,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#071e27',
   },
   memberBtnSub: {
@@ -318,10 +323,10 @@ const styles = StyleSheet.create({
   },
   bentoTitle: {
     fontSize: 10,
-    fontWeight: '800',
+    fontWeight: '700',
     color: '#00450d',
     textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    letterSpacing: letterSpacingBentoTitle,
     marginBottom: 2,
   },
   bentoSub: {
@@ -335,7 +340,7 @@ const styles = StyleSheet.create({
   },
   footerHindi: {
     fontSize: 17,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#1b5e20',
     opacity: 0.9,
     marginBottom: 6,
@@ -345,7 +350,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#004a78',
     textTransform: 'uppercase',
-    letterSpacing: 3,
+    letterSpacing: letterSpacingFooterEnglish,
     opacity: 0.4,
     marginBottom: 20,
   },
@@ -361,9 +366,9 @@ const styles = StyleSheet.create({
   },
   footerPowered: {
     fontSize: 9,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#717a6d',
-    letterSpacing: 0.5,
+    letterSpacing: letterSpacingFooterPowered,
   },
   bottomAccent: {
     position: 'absolute',

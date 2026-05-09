@@ -157,7 +157,7 @@ export function AdminPinView({ visible, onHide, onSuccess, onCancel, correctPin 
         <View style={[styles.keypad, { width: CONTAINER_W }]}>
           {KEYS.map((key, idx) => {
             if (key === '') {
-              return <View key={idx} style={{ width: KEY_SIZE, height: KEY_SIZE }} />;
+              return <View key={idx} style={{ width: KEY_SIZE, height: KEY_SIZE, margin: 12 }} />;
             }
             if (key === 'back') {
               return (
@@ -312,13 +312,14 @@ const styles = StyleSheet.create({
   keypad: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 24,
     justifyContent: 'center',
     alignItems: 'center',
+    width: CONTAINER_W,
   },
   keyBtn: {
     alignItems: 'center',
     justifyContent: 'center',
+    margin: 12,
   },
   numBtn: {
     backgroundColor: '#ffffff',
