@@ -89,6 +89,9 @@ export default function RegisterTruckScreen() {
   const handleSubmit = async () => {
     if (!shop?.shopId || !formComplete || mutation.isPending) return;
 
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
     const gradeInventory: GradeInventory[] = grades.map((g) => ({
       code: g.code,
       name: g.name,
@@ -107,7 +110,7 @@ export default function RegisterTruckScreen() {
       freightAmount: parseFloat(freightAmount) || 0,
       gradeInventory,
       status: 'ACTIVE',
-      date: Date.now(),
+      date: startOfToday.getTime(),
       createdAt: Date.now(),
     });
   };
