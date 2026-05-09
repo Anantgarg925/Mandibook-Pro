@@ -109,8 +109,8 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         return data;
       }
-    } catch {
-      // offline — cached data already shown
+    } catch (err: any) {
+      console.warn('[Firebase] Sync failed (offline? rules?):', err?.code, err?.message);
     }
     return null;
   };
@@ -120,8 +120,8 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     setShop(data);
     try {
       await setDoc(doc(db, 'shops', data.shopId), data);
-    } catch {
-      // will sync when online
+    } catch (err: any) {
+      console.warn('[Firebase] Save failed (will retry when online):', err?.code, err?.message);
     }
   }, []);
 

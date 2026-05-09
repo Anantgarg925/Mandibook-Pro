@@ -37,7 +37,7 @@ export function useTodayTrucks() {
         setError(null);
       },
       (err) => {
-        console.error('useTodayTrucks:', err);
+        console.error('[Firestore] useTodayTrucks error:', err.code, err.message);
         setError(err.message);
         setLoading(false);
       }

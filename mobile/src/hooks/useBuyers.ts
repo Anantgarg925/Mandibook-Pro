@@ -21,7 +21,8 @@ export function useBuyers() {
         setBuyers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Buyer)));
         setLoading(false);
       },
-      _err => {
+      (err) => {
+        console.error('[Firestore] useBuyers error:', err.code, err.message);
         setLoading(false);
       }
     );
@@ -50,7 +51,8 @@ export function useBuyerTransactions(buyerCode: string) {
         setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() } as Transaction)));
         setLoading(false);
       },
-      _err => {
+      (err) => {
+        console.error('[Firestore] useBuyerTransactions error:', err.code, err.message);
         setLoading(false);
       }
     );

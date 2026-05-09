@@ -28,7 +28,8 @@ export function useDateTrucks(date: Date) {
         setTrucks(snap.docs.map(d => ({ id: d.id, ...d.data() } as Truck)));
         setLoading(false);
       },
-      _err => {
+      (err) => {
+        console.error('[Firestore] useDateTrucks error:', err.code, err.message);
         setLoading(false);
       }
     );

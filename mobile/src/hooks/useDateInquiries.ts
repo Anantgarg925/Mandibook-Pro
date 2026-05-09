@@ -29,7 +29,8 @@ export function useDateInquiries(date: Date) {
         setInquiries(snap.docs.map(d => ({ id: d.id, ...d.data() } as Inquiry)));
         setLoading(false);
       },
-      _err => {
+      (err) => {
+        console.error('[Firestore] useDateInquiries error:', err.code, err.message);
         setLoading(false);
       }
     );

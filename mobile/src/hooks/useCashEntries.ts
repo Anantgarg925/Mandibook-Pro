@@ -30,7 +30,8 @@ export function useCashEntries(date: Date) {
         setEntries(snap.docs.map(d => ({ id: d.id, ...d.data() } as CashEntry)));
         setLoading(false);
       },
-      _err => {
+      (err) => {
+        console.error('[Firestore] useCashEntries error:', err.code, err.message);
         setLoading(false);
       }
     );

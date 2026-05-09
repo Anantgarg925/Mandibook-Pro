@@ -34,6 +34,7 @@ export function useInquiries() {
         setError(null);
       },
       (err) => {
+        console.error('[Firestore] useInquiries error:', err.code, err.message);
         setError(err.message);
         setLoading(false);
       }
