@@ -12,15 +12,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
-  ArrowLeft,
   ChevronLeft,
   ChevronRight,
-  BarChart2,
-  BookOpen,
-  CreditCard,
-  BookMarked,
   FileText,
   Plus,
+  Share2,
 } from 'lucide-react-native';
 import { useDateInquiries } from '@/hooks/useDateInquiries';
 import { useDateTrucks } from '@/hooks/useDateTrucks';
@@ -33,12 +29,14 @@ import type { Inquiry } from '@/types/inquiry';
 
 type TabKey = 'sale' | 'accounts' | 'payments' | 'cashbook';
 
-const TABS: { key: TabKey; label: string; icon: React.FC<{ size: number; color: string }> }[] = [
-  { key: 'sale', label: 'बिक्री', icon: BarChart2 },
-  { key: 'accounts', label: 'हिसाब', icon: BookOpen },
-  { key: 'payments', label: 'भुगतान', icon: CreditCard },
-  { key: 'cashbook', label: 'कैश', icon: BookMarked },
-];
+const TAB_LABELS: Record<TabKey, string> = {
+  sale: 'Sale',
+  accounts: 'Accounts',
+  payments: 'Payments',
+  cashbook: 'Cash Book',
+};
+
+const TAB_ORDER: TabKey[] = ['sale', 'accounts', 'payments', 'cashbook'];
 
 function startOfDay(d: Date): Date {
   const r = new Date(d);
@@ -182,423 +180,650 @@ export default function DaySummaryScreen() {
   const isToday = date.toDateString() === new Date().toDateString();
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top']}>
-      {/* Header */}
-      <View style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: Spacing.sm,
-        paddingHorizontal: Spacing.md,
-        paddingVertical: Spacing.sm,
-        backgroundColor: Colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.border,
-      }}>
-        {router.canGoBack() ? (
-          <Pressable testID="back-btn" onPress={() => router.back()} style={{ padding: 4 }}>
-            <ArrowLeft size={24} color={Colors.text} />
-          </Pressable>
-        ) : <View style={{ width: 32 }} />}
-        <Text style={{ flex: 1, fontSize: FontSize.lg, fontWeight: '800', color: Colors.text }}>
-          दिन का हिसाब
-        </Text>
-        <Pressable
-          testID="export-fab"
-          onPress={() => setShowExportMenu(true)}
-          disabled={exporting}
-          style={({ pressed }) => ({
-            flexDirection: 'row',
-            alignItems: 'center',
-            gap: 6,
-            paddingVertical: 8,
-            paddingHorizontal: Spacing.sm,
-            borderRadius: Radius.round,
-            backgroundColor: exporting ? Colors.border : pressed ? Colors.primaryPressed : Colors.primary,
-          })}
-        >
-          <FileText size={16} color="#FFF" />
-          <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: '#FFF' }}>
-            {exporting ? 'Exporting...' : 'Export'}
-          </Text>
-        </Pressable>
-      </View>
-
-      {/* Date picker row */}
-      <View style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: Spacing.md,
-        paddingVertical: Spacing.sm,
-        backgroundColor: Colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.border,
-      }}>
-        <Pressable testID="prev-day-btn" onPress={prevDay} style={{ padding: 8 }}>
-          <ChevronLeft size={22} color={Colors.text} />
-        </Pressable>
-        <View style={{ alignItems: 'center' }}>
-          <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: Colors.text }}>
-            {toIndianDate(date.getTime())}
-          </Text>
-          {isToday ? (
-            <Text style={{ fontSize: FontSize.xs, color: Colors.primary, fontWeight: '700' }}>Today</Text>
-          ) : null}
-        </View>
-        <Pressable
-          testID="next-day-btn"
-          onPress={nextDay}
-          style={{ padding: 8, opacity: isToday ? 0.3 : 1 }}
-          disabled={isToday}
-        >
-          <ChevronRight size={22} color={Colors.text} />
-        </Pressable>
-      </View>
-
-      {/* Tab bar */}
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#f3faff' }} edges={['top']}>
       <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={{ flexGrow: 0, backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.border }}
-        contentContainerStyle={{ flexDirection: 'row', paddingHorizontal: Spacing.sm }}
+        style={{ flex: 1 }}
+        stickyHeaderIndices={[1]}
+        showsVerticalScrollIndicator={false}
       >
-        {TABS.map(tab => {
-          const active = activeTab === tab.key;
-          const Icon = tab.icon;
-          return (
-            <Pressable
-              key={tab.key}
-              testID={`tab-${tab.key}`}
-              onPress={() => setActiveTab(tab.key)}
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: 6,
-                paddingHorizontal: Spacing.md,
-                paddingVertical: 12,
-                borderBottomWidth: 2,
-                borderBottomColor: active ? Colors.primary : 'transparent',
-              }}
-            >
-              <Icon size={16} color={active ? Colors.primary : Colors.textSecond} />
-              <Text style={{
-                fontSize: FontSize.sm,
-                fontWeight: active ? '800' : '500',
-                color: active ? Colors.primary : Colors.textSecond,
-              }}>
-                {tab.label}
-              </Text>
+        {/* Header section — inside ScrollView, NOT fixed */}
+        <View style={{
+          backgroundColor: '#ffffff',
+          borderBottomWidth: 1,
+          borderBottomColor: '#E5E7EB',
+          paddingHorizontal: 20,
+          paddingVertical: 14,
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          {/* Left: title block */}
+          <View style={{ flex: 1, marginRight: 12 }}>
+            <Text style={{
+              fontSize: 26,
+              fontWeight: '800',
+              color: '#00450d',
+              letterSpacing: -0.5,
+            }}>
+              Day Report / आज की रिपोर्ट
+            </Text>
+            <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+              Daily Business Summary
+            </Text>
+          </View>
+
+          {/* Right: date pill */}
+          <View style={{
+            backgroundColor: '#ffffff',
+            borderWidth: 1,
+            borderColor: '#c0c9bb',
+            borderRadius: 12,
+            height: 48,
+            paddingHorizontal: 14,
+            flexDirection: 'row',
+            gap: 8,
+            alignItems: 'center',
+          }}>
+            <Pressable testID="prev-day-btn" onPress={prevDay} hitSlop={8}>
+              <ChevronLeft size={18} color="#071e27" />
             </Pressable>
-          );
-        })}
-      </ScrollView>
 
-      {loading ? (
-        <ActivityIndicator
-          testID="reports-loading"
-          color={Colors.primary}
-          size="large"
-          style={{ marginTop: 48 }}
-        />
-      ) : (
-        <>
-          {/* TAB 1: Sale Summary */}
-          {activeTab === 'sale' ? (
-            <ScrollView contentContainerStyle={{ padding: Spacing.md }}>
-              {trucks.map(t => (
-                <View key={t.id} style={{
-                  backgroundColor: Colors.surface,
-                  borderRadius: Radius.sm,
-                  padding: Spacing.md,
-                  marginBottom: Spacing.sm,
-                  borderLeftWidth: 4,
-                  borderLeftColor: Colors.primary,
-                }}>
-                  <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: Colors.text }}>
-                    {t.truckNumber}
-                  </Text>
-                  <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>
-                    {t.senderName} · {t.totalKg} kg registered
-                  </Text>
-                </View>
-              ))}
-
-              {/* Grade table */}
-              <View style={{ backgroundColor: Colors.surface, borderRadius: Radius.sm, overflow: 'hidden', marginTop: Spacing.sm }}>
-                {/* Table header */}
-                <View style={{ flexDirection: 'row', backgroundColor: Colors.primary, paddingVertical: 10, paddingHorizontal: Spacing.sm }}>
-                  {['Grade', 'Sacks', 'Weight', 'Avg Rate', 'Gross'].map((h, i) => (
-                    <Text key={h} style={{
-                      flex: i === 0 ? 2 : 1,
-                      fontSize: 11,
-                      fontWeight: '700',
-                      color: '#FFF',
-                      textAlign: i > 0 ? 'right' : 'left',
-                    }}>{h}</Text>
-                  ))}
-                </View>
-
-                {gradeSummary.length === 0 ? (
-                  <View testID="no-bills-msg" style={{ padding: Spacing.lg, alignItems: 'center' }}>
-                    <Text style={{ color: Colors.textSecond }}>No confirmed bills for this date</Text>
-                  </View>
-                ) : (
-                  gradeSummary.map((row, idx) => (
-                    <View key={row.grade} style={{
-                      flexDirection: 'row',
-                      paddingVertical: 10,
-                      paddingHorizontal: Spacing.sm,
-                      backgroundColor: idx % 2 === 0 ? Colors.surface : '#F9F9F9',
-                      borderBottomWidth: 1,
-                      borderBottomColor: Colors.border,
-                    }}>
-                      <Text style={{ flex: 2, fontSize: 11, color: Colors.text, fontWeight: '700' }}>
-                        {row.grade}
-                      </Text>
-                      <Text style={{ flex: 1, fontSize: 11, color: Colors.text, textAlign: 'right' }}>{row.sacks}</Text>
-                      <Text style={{ flex: 1, fontSize: 11, color: Colors.text, textAlign: 'right' }}>{row.weight.toFixed(0)}kg</Text>
-                      <Text style={{ flex: 1, fontSize: 11, color: Colors.text, textAlign: 'right' }}>₹{row.avgRate.toFixed(0)}</Text>
-                      <Text style={{ flex: 1, fontSize: 11, color: Colors.text, textAlign: 'right', fontWeight: '700' }}>
-                        {toIndianCurrency(row.gross)}
-                      </Text>
-                    </View>
-                  ))
-                )}
-
-                {/* Total row */}
-                {gradeSummary.length > 0 ? (
-                  <View style={{ flexDirection: 'row', paddingVertical: 12, paddingHorizontal: Spacing.sm, backgroundColor: Colors.success }}>
-                    <Text style={{ flex: 2, fontSize: 11, fontWeight: '900', color: '#FFF' }}>Total</Text>
-                    <Text style={{ flex: 1, fontSize: 11, fontWeight: '900', color: '#FFF', textAlign: 'right' }}>{totalSacks}</Text>
-                    <Text style={{ flex: 1, fontSize: 11, fontWeight: '900', color: '#FFF', textAlign: 'right' }}>{totalWeight.toFixed(0)}kg</Text>
-                    <Text style={{ flex: 1, fontSize: 11, fontWeight: '900', color: '#FFF', textAlign: 'right' }}>₹{totalAvgRate.toFixed(0)}</Text>
-                    <Text style={{ flex: 1, fontSize: 11, fontWeight: '900', color: '#FFF', textAlign: 'right' }}>{toIndianCurrency(totalGross)}</Text>
-                  </View>
-                ) : null}
-              </View>
-            </ScrollView>
-          ) : null}
-
-          {/* TAB 2: Accounts */}
-          {activeTab === 'accounts' ? (
-            <ScrollView contentContainerStyle={{ padding: Spacing.md }}>
-              {[
-                { label: 'Gross Sale', amount: totalGross, deduct: false },
-                { label: 'Less Freight', amount: totalFreight, deduct: true },
-                { label: `Less Commission (${commissionPct}%)`, amount: commission, deduct: true },
-                { label: 'Less APMC', amount: totalApmc, deduct: true },
-                { label: 'Less Cartage', amount: totalCartage, deduct: true },
-                { label: 'Less Tele & Post', amount: telePost, deduct: true },
-                { label: 'Less Bardana', amount: totalBardana, deduct: true },
-              ].map(row => (
-                <View key={row.label} style={{
-                  flexDirection: 'row',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
-                  paddingVertical: 14,
-                  paddingHorizontal: Spacing.md,
-                  backgroundColor: Colors.surface,
-                  borderBottomWidth: 1,
-                  borderBottomColor: Colors.border,
-                }}>
-                  <Text style={{ fontSize: FontSize.sm, color: Colors.text }}>{row.label}</Text>
-                  <Text style={{
-                    fontSize: FontSize.sm,
-                    fontWeight: '700',
-                    color: row.deduct ? Colors.danger : Colors.text,
-                  }}>
-                    {row.deduct ? '-' : null}{toIndianCurrency(row.amount)}
-                  </Text>
-                </View>
-              ))}
-
-              {/* Net to Sender */}
-              <View style={{
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                paddingVertical: 18,
-                paddingHorizontal: Spacing.md,
-                backgroundColor: Colors.surface,
-                borderTopWidth: 3,
-                borderTopColor: Colors.text,
-                borderBottomWidth: 3,
-                borderBottomColor: Colors.text,
-                marginTop: 2,
-              }}>
-                <Text style={{ fontSize: FontSize.md, fontWeight: '900', color: Colors.text }}>
-                  NET TO SENDER
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#071e27' }}>
+                {toIndianDate(date.getTime())}
+              </Text>
+              {isToday ? (
+                <Text style={{ fontSize: 10, color: '#00450d', fontWeight: '700', lineHeight: 12 }}>
+                  आज
                 </Text>
-                <Text style={{ fontSize: FontSize.lg, fontWeight: '900', color: Colors.success }}>
-                  {toIndianCurrency(netToSender)}
-                </Text>
-              </View>
-            </ScrollView>
-          ) : null}
+              ) : null}
+            </View>
 
-          {/* TAB 3: Payments */}
-          {activeTab === 'payments' ? (
-            <ScrollView contentContainerStyle={{ padding: Spacing.md }}>
-              {/* Summary cards */}
-              <View style={{ flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md }}>
-                {[
-                  { label: 'Cash', amount: cashInquiries.reduce((s, i) => s + i.netAmount, 0), count: cashInquiries.length, color: Colors.success },
-                  { label: 'UPI', amount: upiInquiries.reduce((s, i) => s + i.netAmount, 0), count: upiInquiries.length, color: Colors.info },
-                  { label: 'उधारी', amount: udhaariInquiries.reduce((s, i) => s + i.netAmount, 0), count: udhaariInquiries.length, color: Colors.danger },
-                ].map(card => (
-                  <View key={card.label} style={{
+            <Pressable
+              testID="next-day-btn"
+              onPress={nextDay}
+              disabled={isToday}
+              hitSlop={8}
+              style={{ opacity: isToday ? 0.3 : 1 }}
+            >
+              <ChevronRight size={18} color="#071e27" />
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Tab bar — sticky (stickyHeaderIndices=[1]) */}
+        <View style={{
+          backgroundColor: '#f3faff',
+          paddingHorizontal: 16,
+          paddingTop: 12,
+          paddingBottom: 4,
+        }}>
+          <View style={{
+            backgroundColor: '#e6f6ff',
+            borderRadius: 14,
+            padding: 4,
+            flexDirection: 'row',
+          }}>
+            {TAB_ORDER.map(key => {
+              const active = activeTab === key;
+              return (
+                <Pressable
+                  key={key}
+                  testID={`tab-${key === 'cashbook' ? 'cashbook' : key}`}
+                  onPress={() => setActiveTab(key)}
+                  style={{
                     flex: 1,
-                    backgroundColor: Colors.surface,
-                    borderRadius: Radius.sm,
-                    padding: Spacing.sm,
-                    borderTopWidth: 3,
-                    borderTopColor: card.color,
+                    height: 44,
                     alignItems: 'center',
+                    justifyContent: 'center',
+                    borderRadius: 10,
+                    backgroundColor: active ? '#00450d' : 'transparent',
+                  }}
+                >
+                  <Text style={{
+                    fontSize: 13,
+                    fontWeight: active ? '700' : '500',
+                    color: active ? '#ffffff' : '#64748B',
                   }}>
-                    <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginBottom: 4 }}>{card.label}</Text>
-                    <Text style={{ fontSize: FontSize.sm, fontWeight: '900', color: card.color }}>
-                      {toIndianCurrency(card.amount)}
+                    {TAB_LABELS[key]}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        {/* Tab content */}
+        {loading ? (
+          <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 64 }}>
+            <ActivityIndicator testID="reports-loading" color="#00450d" size="large" />
+          </View>
+        ) : (
+          <View>
+            {/* TAB 1: Sale */}
+            {activeTab === 'sale' ? (
+              <ScrollView
+                scrollEnabled={false}
+                contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 }}
+              >
+                {/* Truck cards */}
+                {trucks.map(t => (
+                  <View key={t.id} style={{
+                    backgroundColor: '#ffffff',
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB',
+                    borderRadius: 12,
+                    paddingHorizontal: 14,
+                    paddingVertical: 12,
+                    marginBottom: 8,
+                    borderLeftWidth: 3,
+                    borderLeftColor: '#00450d',
+                  }}>
+                    <Text style={{ fontSize: 14, fontWeight: '800', color: '#071e27' }}>
+                      {t.truckNumber}
                     </Text>
-                    <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>{card.count} bills</Text>
+                    <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                      {t.senderName} · {t.totalKg} kg
+                    </Text>
                   </View>
                 ))}
-              </View>
 
-              {/* Udhaari breakdown */}
-              {udhaariInquiries.length > 0 ? (
-                <>
-                  <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: Colors.textSecond, marginBottom: Spacing.sm }}>
-                    UDHAARI BREAKDOWN
+                {/* Grade Table Card */}
+                <View style={{
+                  backgroundColor: '#ffffff',
+                  borderWidth: 1,
+                  borderColor: '#E5E7EB',
+                  borderRadius: 14,
+                  overflow: 'hidden',
+                  marginBottom: 16,
+                }}>
+                  {/* Card header */}
+                  <View style={{
+                    backgroundColor: '#dbf1fe',
+                    paddingHorizontal: 16,
+                    paddingVertical: 14,
+                  }}>
+                    <Text style={{ fontSize: 16, fontWeight: '700', color: '#00450d' }}>
+                      Sales Summary by Grade
+                    </Text>
+                  </View>
+
+                  {/* Table column headers */}
+                  <View style={{
+                    backgroundColor: '#f3faff',
+                    paddingHorizontal: 12,
+                    paddingVertical: 10,
+                    borderBottomWidth: 1,
+                    borderBottomColor: '#E5E7EB',
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                  }}>
+                    <Text style={{ flex: 2, fontSize: 11, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                      Grade
+                    </Text>
+                    <Text style={{ width: 50, fontSize: 11, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'right' }}>
+                      Sacks
+                    </Text>
+                    <Text style={{ width: 80, fontSize: 11, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'right' }}>
+                      Weight
+                    </Text>
+                    <Text style={{ width: 70, fontSize: 11, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'right' }}>
+                      Avg Rate
+                    </Text>
+                    <Text style={{ width: 90, fontSize: 11, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'right' }}>
+                      Gross
+                    </Text>
+                  </View>
+
+                  {/* Empty state */}
+                  {gradeSummary.length === 0 ? (
+                    <View testID="no-bills-msg" style={{ paddingVertical: 32, alignItems: 'center' }}>
+                      <Text style={{ color: '#64748B' }}>No confirmed bills for this date</Text>
+                    </View>
+                  ) : (
+                    <>
+                      {gradeSummary.map((row, idx) => (
+                        <View key={row.grade} style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          paddingHorizontal: 12,
+                          paddingVertical: 12,
+                          backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f9fafb',
+                          borderBottomWidth: 1,
+                          borderBottomColor: '#E5E7EB',
+                        }}>
+                          <View style={{ flex: 2 }}>
+                            <Text style={{ fontSize: 13, fontWeight: '700', color: '#071e27' }}>
+                              {row.grade}
+                            </Text>
+                            <Text style={{ fontSize: 11, color: '#64748B' }}>
+                              {row.gradeName}
+                            </Text>
+                          </View>
+                          <Text style={{ width: 50, fontSize: 14, fontWeight: '600', color: '#071e27', textAlign: 'right' }}>
+                            {row.sacks}
+                          </Text>
+                          <Text style={{ width: 80, fontSize: 14, fontWeight: '600', color: '#071e27', textAlign: 'right' }}>
+                            {row.weight.toFixed(0)} kg
+                          </Text>
+                          <Text style={{ width: 70, fontSize: 14, fontWeight: '600', color: '#071e27', textAlign: 'right' }}>
+                            {'\u20B9'}{row.avgRate.toFixed(0)}
+                          </Text>
+                          <Text style={{ width: 90, fontSize: 14, fontWeight: '800', color: '#00450d', textAlign: 'right' }}>
+                            {toIndianCurrency(row.gross)}
+                          </Text>
+                        </View>
+                      ))}
+
+                      {/* Total row */}
+                      <View style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        backgroundColor: '#00450d',
+                        paddingHorizontal: 12,
+                        paddingVertical: 12,
+                      }}>
+                        <Text style={{ flex: 2, fontSize: 13, fontWeight: '900', color: '#ffffff' }}>
+                          Total
+                        </Text>
+                        <Text style={{ width: 50, fontSize: 13, fontWeight: '900', color: '#ffffff', textAlign: 'right' }}>
+                          {totalSacks}
+                        </Text>
+                        <Text style={{ width: 80, fontSize: 13, fontWeight: '900', color: '#ffffff', textAlign: 'right' }}>
+                          {totalWeight.toFixed(0)} kg
+                        </Text>
+                        <Text style={{ width: 70, fontSize: 13, fontWeight: '900', color: '#ffffff', textAlign: 'right' }}>
+                          {'\u20B9'}{totalAvgRate.toFixed(0)}
+                        </Text>
+                        <Text style={{ width: 90, fontSize: 13, fontWeight: '900', color: '#ffffff', textAlign: 'right' }}>
+                          {toIndianCurrency(totalGross)}
+                        </Text>
+                      </View>
+                    </>
+                  )}
+                </View>
+
+                {/* Net Settlement Card */}
+                <View style={{
+                  backgroundColor: '#cfe6f2',
+                  borderWidth: 1,
+                  borderColor: '#c0c9bb',
+                  borderRadius: 14,
+                  padding: 20,
+                  marginBottom: 16,
+                }}>
+                  <Text style={{ fontSize: 16, fontWeight: '700', color: '#00450d', marginBottom: 16 }}>
+                    Net Settlement
                   </Text>
-                  {udhaariInquiries.map((inq: Inquiry) => (
-                    <View key={inq.id} style={{
+
+                  {/* Line items */}
+                  {[
+                    { label: 'Gross Sale / कुल बिक्री', amount: totalGross, deduct: false },
+                    { label: '- Freight / भाड़ा', amount: totalFreight, deduct: true },
+                    { label: `- Commission (${commissionPct}%) / कमीशन`, amount: commission, deduct: true },
+                    { label: '- APMC / मंडी शुल्क', amount: totalApmc, deduct: true },
+                    ...(totalCartage > 0 ? [{ label: '- Cartage', amount: totalCartage, deduct: true }] : []),
+                    ...(totalBardana > 0 ? [{ label: '- Bardana', amount: totalBardana, deduct: true }] : []),
+                  ].map(item => (
+                    <View key={item.label} style={{
                       flexDirection: 'row',
                       justifyContent: 'space-between',
                       alignItems: 'center',
-                      paddingVertical: 12,
-                      paddingHorizontal: Spacing.md,
-                      backgroundColor: Colors.surface,
+                      paddingVertical: 10,
                       borderBottomWidth: 1,
-                      borderBottomColor: Colors.border,
+                      borderBottomColor: 'rgba(0,0,0,0.06)',
                     }}>
-                      <View>
-                        <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text }}>{inq.customerName}</Text>
-                        <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>#{inq.slipNumber} · {inq.grade}</Text>
-                      </View>
-                      <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: Colors.danger }}>
-                        {toIndianCurrency(inq.netAmount)}
+                      <Text style={{ fontSize: 14, color: '#071e27' }}>{item.label}</Text>
+                      <Text style={{
+                        fontSize: 14,
+                        fontWeight: '700',
+                        color: item.deduct ? '#ba1a1a' : '#071e27',
+                      }}>
+                        {toIndianCurrency(item.amount)}
                       </Text>
                     </View>
                   ))}
-                </>
-              ) : null}
-            </ScrollView>
-          ) : null}
 
-          {/* TAB 4: Cash Book */}
-          {activeTab === 'cashbook' ? (
-            <View style={{ flex: 1 }}>
-              <ScrollView contentContainerStyle={{ padding: Spacing.md, paddingBottom: 120 }}>
-                {/* Add entry button */}
-                <Pressable
-                  testID="add-cash-entry"
-                  onPress={() => setShowEntryModal(true)}
-                  style={({ pressed }) => ({
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: 6,
-                    height: 44,
-                    borderRadius: Radius.sm,
-                    marginBottom: Spacing.md,
-                    backgroundColor: pressed ? Colors.primaryPressed : Colors.primary,
-                  })}
-                >
-                  <Plus size={16} color="#FFF" />
-                  <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: '#FFF' }}>+ एंट्री जोड़ें</Text>
-                </Pressable>
+                  {/* Dashed divider */}
+                  <View style={{
+                    borderStyle: 'dashed',
+                    borderTopWidth: 1,
+                    borderColor: '#717a6d',
+                    marginVertical: 12,
+                  }} />
 
-                {/* Receipts */}
-                <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: Colors.textSecond, marginBottom: Spacing.sm }}>
-                  RECEIPTS
-                </Text>
-                {allReceipts.length === 0 ? (
-                  <Text style={{ color: Colors.textSecond, fontSize: FontSize.sm, marginBottom: Spacing.md }}>No receipts</Text>
-                ) : allReceipts.map((e, idx) => (
-                  <View key={`${e.id}-${idx}`} style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    paddingVertical: 10,
-                    paddingHorizontal: Spacing.md,
-                    backgroundColor: Colors.surface,
-                    borderBottomWidth: 1,
-                    borderBottomColor: Colors.border,
-                  }}>
-                    <Text style={{ flex: 1, fontSize: FontSize.sm, color: Colors.text }} numberOfLines={1}>{e.description}</Text>
-                    <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.success }}>
-                      +{toIndianCurrency(e.amount)}
+                  {/* Net row */}
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                    <View>
+                      <Text style={{ fontSize: 16, fontWeight: '800', color: '#00450d' }}>
+                        Net to Sender
+                      </Text>
+                      <Text style={{ fontSize: 11, color: '#41493e', marginTop: 2 }}>
+                        भेजने वाले को शुद्ध देय
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 24, fontWeight: '900', color: '#00450d' }}>
+                      {toIndianCurrency(netToSender)}
                     </Text>
                   </View>
-                ))}
+                </View>
 
-                {/* Payments */}
-                <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: Colors.textSecond, marginTop: Spacing.md, marginBottom: Spacing.sm }}>
-                  PAYMENTS
-                </Text>
-                {allPayments.length === 0 ? (
-                  <Text style={{ color: Colors.textSecond, fontSize: FontSize.sm, marginBottom: Spacing.md }}>No payments</Text>
-                ) : allPayments.map(e => (
-                  <View key={e.id} style={{
-                    flexDirection: 'row',
-                    justifyContent: 'space-between',
-                    paddingVertical: 10,
-                    paddingHorizontal: Spacing.md,
-                    backgroundColor: Colors.surface,
-                    borderBottomWidth: 1,
-                    borderBottomColor: Colors.border,
-                  }}>
-                    <Text style={{ flex: 1, fontSize: FontSize.sm, color: Colors.text }} numberOfLines={1}>{e.description}</Text>
-                    <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.danger }}>
-                      -{toIndianCurrency(e.amount)}
-                    </Text>
-                  </View>
-                ))}
+                {/* Export Action Buttons */}
+                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+                  {/* Export PDF */}
+                  <Pressable
+                    testID="export-fab"
+                    onPress={() => setShowExportMenu(true)}
+                    disabled={exporting}
+                    style={({ pressed }) => ({
+                      flex: 1,
+                      backgroundColor: exporting ? '#4a7a52' : pressed ? '#005a10' : '#00450d',
+                      borderRadius: 12,
+                      height: 56,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 10,
+                    })}
+                  >
+                    <FileText size={20} color="#ffffff" />
+                    <View>
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: '#ffffff' }}>
+                        Export PDF
+                      </Text>
+                      <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>
+                        पीडीएफ निर्यात करें
+                      </Text>
+                    </View>
+                  </Pressable>
+
+                  {/* Share WhatsApp */}
+                  <Pressable
+                    testID="share-whatsapp-btn"
+                    onPress={() => setShowExportMenu(true)}
+                    style={({ pressed }) => ({
+                      flex: 1,
+                      backgroundColor: pressed ? '#2e7d32' : '#1b5e20',
+                      borderRadius: 12,
+                      height: 56,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 10,
+                    })}
+                  >
+                    <Share2 size={20} color="#ffffff" />
+                    <View>
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: '#ffffff' }}>
+                        Share Report
+                      </Text>
+                      <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>
+                        व्हाट्सएप पर साझा करें
+                      </Text>
+                    </View>
+                  </Pressable>
+                </View>
               </ScrollView>
+            ) : null}
 
-              {/* Closing balance sticky */}
-              <View style={{
-                position: 'absolute',
-                bottom: 0,
-                left: 0,
-                right: 0,
-                backgroundColor: Colors.surface,
-                borderTopWidth: 2,
-                borderTopColor: Colors.border,
-                padding: Spacing.md,
-                flexDirection: 'row',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: -3 },
-                shadowOpacity: 0.1,
-                shadowRadius: 6,
-                elevation: 10,
-              }}>
-                <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: Colors.text }}>बैलेंस</Text>
-                <Text style={{
-                  fontSize: FontSize.xl,
-                  fontWeight: '900',
-                  color: closingBalance >= 0 ? Colors.success : Colors.danger,
+            {/* TAB 2: Accounts */}
+            {activeTab === 'accounts' ? (
+              <View style={{ marginHorizontal: 16, marginTop: 12, marginBottom: 24 }}>
+                <View style={{
+                  backgroundColor: '#ffffff',
+                  borderWidth: 1,
+                  borderColor: '#E5E7EB',
+                  borderRadius: 14,
+                  overflow: 'hidden',
                 }}>
-                  {toIndianCurrency(closingBalance)}
-                </Text>
-              </View>
-            </View>
-          ) : null}
-        </>
-      )}
+                  {[
+                    { label: 'Gross Sale / कुल बिक्री', amount: totalGross, deduct: false },
+                    { label: 'Less Freight / भाड़ा', amount: totalFreight, deduct: true },
+                    { label: `Less Commission (${commissionPct}%) / कमीशन`, amount: commission, deduct: true },
+                    { label: 'Less APMC / मंडी शुल्क', amount: totalApmc, deduct: true },
+                    { label: 'Less Cartage', amount: totalCartage, deduct: true },
+                    { label: 'Less Tele & Post', amount: telePost, deduct: true },
+                    { label: 'Less Bardana', amount: totalBardana, deduct: true },
+                  ].map(row => (
+                    <View key={row.label} style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      paddingHorizontal: 16,
+                      paddingVertical: 14,
+                      borderBottomWidth: 1,
+                      borderBottomColor: '#E5E7EB',
+                    }}>
+                      <Text style={{ fontSize: 14, color: '#071e27' }}>{row.label}</Text>
+                      <Text style={{
+                        fontSize: 14,
+                        fontWeight: '700',
+                        color: row.deduct ? '#ba1a1a' : '#071e27',
+                      }}>
+                        {row.deduct ? '-' : null}{toIndianCurrency(row.amount)}
+                      </Text>
+                    </View>
+                  ))}
 
-      {/* Export options modal */}
+                  {/* NET TO SENDER row */}
+                  <View style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    backgroundColor: '#e8f5e9',
+                    paddingHorizontal: 16,
+                    paddingVertical: 18,
+                  }}>
+                    <Text style={{ fontSize: 16, fontWeight: '900', color: '#00450d' }}>
+                      NET TO SENDER
+                    </Text>
+                    <Text style={{ fontSize: 22, fontWeight: '900', color: '#00450d' }}>
+                      {toIndianCurrency(netToSender)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            ) : null}
+
+            {/* TAB 3: Payments */}
+            {activeTab === 'payments' ? (
+              <View style={{ marginHorizontal: 16, marginTop: 12, marginBottom: 24 }}>
+                {/* Summary cards */}
+                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
+                  {[
+                    { label: 'Cash', amount: cashInquiries.reduce((s, i) => s + i.netAmount, 0), count: cashInquiries.length, color: '#00450d' },
+                    { label: 'UPI', amount: upiInquiries.reduce((s, i) => s + i.netAmount, 0), count: upiInquiries.length, color: '#0277bd' },
+                    { label: 'उधारी', amount: udhaariInquiries.reduce((s, i) => s + i.netAmount, 0), count: udhaariInquiries.length, color: '#ba1a1a' },
+                  ].map(card => (
+                    <View key={card.label} style={{
+                      flex: 1,
+                      backgroundColor: '#ffffff',
+                      borderWidth: 1,
+                      borderColor: '#E5E7EB',
+                      borderRadius: 12,
+                      padding: 14,
+                      borderTopWidth: 3,
+                      borderTopColor: card.color,
+                      alignItems: 'center',
+                    }}>
+                      <Text style={{ fontSize: 11, color: '#64748B', marginBottom: 4 }}>{card.label}</Text>
+                      <Text style={{ fontSize: 13, fontWeight: '900', color: card.color }}>
+                        {toIndianCurrency(card.amount)}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>{card.count} bills</Text>
+                    </View>
+                  ))}
+                </View>
+
+                {/* Udhaari breakdown */}
+                {udhaariInquiries.length > 0 ? (
+                  <View style={{
+                    backgroundColor: '#ffffff',
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB',
+                    borderRadius: 14,
+                    overflow: 'hidden',
+                  }}>
+                    <View style={{ paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                        Udhaari Breakdown
+                      </Text>
+                    </View>
+                    {udhaariInquiries.map((inq: Inquiry) => (
+                      <View key={inq.id} style={{
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        paddingVertical: 12,
+                        paddingHorizontal: 16,
+                        borderBottomWidth: 1,
+                        borderBottomColor: '#E5E7EB',
+                      }}>
+                        <View>
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: '#071e27' }}>{inq.customerName}</Text>
+                          <Text style={{ fontSize: 12, color: '#64748B' }}>#{inq.slipNumber} · {inq.grade}</Text>
+                        </View>
+                        <Text style={{ fontSize: 14, fontWeight: '800', color: '#ba1a1a' }}>
+                          {toIndianCurrency(inq.netAmount)}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
+            ) : null}
+
+            {/* TAB 4: Cash Book */}
+            {activeTab === 'cashbook' ? (
+              <View style={{ paddingBottom: 120 }}>
+                <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
+                  {/* Add entry button */}
+                  <Pressable
+                    testID="add-cash-entry"
+                    onPress={() => setShowEntryModal(true)}
+                    style={({ pressed }) => ({
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6,
+                      height: 44,
+                      borderRadius: 12,
+                      marginBottom: 14,
+                      backgroundColor: pressed ? '#005a10' : '#00450d',
+                    })}
+                  >
+                    <Plus size={16} color="#FFF" />
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#FFF' }}>+ एंट्री जोड़ें</Text>
+                  </Pressable>
+
+                  {/* Receipts */}
+                  <View style={{
+                    backgroundColor: '#ffffff',
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB',
+                    borderRadius: 14,
+                    overflow: 'hidden',
+                    marginBottom: 14,
+                  }}>
+                    <View style={{ paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', backgroundColor: '#f0fdf4' }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#00450d', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                        Receipts
+                      </Text>
+                    </View>
+                    {allReceipts.length === 0 ? (
+                      <View style={{ paddingHorizontal: 16, paddingVertical: 16 }}>
+                        <Text style={{ color: '#64748B', fontSize: 14 }}>No receipts</Text>
+                      </View>
+                    ) : allReceipts.map((e, idx) => (
+                      <View key={`${e.id}-${idx}`} style={{
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        paddingVertical: 12,
+                        paddingHorizontal: 16,
+                        borderBottomWidth: 1,
+                        borderBottomColor: '#E5E7EB',
+                      }}>
+                        <Text style={{ flex: 1, fontSize: 14, color: '#071e27' }} numberOfLines={1}>{e.description}</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#00450d' }}>
+                          +{toIndianCurrency(e.amount)}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* Payments */}
+                  <View style={{
+                    backgroundColor: '#ffffff',
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB',
+                    borderRadius: 14,
+                    overflow: 'hidden',
+                    marginBottom: 14,
+                  }}>
+                    <View style={{ paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', backgroundColor: '#fff5f5' }}>
+                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#ba1a1a', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                        Payments
+                      </Text>
+                    </View>
+                    {allPayments.length === 0 ? (
+                      <View style={{ paddingHorizontal: 16, paddingVertical: 16 }}>
+                        <Text style={{ color: '#64748B', fontSize: 14 }}>No payments</Text>
+                      </View>
+                    ) : allPayments.map(e => (
+                      <View key={e.id} style={{
+                        flexDirection: 'row',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        paddingVertical: 12,
+                        paddingHorizontal: 16,
+                        borderBottomWidth: 1,
+                        borderBottomColor: '#E5E7EB',
+                      }}>
+                        <Text style={{ flex: 1, fontSize: 14, color: '#071e27' }} numberOfLines={1}>{e.description}</Text>
+                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#ba1a1a' }}>
+                          -{toIndianCurrency(e.amount)}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Closing balance sticky */}
+                <View style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  backgroundColor: '#ffffff',
+                  borderTopWidth: 2,
+                  borderTopColor: '#E5E7EB',
+                  padding: 16,
+                  flexDirection: 'row',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: -3 },
+                  shadowOpacity: 0.1,
+                  shadowRadius: 6,
+                  elevation: 10,
+                }}>
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: '#071e27' }}>बैलेंस</Text>
+                  <Text style={{
+                    fontSize: 22,
+                    fontWeight: '900',
+                    color: closingBalance >= 0 ? '#00450d' : '#ba1a1a',
+                  }}>
+                    {toIndianCurrency(closingBalance)}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Export options modal — kept exactly as-is */}
       <Modal
         visible={showExportMenu}
         transparent
@@ -641,7 +866,7 @@ export default function DaySummaryScreen() {
         </Pressable>
       </Modal>
 
-      {/* Cash entry modal */}
+      {/* Cash entry modal — kept exactly as-is */}
       <Modal
         visible={showEntryModal}
         transparent
