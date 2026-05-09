@@ -1,4 +1,5 @@
 import React from 'react';
+import { BottomNavBar } from '@/components/common/BottomNavBar';
 import { View, Text, ScrollView, Pressable, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -228,6 +229,7 @@ export default function SettingsScreen() {
           MandiBook Pro v1.0.0
         </Text>
       </ScrollView>
+      <BottomNavBar />
     </SafeAreaView>
   );
 }

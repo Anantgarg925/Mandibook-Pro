@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { BottomNavBar } from '@/components/common/BottomNavBar';
 import {
   View,
   Text,
@@ -977,6 +978,8 @@ export default function DaySummaryScreen() {
           </View>
         </Pressable>
       </Modal>
+
+      <BottomNavBar />
     </SafeAreaView>
   );
 }
