@@ -71,8 +71,10 @@ function parseShop(shop: {
   teamNames: string;
   createdAt: number;
 }) {
+  const { id, ...rest } = shop;
   return {
-    ...shop,
+    shopId: id,
+    ...rest,
     upiApps: JSON.parse(shop.upiApps) as string[],
     grades: JSON.parse(shop.grades) as { code: string; name: string }[],
     charges: JSON.parse(shop.charges) as {

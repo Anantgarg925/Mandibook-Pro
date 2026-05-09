@@ -87,9 +87,20 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
           setShop(parsed);
           setLoading(false);
           // Background sync from API
-          syncFromApi(parsed.shopId).then((remote) => {
-            if (remote) setShop(remote);
-          });
+          try {
+            const remote = await api.get<ShopData>(`/api/shops/${parsed.shopId}`);
+            if (remote) {
+              setShop(remote);
+              await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(remote));
+            }
+          } catch (err: any) {
+            if (err?.message === 'Shop not found') {
+              // Shop exists locally but not in backend (e.g. created with wrong ID).
+              // Re-create it with the correct ID so trucks can be linked to it.
+              api.post('/api/shops', { ...parsed, id: parsed.shopId }).catch(() => {});
+            }
+            // Other errors (network, etc.) — keep using local cache silently.
+          }
         } else {
           setLoading(false);
         }
@@ -121,7 +132,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
       try {
         await api.put<ShopData>(`/api/shops/${data.shopId}`, data);
       } catch {
-        await api.post<ShopData>('/api/shops', data);
+        await api.post<ShopData>('/api/shops', { ...data, id: data.shopId });
       }
     } catch (err: any) {
       console.warn('[API] Save failed (will use local cache):', err?.message);
