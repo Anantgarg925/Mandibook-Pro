@@ -20,6 +20,7 @@ import { toIndianCurrency, toIndianDate } from '@/lib/formatters';
 import type { Inquiry } from '@/types/inquiry';
 import { SplashScreenView } from '@/components/SplashScreenView';
 import { LaunchView } from '@/components/LaunchView';
+import { AdminPinView } from '@/components/AdminPinView';
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: Colors.warning,
@@ -151,6 +152,8 @@ export default function HomeScreen() {
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
   const [launchVisible, setLaunchVisible] = useState(false);
   const [launchGone, setLaunchGone] = useState(false);
+  const [pinVisible, setPinVisible] = useState(false);
+  const [pinGone, setPinGone] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setMinTimeElapsed(true), 3000);
@@ -363,8 +366,18 @@ export default function HomeScreen() {
           visible={launchVisible}
           shopName={shop?.firmName ?? ''}
           onHide={() => setLaunchGone(true)}
-          onAdminPress={() => {/* home is already shown */}}
-          onMemberPress={() => router.push('/authorization' as any)}
+          onAdminPress={() => setPinVisible(true)}
+          onMemberPress={() => { setLaunchGone(true); router.push('/authorization' as any); }}
+        />
+      ) : null}
+
+      {!pinGone ? (
+        <AdminPinView
+          visible={pinVisible}
+          correctPin={shop?.adminPin ?? ''}
+          onHide={() => setPinGone(true)}
+          onSuccess={() => { setLaunchGone(true); setPinVisible(false); }}
+          onCancel={() => setPinVisible(false)}
         />
       ) : null}
     </SafeAreaView>
