@@ -316,7 +316,10 @@ export default function RegisterTruckScreen() {
             </View>
           </View>
 
-          <SectionLabel text="ग्रेड वजन / Grade-wise Weight" />
+          <SectionLabel text="ग्रेड अनुमान / Grade Estimate (Optional)" />
+          <Text style={{ fontSize: 12, color: Colors.textSecond, marginBottom: Spacing.sm, marginTop: -8 }}>
+            अभी छोड़ सकते हैं — बाद में ट्रक डिटेल से अपडेट करें
+          </Text>
 
           {grades.map((grade) => (
             <View

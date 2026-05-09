@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Plus } from 'lucide-react-native';
+import { ArrowLeft, Plus, Pencil } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useShop } from '@/context/ShopContext';
@@ -107,19 +107,19 @@ export default function TruckDetailScreen() {
         </View>
 
         {/* Grade breakdown table */}
-        <Text
-          style={{
-            fontSize: FontSize.sm,
-            fontWeight: '700',
-            color: Colors.textSecond,
-            textTransform: 'uppercase',
-            letterSpacing: 0.8,
-            paddingHorizontal: Spacing.md,
-            marginBottom: Spacing.xs,
-          }}
-        >
-          Grade Breakdown
-        </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, marginBottom: Spacing.xs }}>
+          <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.textSecond, textTransform: 'uppercase', letterSpacing: 0.8 }}>
+            Grade Breakdown
+          </Text>
+          <Pressable
+            testID="edit-grades-button"
+            onPress={() => router.push({ pathname: '/trucks/edit-grades', params: { truckId: id } })}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6, borderRadius: Radius.sm, backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border }}
+          >
+            <Pencil size={14} color={Colors.primary} />
+            <Text style={{ fontSize: FontSize.xs, color: Colors.primary, fontWeight: '700' }}>Edit</Text>
+          </Pressable>
+        </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
           <View style={{ paddingHorizontal: Spacing.md }}>
