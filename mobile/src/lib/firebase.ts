@@ -33,7 +33,7 @@ let db: Firestore;
 try {
   db = initializeFirestore(app, {
     localCache: memoryLocalCache(),
-    experimentalAutoDetectLongPolling: true,
+    experimentalForceLongPolling: true,
   });
 } catch {
   db = getFirestore(app);
