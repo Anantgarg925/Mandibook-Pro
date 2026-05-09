@@ -486,12 +486,7 @@ export default function DaySummaryScreen() {
                   ))}
 
                   {/* Dashed divider */}
-                  <View style={{
-                    borderStyle: 'dashed',
-                    borderTopWidth: 1,
-                    borderColor: '#717a6d',
-                    marginVertical: 12,
-                  }} />
+                  <View style={{ height: 1, backgroundColor: '#717a6d', opacity: 0.4, marginVertical: 12 }} />
 
                   {/* Net row */}
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>

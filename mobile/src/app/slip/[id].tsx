@@ -6,6 +6,7 @@ import {
   Pressable,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -157,7 +158,7 @@ export default function SlipPreviewScreen() {
                 style={{
                   fontSize: 11,
                   color: '#64748B',
-                  fontVariant: ['tabular-nums'],
+                  letterSpacing: 0.5,
                 }}
               >
                 M: {shop.phone1}
@@ -167,7 +168,7 @@ export default function SlipPreviewScreen() {
                   style={{
                     fontSize: 11,
                     color: '#64748B',
-                    fontVariant: ['tabular-nums'],
+                    letterSpacing: 0.5,
                   }}
                 >
                   M: {shop.phone2}
@@ -218,15 +219,18 @@ export default function SlipPreviewScreen() {
             ) : null}
 
             {/* Dashed divider */}
-            <View
+            <Text
               style={{
-                height: 1,
-                borderTopWidth: 1,
-                borderStyle: 'dashed',
-                borderColor: '#cbd5e1',
+                color: '#cbd5e1',
+                fontSize: 10,
+                letterSpacing: Platform.OS === 'android' ? 2 : 4,
                 marginVertical: 12,
+                textAlign: 'center',
               }}
-            />
+              numberOfLines={1}
+            >
+              {'- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -'}
+            </Text>
 
             {/* Bill meta row */}
             <View
@@ -441,15 +445,18 @@ export default function SlipPreviewScreen() {
             </View>
 
             {/* Dashed divider */}
-            <View
+            <Text
               style={{
-                height: 1,
-                borderTopWidth: 1,
-                borderStyle: 'dashed',
-                borderColor: '#cbd5e1',
+                color: '#cbd5e1',
+                fontSize: 10,
+                letterSpacing: Platform.OS === 'android' ? 2 : 4,
                 marginVertical: 12,
+                textAlign: 'center',
               }}
-            />
+              numberOfLines={1}
+            >
+              {'- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -'}
+            </Text>
 
             {/* Footer */}
             <View style={{ alignItems: 'center', gap: 6 }}>

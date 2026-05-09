@@ -6,7 +6,7 @@ const STORAGE_KEY = 'today_slip_counter';
 
 function getTodayKey() {
   const d = new Date();
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
 }
 
 export async function getNextSlipNumber(shopId: string): Promise<number> {
