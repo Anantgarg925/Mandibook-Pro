@@ -6,67 +6,38 @@ import {
   Pressable,
   ActivityIndicator,
   Alert,
-  DimensionValue,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft } from 'lucide-react-native';
+import {
+  ArrowLeft,
+  Share2,
+  CheckCircle,
+  MessageCircle,
+  Users,
+  Printer,
+} from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useShop } from '@/context/ShopContext';
-import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
+import { Colors } from '@/lib/theme';
 import { toIndianCurrency, toIndianDate } from '@/lib/formatters';
-import { generateCustomerMessage, generateThekedaarMessage, openWhatsApp } from '@/utils/whatsapp';
+import {
+  generateCustomerMessage,
+  generateThekedaarMessage,
+  openWhatsApp,
+} from '@/utils/whatsapp';
 import { printSlip, shareSlipAsPDF } from '@/utils/printSlip';
 import type { Inquiry } from '@/types/inquiry';
 
-const COL: Record<string, DimensionValue> = { desc: '38%', wt: '16%', rate: '16%', amt: '30%' };
-
-function TableCell({
-  value,
-  align = 'left',
-  bold,
-  small,
-}: {
-  value: string;
-  align?: 'left' | 'right' | 'center';
-  bold?: boolean;
-  small?: boolean;
-}) {
-  return (
-    <Text
-      style={{
-        fontSize: small ? 10 : FontSize.xs,
-        fontWeight: bold ? '700' : '400',
-        color: Colors.text,
-        textAlign: align,
-        lineHeight: 16,
-      }}
-    >
-      {value}
-    </Text>
-  );
-}
-
-function SlipDivider({ dashed }: { dashed?: boolean }) {
-  return (
-    <View
-      style={{
-        height: 1,
-        borderTopWidth: 1,
-        borderTopColor: Colors.border,
-        borderStyle: dashed ? 'dashed' : 'solid',
-        marginVertical: 6,
-      }}
-    />
-  );
-}
+const BARCODE_WIDTHS = [1, 2, 1, 3, 1, 2, 1, 4, 2, 1, 3, 1, 2, 1, 2, 3];
 
 export default function SlipPreviewScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { shop } = useShop();
   const [printing, setPrinting] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const { data: inquiry } = useQuery({
     queryKey: ['inquiry', shop?.shopId, id],
@@ -102,7 +73,7 @@ export default function SlipPreviewScreen() {
   if (!inquiry || !shop) {
     return (
       <SafeAreaView
-        style={{ flex: 1, backgroundColor: Colors.background, alignItems: 'center', justifyContent: 'center' }}
+        style={{ flex: 1, backgroundColor: '#E8E8E8', alignItems: 'center', justifyContent: 'center' }}
         edges={['top']}
       >
         <ActivityIndicator color={Colors.primary} size="large" />
@@ -117,296 +88,554 @@ export default function SlipPreviewScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#E8E8E8' }} edges={['top']}>
-      {/* Header */}
+      {/* Header bar */}
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          gap: Spacing.sm,
-          paddingHorizontal: Spacing.md,
-          paddingVertical: Spacing.sm,
-          backgroundColor: Colors.surface,
+          gap: 8,
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          backgroundColor: '#FFFFFF',
           borderBottomWidth: 1,
-          borderBottomColor: Colors.border,
+          borderBottomColor: '#E5E7EB',
         }}
       >
-        <Pressable testID="back-from-slip" onPress={() => router.back()} style={{ padding: 4 }}>
-          <ArrowLeft size={24} color={Colors.text} />
+        <Pressable testID="back-from-slip" onPress={() => router.back()}>
+          <ArrowLeft size={22} color="#071e27" />
         </Pressable>
-        <Text style={{ flex: 1, fontSize: FontSize.md, fontWeight: '800', color: Colors.text }}>
-          Slip Preview #{inquiry.slipNumber}
-        </Text>
+
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 17, fontWeight: '800', color: '#071e27' }}>
+            Delivery Slip
+          </Text>
+          <Text style={{ fontSize: 12, color: '#64748B', marginTop: 1 }}>
+            #{inquiry.slipNumber}
+          </Text>
+        </View>
+
+        <Pressable testID="share-pdf" onPress={handleShare} style={{ marginLeft: 8 }}>
+          <Share2 size={20} color="#64748B" />
+        </Pressable>
       </View>
 
       <ScrollView
-        contentContainerStyle={{ padding: Spacing.md, paddingBottom: 140 }}
+        contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 180 }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Slip card */}
+        {/* Thermal Receipt Card */}
         <View
           testID="slip-card"
           style={{
-            backgroundColor: Colors.surface,
-            borderRadius: Radius.sm,
-            padding: Spacing.md,
+            backgroundColor: '#FFFFFF',
+            borderRadius: 4,
             shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 6,
-            elevation: 4,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.15,
+            shadowRadius: 10,
+            elevation: 6,
+            marginBottom: 20,
           }}
         >
-          {/* Phones row */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-            <Text style={{ fontSize: 11, color: Colors.textSecond }}>M:{shop.phone1}</Text>
-            {shop.phone2 ? (
-              <Text style={{ fontSize: 11, color: Colors.textSecond }}>M:{shop.phone2}</Text>
-            ) : null}
-          </View>
-
-          {/* Firm header */}
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: '900',
-              color: Colors.primary,
-              textAlign: 'center',
-              letterSpacing: 0.3,
-            }}
-          >
-            {shop.firmName}
-          </Text>
-          <Text style={{ fontSize: 11, color: Colors.textSecond, textAlign: 'center', marginTop: 2 }}>
-            {shop.address}
-          </Text>
-          <Text style={{ fontSize: 11, color: Colors.textSecond, textAlign: 'center' }}>
-            {shop.city}
-          </Text>
-          {upiLine ? (
-            <Text style={{ fontSize: 11, color: Colors.textSecond, textAlign: 'center' }}>
-              {upiLine}
-            </Text>
-          ) : null}
-
-          <SlipDivider />
-
-          {/* Bill meta */}
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-            <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text }}>
-              No. {inquiry.slipNumber}
-            </Text>
-            <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond }}>
-              Date: {toIndianDate(inquiry.date)}
-            </Text>
-          </View>
-          <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text }}>
-            M/s. {inquiry.customerName}
-          </Text>
-          {inquiry.customerPhone ? (
-            <Text style={{ fontSize: 11, color: Colors.textSecond }}>📞 {inquiry.customerPhone}</Text>
-          ) : null}
-
-          <SlipDivider />
-
-          {/* Table header */}
-          <View style={{ flexDirection: 'row', paddingBottom: 4, borderBottomWidth: 1, borderBottomColor: Colors.text }}>
-            <Text style={{ width: COL.desc, fontSize: FontSize.xs, fontWeight: '700', color: Colors.text }}>Description</Text>
-            <Text style={{ width: COL.wt, fontSize: FontSize.xs, fontWeight: '700', color: Colors.text, textAlign: 'right' }}>Wt</Text>
-            <Text style={{ width: COL.rate, fontSize: FontSize.xs, fontWeight: '700', color: Colors.text, textAlign: 'right' }}>Rate</Text>
-            <Text style={{ width: COL.amt, fontSize: FontSize.xs, fontWeight: '700', color: Colors.text, textAlign: 'right' }}>Amt</Text>
-          </View>
-
-          {/* Grade row */}
-          <View style={{ flexDirection: 'row', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
-            <View style={{ width: COL.desc }}>
-              <TableCell value={`${inquiry.grade} (${inquiry.gradeName})`} bold />
-              <TableCell value={`${inquiry.sacks}×${inquiry.weightPerSack}kg`} small />
-            </View>
-            <View style={{ width: COL.wt, alignItems: 'flex-end' }}>
-              <TableCell value={`${inquiry.totalWeight}kg`} align="right" />
-            </View>
-            <View style={{ width: COL.rate, alignItems: 'flex-end' }}>
-              <TableCell value={`₹${inquiry.ratePerKg}`} align="right" />
-            </View>
-            <View style={{ width: COL.amt, alignItems: 'flex-end' }}>
-              <TableCell value={String(Math.round(inquiry.grossAmount))} align="right" bold />
-            </View>
-          </View>
-
-          {/* Charges rows */}
-          {[
-            ['APMC', inquiry.apmcAmount],
-            ['Bardana', inquiry.bardanaAmount],
-            ...(inquiry.cartageAmount > 0 ? [['Cartage', inquiry.cartageAmount]] : []),
-          ].map(([label, val]) => (
-            <View key={String(label)} style={{ flexDirection: 'row', paddingVertical: 3, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
-              <Text style={{ flex: 1, fontSize: FontSize.xs, color: Colors.textSecond }}>{String(label)}</Text>
-              <Text style={{ width: COL.amt, fontSize: FontSize.xs, color: Colors.danger, textAlign: 'right' }}>
-                {String(Math.round(Number(val)))}
-              </Text>
-            </View>
-          ))}
-
-          {/* Net amount */}
+          {/* Top jagged edge */}
           <View
             style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              paddingVertical: 6,
-              borderTopWidth: 2,
-              borderTopColor: Colors.text,
-              borderBottomWidth: 2,
-              borderBottomColor: Colors.text,
-              marginTop: 2,
+              height: 12,
+              backgroundColor: '#FFFFFF',
+              borderTopWidth: 3,
+              borderTopColor: '#E8E8E8',
+              borderStyle: 'dotted',
+              borderRadius: 2,
             }}
-          >
-            <Text style={{ fontSize: FontSize.md, fontWeight: '900', color: Colors.text }}>
-              NET AMOUNT
-            </Text>
-            <Text style={{ fontSize: FontSize.md, fontWeight: '900', color: Colors.success }}>
-              {toIndianCurrency(inquiry.netAmount)}
-            </Text>
-          </View>
+          />
 
-          <SlipDivider />
+          {/* Receipt body */}
+          <View style={{ paddingHorizontal: 20, paddingBottom: 20 }}>
+            {/* Phones row */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+              <Text
+                style={{
+                  fontSize: 11,
+                  color: '#64748B',
+                  fontVariant: ['tabular-nums'],
+                }}
+              >
+                M: {shop.phone1}
+              </Text>
+              {shop.phone2 ? (
+                <Text
+                  style={{
+                    fontSize: 11,
+                    color: '#64748B',
+                    fontVariant: ['tabular-nums'],
+                  }}
+                >
+                  M: {shop.phone2}
+                </Text>
+              ) : null}
+            </View>
 
-          <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>
-            Payment: <Text style={{ fontWeight: '700', color: Colors.text }}>{inquiry.paymentMode}</Text>
-            {inquiry.upiRef ? ` [${inquiry.upiRef}]` : null}
-          </Text>
-          <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>
-            Truck: {inquiry.truckNumber}
-          </Text>
-
-          <SlipDivider />
-
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: Colors.success }}>
-              Authorized ✓
-            </Text>
-            <View
+            {/* Firm name */}
+            <Text
               style={{
-                width: 72,
-                height: 36,
-                borderWidth: 1,
-                borderColor: Colors.border,
-                borderRadius: 4,
-                alignItems: 'center',
-                justifyContent: 'center',
+                textAlign: 'center',
+                fontSize: 20,
+                fontWeight: '900',
+                color: '#00450d',
+                letterSpacing: 0.5,
+                marginBottom: 4,
               }}
             >
-              <Text style={{ fontSize: 9, color: Colors.border }}>STAMP</Text>
+              {shop.firmName}
+            </Text>
+
+            {/* Address */}
+            <Text
+              style={{
+                textAlign: 'center',
+                fontSize: 11,
+                color: '#64748B',
+                lineHeight: 18,
+              }}
+            >
+              {shop.address}
+              {'\n'}
+              {shop.city}
+            </Text>
+
+            {/* UPI line */}
+            {upiLine ? (
+              <Text
+                style={{
+                  textAlign: 'center',
+                  fontSize: 11,
+                  color: '#64748B',
+                  marginTop: 2,
+                }}
+              >
+                {upiLine}
+              </Text>
+            ) : null}
+
+            {/* Dashed divider */}
+            <View
+              style={{
+                height: 1,
+                borderTopWidth: 1,
+                borderStyle: 'dashed',
+                borderColor: '#cbd5e1',
+                marginVertical: 12,
+              }}
+            />
+
+            {/* Bill meta row */}
+            <View
+              style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '800', color: '#071e27' }}>
+                No. {inquiry.slipNumber}
+              </Text>
+              <Text style={{ fontSize: 11, color: '#64748B' }}>
+                Date: {toIndianDate(inquiry.date)}
+              </Text>
+            </View>
+
+            {/* Customer row */}
+            <Text style={{ fontSize: 14, fontWeight: '700', color: '#071e27' }}>
+              M/s. {inquiry.customerName}
+            </Text>
+            {inquiry.customerPhone ? (
+              <Text style={{ fontSize: 11, color: '#64748B' }}>{inquiry.customerPhone}</Text>
+            ) : null}
+
+            {/* Solid divider */}
+            <View
+              style={{ height: 1, backgroundColor: '#071e27', marginVertical: 8 }}
+            />
+
+            {/* Table header */}
+            <View
+              style={{
+                flexDirection: 'row',
+                paddingBottom: 6,
+                borderBottomWidth: 1,
+                borderBottomColor: '#E5E7EB',
+              }}
+            >
+              <Text
+                style={{
+                  flex: 2,
+                  fontSize: 11,
+                  fontWeight: '700',
+                  color: '#64748B',
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                }}
+              >
+                Item
+              </Text>
+              <Text
+                style={{
+                  width: 60,
+                  fontSize: 11,
+                  fontWeight: '700',
+                  color: '#64748B',
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                  textAlign: 'right',
+                }}
+              >
+                Qty
+              </Text>
+              <Text
+                style={{
+                  width: 50,
+                  fontSize: 11,
+                  fontWeight: '700',
+                  color: '#64748B',
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                  textAlign: 'right',
+                }}
+              >
+                Rate
+              </Text>
+              <Text
+                style={{
+                  width: 70,
+                  fontSize: 11,
+                  fontWeight: '700',
+                  color: '#64748B',
+                  textTransform: 'uppercase',
+                  letterSpacing: 0.5,
+                  textAlign: 'right',
+                }}
+              >
+                Total
+              </Text>
+            </View>
+
+            {/* Grade row */}
+            <View
+              style={{
+                flexDirection: 'row',
+                paddingVertical: 10,
+                borderBottomWidth: 1,
+                borderBottomColor: '#f1f5f9',
+              }}
+            >
+              <View style={{ flex: 2 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#071e27' }}>
+                  {inquiry.grade}
+                </Text>
+                <Text style={{ fontSize: 11, color: '#64748B' }}>{inquiry.gradeName}</Text>
+                <Text style={{ fontSize: 11, color: '#64748B' }}>
+                  {inquiry.sacks}x{inquiry.weightPerSack}kg
+                </Text>
+              </View>
+              <Text style={{ width: 60, fontSize: 13, color: '#071e27', textAlign: 'right' }}>
+                {inquiry.totalWeight}kg
+              </Text>
+              <Text style={{ width: 50, fontSize: 13, color: '#071e27', textAlign: 'right' }}>
+                {'\u20B9'}{inquiry.ratePerKg}
+              </Text>
+              <Text
+                style={{
+                  width: 70,
+                  fontSize: 14,
+                  fontWeight: '800',
+                  color: '#00450d',
+                  textAlign: 'right',
+                }}
+              >
+                {inquiry.grossAmount.toFixed(0)}
+              </Text>
+            </View>
+
+            {/* APMC charge */}
+            <View
+              style={{
+                flexDirection: 'row',
+                paddingVertical: 6,
+                borderBottomWidth: 1,
+                borderBottomColor: '#f1f5f9',
+              }}
+            >
+              <Text style={{ flex: 1, fontSize: 12, color: '#64748B' }}>APMC</Text>
+              <Text style={{ width: 70, fontSize: 12, color: '#ba1a1a', textAlign: 'right' }}>
+                {Math.round(inquiry.apmcAmount)}
+              </Text>
+            </View>
+
+            {/* Bardana charge */}
+            {inquiry.bardanaAmount > 0 ? (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  paddingVertical: 6,
+                  borderBottomWidth: 1,
+                  borderBottomColor: '#f1f5f9',
+                }}
+              >
+                <Text style={{ flex: 1, fontSize: 12, color: '#64748B' }}>Bardana</Text>
+                <Text style={{ width: 70, fontSize: 12, color: '#ba1a1a', textAlign: 'right' }}>
+                  {Math.round(inquiry.bardanaAmount)}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Cartage charge */}
+            {inquiry.cartageAmount > 0 ? (
+              <View
+                style={{
+                  flexDirection: 'row',
+                  paddingVertical: 6,
+                  borderBottomWidth: 1,
+                  borderBottomColor: '#f1f5f9',
+                }}
+              >
+                <Text style={{ flex: 1, fontSize: 12, color: '#64748B' }}>Cartage</Text>
+                <Text style={{ width: 70, fontSize: 12, color: '#ba1a1a', textAlign: 'right' }}>
+                  {Math.round(inquiry.cartageAmount)}
+                </Text>
+              </View>
+            ) : null}
+
+            {/* Net Amount box */}
+            <View
+              style={{
+                backgroundColor: 'rgba(27,94,32,0.08)',
+                borderRadius: 10,
+                padding: 14,
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginTop: 10,
+                marginBottom: 4,
+                borderWidth: 1,
+                borderColor: 'rgba(0,69,13,0.12)',
+              }}
+            >
+              <View>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#1b5e20' }}>
+                  Net Amount
+                </Text>
+                <Text style={{ fontSize: 11, color: '#1b5e20', opacity: 0.7 }}>
+                  {'\u0915\u0941\u0932 \u0930\u093E\u0936\u093F'}
+                </Text>
+              </View>
+              <Text style={{ fontSize: 22, fontWeight: '900', color: '#1b5e20' }}>
+                {toIndianCurrency(inquiry.netAmount)}
+              </Text>
+            </View>
+
+            {/* Payment + Truck row */}
+            <View style={{ marginTop: 12, gap: 4 }}>
+              <Text style={{ fontSize: 12, color: '#64748B' }}>
+                Payment: {inquiry.paymentMode}
+                {inquiry.upiRef ? ` [${inquiry.upiRef}]` : null}
+              </Text>
+              <Text style={{ fontSize: 12, color: '#64748B' }}>
+                Truck: {inquiry.truckNumber}
+              </Text>
+            </View>
+
+            {/* Dashed divider */}
+            <View
+              style={{
+                height: 1,
+                borderTopWidth: 1,
+                borderStyle: 'dashed',
+                borderColor: '#cbd5e1',
+                marginVertical: 12,
+              }}
+            />
+
+            {/* Footer */}
+            <View style={{ alignItems: 'center', gap: 6 }}>
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: '800',
+                  color: '#00450d',
+                  textAlign: 'center',
+                }}
+              >
+                {'\u0927\u0928\u094D\u092F\u0935\u093E\u0926'}
+              </Text>
+              <Text style={{ fontSize: 11, color: '#94A3B8', textAlign: 'center' }}>
+                Thank You for your business!
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 4, alignItems: 'center' }}>
+                <CheckCircle size={14} color="#00450d" />
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#00450d' }}>
+                  Authorized {'\u2713'}
+                </Text>
+              </View>
+            </View>
+
+            {/* Barcode decoration */}
+            <View
+              style={{
+                marginTop: 12,
+                flexDirection: 'row',
+                gap: 1.5,
+                height: 40,
+                opacity: 0.15,
+                overflow: 'hidden',
+                width: '100%',
+              }}
+            >
+              {BARCODE_WIDTHS.map((w, i) => (
+                <View
+                  key={i}
+                  style={{
+                    width: w * 2.5,
+                    height: '100%',
+                    backgroundColor: '#071e27',
+                  }}
+                />
+              ))}
             </View>
           </View>
 
-          <SlipDivider dashed />
-
-          <Text style={{ fontSize: 11, color: Colors.textSecond, textAlign: 'center' }}>
-            वजन की जिम्मेदारी हमारी नहीं
-          </Text>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 2 }}>
-            <Text style={{ fontSize: 11, color: Colors.textSecond }}>E.&O.E.</Text>
-            <Text style={{ fontSize: 11, color: Colors.textSecond }}>धन्यवाद! 🙏</Text>
-          </View>
+          {/* Bottom jagged edge */}
+          <View
+            style={{
+              height: 12,
+              backgroundColor: '#FFFFFF',
+              borderTopWidth: 3,
+              borderTopColor: '#E8E8E8',
+              borderStyle: 'dotted',
+              borderRadius: 2,
+            }}
+          />
         </View>
+
+        {/* Action Grid */}
+        {/* Row 1: WhatsApp buttons */}
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <Pressable
+            testID="wa-customer"
+            onPress={() =>
+              openWhatsApp(inquiry.customerPhone, generateCustomerMessage(inquiry, shop))
+            }
+            style={({ pressed }) => ({
+              flex: 1,
+              backgroundColor: pressed ? '#F8FAFC' : '#FFFFFF',
+              borderWidth: 1,
+              borderColor: '#E5E7EB',
+              borderRadius: 14,
+              height: 60,
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: 14,
+              gap: 10,
+            })}
+          >
+            <MessageCircle size={22} color="#25D366" />
+            <View>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#071e27' }}>Customer</Text>
+              <Text style={{ fontSize: 11, color: '#64748B' }}>
+                {'\u0917\u094D\u0930\u093E\u0939\u0915'}
+              </Text>
+            </View>
+          </Pressable>
+
+          <Pressable
+            testID="wa-thekedaar"
+            onPress={() => openWhatsApp(shop.phone1, generateThekedaarMessage(inquiry, shop))}
+            style={({ pressed }) => ({
+              flex: 1,
+              backgroundColor: pressed ? '#F8FAFC' : '#FFFFFF',
+              borderWidth: 1,
+              borderColor: '#E5E7EB',
+              borderRadius: 14,
+              height: 60,
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingHorizontal: 14,
+              gap: 10,
+            })}
+          >
+            <Users size={22} color="#25D366" />
+            <View>
+              <Text style={{ fontSize: 14, fontWeight: '700', color: '#071e27' }}>Thekedaar</Text>
+              <Text style={{ fontSize: 11, color: '#64748B' }}>
+                {'\u0920\u0947\u0915\u0947\u0926\u093E\u0930'}
+              </Text>
+            </View>
+          </Pressable>
+        </View>
+
+        {/* Row 2: Print Receipt */}
+        <Pressable
+          testID="print-slip"
+          onPress={handlePrint}
+          disabled={printing}
+          style={({ pressed }) => ({
+            marginTop: 10,
+            backgroundColor: pressed ? '#F8FAFC' : '#FFFFFF',
+            borderWidth: 1,
+            borderColor: '#E5E7EB',
+            borderRadius: 14,
+            height: 60,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 10,
+          })}
+        >
+          <Printer size={22} color="#41493e" />
+          <View>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: '#071e27' }}>
+              Print Receipt
+            </Text>
+            <Text style={{ fontSize: 11, color: '#64748B' }}>
+              {'\u0930\u0938\u0940\u0926 \u092A\u094D\u0930\u093F\u0902\u091F \u0915\u0930\u0947\u0902'}
+            </Text>
+          </View>
+        </Pressable>
       </ScrollView>
 
-      {/* Sticky action bar */}
+      {/* Fixed Bottom CTA */}
       <View
         style={{
           position: 'absolute',
           bottom: 0,
           left: 0,
           right: 0,
-          backgroundColor: Colors.surface,
+          backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
-          borderTopColor: Colors.border,
-          padding: Spacing.md,
-          gap: Spacing.sm,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: -3 },
-          shadowOpacity: 0.1,
-          shadowRadius: 6,
-          elevation: 10,
+          borderTopColor: '#E5E7EB',
+          padding: 16,
+          paddingBottom: insets.bottom + 16,
         }}
       >
-        {/* Row 1: WhatsApp buttons */}
-        <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-          <Pressable
-            testID="wa-customer"
-            onPress={() => openWhatsApp(inquiry.customerPhone, generateCustomerMessage(inquiry, shop))}
-            style={({ pressed }) => ({
-              flex: 1,
-              height: 48,
-              borderRadius: Radius.sm,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: pressed ? '#1B5E20' : '#25D366',
-            })}
-          >
-            <Text style={{ fontSize: FontSize.xs, color: '#FFF', fontWeight: '700' }}>
-              📱 WhatsApp ग्राहक
+        <Pressable
+          testID="share-pdf-bottom"
+          onPress={handleShare}
+          disabled={printing}
+          style={({ pressed }) => ({
+            height: 56,
+            backgroundColor: printing ? '#E5E7EB' : pressed ? '#003a0b' : '#00450d',
+            borderRadius: 14,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 12,
+          })}
+        >
+          <CheckCircle size={22} color="#FFFFFF" />
+          <View>
+            <Text style={{ fontSize: 16, fontWeight: '800', color: '#FFFFFF' }}>
+              Authorize Next
             </Text>
-          </Pressable>
-          <Pressable
-            testID="wa-thekedaar"
-            onPress={() =>
-              openWhatsApp(shop.phone1, generateThekedaarMessage(inquiry, shop))
-            }
-            style={({ pressed }) => ({
-              flex: 1,
-              height: 48,
-              borderRadius: Radius.sm,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: pressed ? '#1B5E20' : '#25D366',
-            })}
-          >
-            <Text style={{ fontSize: FontSize.xs, color: '#FFF', fontWeight: '700' }}>
-              📱 WhatsApp ठेकेदार
+            <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>
+              {'\u0905\u0917\u0932\u093E \u0905\u0927\u093F\u0915\u0943\u0924 \u0915\u0930\u0947\u0902'}
             </Text>
-          </Pressable>
-        </View>
-
-        {/* Row 2: Print + Next */}
-        <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-          <Pressable
-            testID="print-slip"
-            onPress={handlePrint}
-            disabled={printing}
-            style={({ pressed }) => ({
-              flex: 1,
-              height: 48,
-              borderRadius: Radius.sm,
-              alignItems: 'center',
-              justifyContent: 'center',
-              backgroundColor: printing ? Colors.border : pressed ? Colors.primaryPressed : Colors.primary,
-            })}
-          >
-            <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>
-              {printing ? '⏳' : '🖨️'} Print Slip
-            </Text>
-          </Pressable>
-          <Pressable
-            testID="share-pdf"
-            onPress={handleShare}
-            disabled={printing}
-            style={({ pressed }) => ({
-              flex: 1,
-              height: 48,
-              borderRadius: Radius.sm,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderWidth: 1,
-              borderColor: Colors.border,
-              backgroundColor: pressed ? Colors.background : Colors.surface,
-            })}
-          >
-            <Text style={{ fontSize: FontSize.sm, color: Colors.text, fontWeight: '700' }}>
-              ⬅ Next Bill
-            </Text>
-          </Pressable>
-        </View>
+          </View>
+        </Pressable>
       </View>
     </SafeAreaView>
   );
