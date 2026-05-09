@@ -65,7 +65,8 @@ trucksRouter.get("/", async (c) => {
   try {
     const where: Record<string, unknown> = { shopId };
     if (dateStr) {
-      where.date = parseInt(dateStr, 10);
+      const dayStart = parseInt(dateStr, 10);
+      where.date = { gte: dayStart, lt: dayStart + 86400000 };
     }
 
     const trucks = await prisma.truck.findMany({ where, orderBy: { createdAt: "desc" } });

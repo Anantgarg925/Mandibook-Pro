@@ -67,7 +67,10 @@ inquiriesRouter.get("/", async (c) => {
 
   try {
     const where: Record<string, unknown> = { shopId };
-    if (dateStr) where.date = parseInt(dateStr, 10);
+    if (dateStr) {
+      const dayStart = parseInt(dateStr, 10);
+      where.date = { gte: dayStart, lt: dayStart + 86400000 };
+    }
     if (status) where.status = status;
 
     const inquiries = await prisma.inquiry.findMany({ where, orderBy: { createdAt: "desc" } });
