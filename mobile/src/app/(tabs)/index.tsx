@@ -19,6 +19,7 @@ import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { toIndianCurrency, toIndianDate } from '@/lib/formatters';
 import type { Inquiry } from '@/types/inquiry';
 import { SplashScreenView } from '@/components/SplashScreenView';
+import { LaunchView } from '@/components/LaunchView';
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: Colors.warning,
@@ -148,6 +149,8 @@ export default function HomeScreen() {
   const [search, setSearch] = useState('');
   const [splashGone, setSplashGone] = useState(false);
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
+  const [launchVisible, setLaunchVisible] = useState(false);
+  const [launchGone, setLaunchGone] = useState(false);
 
   useEffect(() => {
     const timer = setTimeout(() => setMinTimeElapsed(true), 3000);
@@ -348,9 +351,22 @@ export default function HomeScreen() {
       {!splashGone && (
         <SplashScreenView
           visible={shopLoading || !minTimeElapsed}
-          onHide={() => setSplashGone(true)}
+          onHide={() => {
+            setSplashGone(true);
+            if (shop) setLaunchVisible(true);
+          }}
         />
       )}
+
+      {(!launchGone && launchVisible) ? (
+        <LaunchView
+          visible={launchVisible}
+          shopName={shop?.firmName ?? ''}
+          onHide={() => setLaunchGone(true)}
+          onAdminPress={() => {/* home is already shown */}}
+          onMemberPress={() => router.push('/authorization' as any)}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }
