@@ -32,12 +32,14 @@ export function LaunchView({ visible, onHide, onAdminPress, onMemberPress, shopN
   const dismiss = (callback: () => void) => {
     if (animationStarted.current) return;
     animationStarted.current = true;
+    const hide = onHide;
     const cb = callback;
+    const handleFinish = () => {
+      hide();
+      setTimeout(cb, 0);
+    };
     opacity.value = withTiming(0, { duration: 380 }, (finished) => {
-      if (finished) {
-        runOnJS(onHide)();
-        runOnJS(cb)();
-      }
+      if (finished) runOnJS(handleFinish)();
     });
   };
 

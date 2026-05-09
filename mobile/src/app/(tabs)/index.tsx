@@ -749,7 +749,7 @@ export default function HomeScreen() {
           visible={shopLoading || !minTimeElapsed}
           onHide={() => {
             setSplashGone(true);
-            if (shop) setLaunchVisible(true);
+            if (shop) setTimeout(() => setLaunchVisible(true), 0);
           }}
         />
       )}
