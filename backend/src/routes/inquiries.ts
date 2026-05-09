@@ -55,11 +55,12 @@ const InquiryUpdateSchema = z.object({
   createdAt: z.number().optional(),
 });
 
-// GET /api/inquiries?shopId=&date=&status=
+// GET /api/inquiries?shopId=&date=&status=&truckId=
 inquiriesRouter.get("/", async (c) => {
   const shopId = c.req.query("shopId");
   const dateStr = c.req.query("date");
   const status = c.req.query("status");
+  const truckId = c.req.query("truckId");
 
   if (!shopId) {
     return c.json({ error: { message: "shopId is required", code: "BAD_REQUEST" } }, 400);
@@ -72,6 +73,7 @@ inquiriesRouter.get("/", async (c) => {
       where.date = { gte: dayStart, lt: dayStart + 86400000 };
     }
     if (status) where.status = status;
+    if (truckId) where.truckId = truckId;
 
     const inquiries = await prisma.inquiry.findMany({ where, orderBy: { createdAt: "desc" } });
     return c.json({ data: inquiries });

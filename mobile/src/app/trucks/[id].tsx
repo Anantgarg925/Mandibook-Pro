@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
+import { View, Text, Pressable, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Plus, Pencil } from 'lucide-react-native';
@@ -8,10 +8,24 @@ import { api } from '@/lib/api';
 import { useShop } from '@/context/ShopContext';
 import InventoryBar from '@/components/truck/InventoryBar';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
-import { toIndianWeight, toIndianDate } from '@/lib/formatters';
+import { toIndianWeight, toIndianDate, toIndianCurrency } from '@/lib/formatters';
 import type { Truck, GradeInventory } from '@/types/truck';
+import type { Inquiry } from '@/types/inquiry';
 
 type BillTab = 'all' | 'confirmed';
+
+const STATUS_COLOR: Record<string, string> = {
+  PENDING: Colors.warning,
+  CONFIRMED: Colors.success,
+  CANCELLED: Colors.danger,
+};
+
+const STATUS_BG: Record<string, string> = {
+  PENDING: '#FFF3E0',
+  CONFIRMED: '#E8F5E9',
+  CANCELLED: '#FFEBEE',
+  UDHAARI: '#FFEBEE',
+};
 
 export default function TruckDetailScreen() {
   const router = useRouter();
@@ -22,6 +36,13 @@ export default function TruckDetailScreen() {
   const { data: truck } = useQuery({
     queryKey: ['truck', shop?.shopId, id],
     queryFn: () => api.get<Truck>(`/api/trucks/${id}?shopId=${shop!.shopId}`),
+    enabled: !!shop?.shopId && !!id,
+    refetchInterval: 10000,
+  });
+
+  const { data: truckBills = [], isLoading: billsLoading } = useQuery({
+    queryKey: ['inquiries', shop?.shopId, 'truck', id],
+    queryFn: () => api.get<Inquiry[]>(`/api/inquiries?shopId=${shop!.shopId}&truckId=${id}`),
     enabled: !!shop?.shopId && !!id,
     refetchInterval: 10000,
   });
@@ -190,16 +211,70 @@ export default function TruckDetailScreen() {
             ))}
           </View>
 
-          {/* Empty bills placeholder */}
-          <View
-            testID="bills-empty"
-            style={{ alignItems: 'center', paddingVertical: Spacing.xl }}
-          >
-            <Text style={{ fontSize: 40, marginBottom: Spacing.sm }}>📄</Text>
-            <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond }}>
-              {tab === 'all' ? 'No bills yet' : 'No confirmed bills'}
-            </Text>
-          </View>
+          {billsLoading ? (
+            <ActivityIndicator testID="truck-bills-loading" color={Colors.primary} style={{ marginVertical: Spacing.lg }} />
+          ) : (() => {
+            const filtered = tab === 'confirmed'
+              ? truckBills.filter((b) => b.status === 'CONFIRMED')
+              : truckBills;
+            if (filtered.length === 0) {
+              return (
+                <View testID="bills-empty" style={{ alignItems: 'center', paddingVertical: Spacing.xl }}>
+                  <Text style={{ fontSize: 40, marginBottom: Spacing.sm }}>📄</Text>
+                  <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond }}>
+                    {tab === 'all' ? 'No bills yet' : 'No confirmed bills'}
+                  </Text>
+                </View>
+              );
+            }
+            return (
+              <View style={{ backgroundColor: Colors.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden' }}>
+                {filtered.map((bill, i) => (
+                  <Pressable
+                    key={bill.id}
+                    testID={`truck-bill-${bill.id}`}
+                    onPress={() => router.push(`/bills/${bill.id}` as any)}
+                    style={({ pressed }) => ({
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      paddingVertical: 12,
+                      paddingHorizontal: Spacing.md,
+                      backgroundColor: pressed ? Colors.background : Colors.surface,
+                      borderBottomWidth: i < filtered.length - 1 ? 1 : 0,
+                      borderBottomColor: Colors.border,
+                      gap: Spacing.sm,
+                    })}
+                  >
+                    <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: '#E8F5E9', alignItems: 'center', justifyContent: 'center' }}>
+                      <Text style={{ fontSize: FontSize.xs, fontWeight: '800', color: Colors.primary }}>
+                        {bill.customerName.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text }} numberOfLines={1}>
+                        {bill.customerName}
+                      </Text>
+                      <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>
+                        {bill.grade} · {bill.sacks} bags
+                      </Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                      <View style={{ paddingHorizontal: 8, paddingVertical: 3, borderRadius: Radius.round, backgroundColor: STATUS_BG[bill.status] ?? '#F5F5F5' }}>
+                        <Text style={{ fontSize: 10, fontWeight: '700', color: STATUS_COLOR[bill.status] ?? Colors.textSecond }}>
+                          {bill.status}
+                        </Text>
+                      </View>
+                      {bill.netAmount > 0 ? (
+                        <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: Colors.text }}>
+                          {toIndianCurrency(bill.netAmount)}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            );
+          })()}
         </View>
       </ScrollView>
 
