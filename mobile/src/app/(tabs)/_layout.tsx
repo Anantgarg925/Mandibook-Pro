@@ -1,4 +1,5 @@
 import React from 'react';
+import { Platform } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Home, FileText, Truck, BarChart2, Settings } from 'lucide-react-native';
 import { useClientOnlyValue } from '@/lib/useClientOnlyValue';
@@ -14,7 +15,12 @@ export default function TabLayout() {
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textSecond,
         tabBarStyle: launchComplete
-          ? { borderTopColor: Colors.border, backgroundColor: Colors.surface, height: 60, paddingBottom: 8 }
+          ? {
+              borderTopColor: Colors.border,
+              backgroundColor: Colors.surface,
+              height: Platform.OS === 'android' ? 56 : 60,
+              paddingBottom: Platform.OS === 'android' ? 4 : 8,
+            }
           : { display: 'none' },
         headerShown: useClientOnlyValue(false, true),
       }}

@@ -509,31 +509,39 @@ export default function HomeScreen() {
             </View>
 
             {/* ── Metric cards (2x2 grid) ── */}
-            <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.md, gap: Spacing.sm }}>
-              <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-                <MetricCard
-                  label="Today's Total Sale"
-                  labelHindi="आज की बिक्री"
-                  value={toIndianCurrency(todaySale)}
-                />
-                <MetricCard
-                  label="Confirmed Bills"
-                  value={String(confirmed.length)}
-                  sub="bills confirmed"
-                />
+            <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.md }}>
+              <View style={{ flexDirection: 'row', marginBottom: Spacing.sm }}>
+                <View style={{ flex: 1, marginRight: Spacing.sm }}>
+                  <MetricCard
+                    label="Today's Total Sale"
+                    labelHindi="आज की बिक्री"
+                    value={toIndianCurrency(todaySale)}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <MetricCard
+                    label="Confirmed Bills"
+                    value={String(confirmed.length)}
+                    sub="bills confirmed"
+                  />
+                </View>
               </View>
-              <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-                <MetricCard
-                  label="Pending Auth"
-                  value={String(pending.length)}
-                  sub="awaiting"
-                  amber
-                />
-                <MetricCard
-                  label="Stock Remaining"
-                  value={`${Math.round((totalStock / 1000) * 10) / 10} t`}
-                  sub={`${trucks.length} trucks`}
-                />
+              <View style={{ flexDirection: 'row' }}>
+                <View style={{ flex: 1, marginRight: Spacing.sm }}>
+                  <MetricCard
+                    label="Pending Auth"
+                    value={String(pending.length)}
+                    sub="awaiting"
+                    amber
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <MetricCard
+                    label="Stock Remaining"
+                    value={`${Math.round((totalStock / 1000) * 10) / 10} t`}
+                    sub={`${trucks.length} trucks`}
+                  />
+                </View>
               </View>
             </View>
 
@@ -728,7 +736,8 @@ export default function HomeScreen() {
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.4,
           shadowRadius: 8,
-          elevation: 6,
+          elevation: 8,
+          zIndex: 100,
         })}
       >
         <Plus size={18} color="#FFF" strokeWidth={3} />
