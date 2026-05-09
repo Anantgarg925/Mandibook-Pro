@@ -1,40 +1,24 @@
-import { useState, useEffect } from 'react';
-import { collection, query, where, onSnapshot, orderBy } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { useShop } from '@/context/ShopContext';
 import type { Truck } from '@/types/truck';
 
 export function useDateTrucks(date: Date) {
   const { shop } = useShop();
-  const [trucks, setTrucks] = useState<Truck[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!shop?.shopId) return;
-    const start = new Date(date);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(date);
-    end.setHours(23, 59, 59, 999);
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  const dateParam = start.getTime();
 
-    const q = query(
-      collection(db, 'shops', shop.shopId, 'trucks'),
-      where('date', '>=', start.getTime()),
-      where('date', '<=', end.getTime()),
-      orderBy('date', 'asc')
-    );
-    const unsub = onSnapshot(
-      q,
-      snap => {
-        setTrucks(snap.docs.map(d => ({ id: d.id, ...d.data() } as Truck)));
-        setLoading(false);
-      },
-      (err) => {
-        console.error('[Firestore] useDateTrucks error:', err.code, err.message);
-        setLoading(false);
-      }
-    );
-    return unsub;
-  }, [shop?.shopId, date.toDateString()]);
+  const { data: trucks = [], isLoading: loading } = useQuery({
+    queryKey: ['trucks', shop?.shopId, dateParam],
+    queryFn: () =>
+      api.get<Truck[]>(
+        `/api/trucks?shopId=${shop!.shopId}&date=${dateParam}`
+      ),
+    enabled: !!shop?.shopId,
+    refetchInterval: 15000,
+  });
 
   return { trucks, loading };
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -19,18 +19,11 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
 } from 'react-native-reanimated';
-import {
-  collection,
-  addDoc,
-  getDocs,
-  query,
-  where,
-  doc,
-  updateDoc,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { useShop } from '@/context/ShopContext';
 import { useTodayTrucks } from '@/hooks/useTodayTrucks';
+import { useBuyers } from '@/hooks/useBuyers';
 import GradeSelector from '@/components/bills/GradeSelector';
 import PaymentSelector from '@/components/bills/PaymentSelector';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
@@ -74,6 +67,8 @@ export default function NewBillScreen() {
   const { truckId: preselectedTruckId } = useLocalSearchParams<{ truckId?: string }>();
   const { shop } = useShop();
   const { trucks } = useTodayTrucks();
+  const { buyers } = useBuyers();
+  const queryClient = useQueryClient();
 
   const [slipNumber, setSlipNumber] = useState<number | null>(null);
   const [selectedTruck, setSelectedTruck] = useState<Truck | null>(null);
@@ -81,14 +76,12 @@ export default function NewBillScreen() {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [buyerSuggestions, setBuyerSuggestions] = useState<Buyer[]>([]);
-  const [allBuyers, setAllBuyers] = useState<Buyer[]>([]);
   const [selectedGrade, setSelectedGrade] = useState<string | null>(null);
   const [sacks, setSacks] = useState(0);
   const [weightPerSack, setWeightPerSack] = useState('');
   const [ratePerKg, setRatePerKg] = useState('');
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('CASH');
   const [upiRef, setUpiRef] = useState('');
-  const [saving, setSaving] = useState(false);
   const [success, setSuccess] = useState(false);
   const [savedSlip, setSavedSlip] = useState<number | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -99,12 +92,6 @@ export default function NewBillScreen() {
   useEffect(() => {
     if (!shop?.shopId) return;
     getNextSlipNumber(shop.shopId).then(setSlipNumber);
-    // Load buyers for search
-    getDocs(collection(db, 'shops', shop.shopId, 'buyers'))
-      .then((snap) => {
-        setAllBuyers(snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Buyer));
-      })
-      .catch(() => {});
   }, [shop?.shopId]);
 
   useEffect(() => {
@@ -117,18 +104,18 @@ export default function NewBillScreen() {
   useEffect(() => {
     const show = sacks > 0 && parseFloat(weightPerSack) > 0;
     calcOpacity.value = withTiming(show ? 1 : 0, { duration: 250 });
-  }, [sacks, weightPerSack]);
+  }, [sacks, weightPerSack, calcOpacity]);
 
   useEffect(() => {
     if (success) successY.value = withTiming(0, { duration: 380 });
-  }, [success]);
+  }, [success, successY]);
 
   const handleCustomerNameChange = (v: string) => {
     setCustomerName(v);
     if (v.length >= 2) {
       const lower = v.toLowerCase();
       setBuyerSuggestions(
-        allBuyers.filter((b) => b.name.toLowerCase().includes(lower)).slice(0, 5)
+        buyers.filter((b) => b.name.toLowerCase().includes(lower)).slice(0, 5)
       );
     } else {
       setBuyerSuggestions([]);
@@ -167,6 +154,51 @@ export default function NewBillScreen() {
     transform: [{ translateY: successY.value }],
   }));
 
+  const saveMutation = useMutation({
+    mutationFn: async (payload: {
+      inquiry: object;
+      truckUpdate: { id: string; gradeInventory: object[] };
+      buyerUpsert?: { name: string; phone: string } | null;
+    }) => {
+      // 1. Create inquiry
+      const inquiry = await api.post('/api/inquiries', payload.inquiry);
+
+      // 2. Update truck inventory (best-effort)
+      try {
+        await api.put(`/api/trucks/${payload.truckUpdate.id}`, {
+          shopId: shop!.shopId,
+          gradeInventory: payload.truckUpdate.gradeInventory,
+        });
+      } catch { /* best-effort */ }
+
+      // 3. Upsert buyer (best-effort)
+      try {
+        if (payload.buyerUpsert) {
+          const existing = buyers.find(
+            (b) =>
+              b.phone === payload.buyerUpsert!.phone ||
+              b.name.toLowerCase() === payload.buyerUpsert!.name.toLowerCase()
+          );
+          if (!existing) {
+            await api.post('/api/buyers', {
+              shopId: shop!.shopId,
+              name: payload.buyerUpsert.name,
+              phone: payload.buyerUpsert.phone,
+              lastTransactionDate: Date.now(),
+            });
+          }
+        }
+      } catch { /* best-effort */ }
+
+      return inquiry;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inquiries', shop?.shopId] });
+      queryClient.invalidateQueries({ queryKey: ['trucks', shop?.shopId] });
+      queryClient.invalidateQueries({ queryKey: ['buyers', shop?.shopId] });
+    },
+  });
+
   const validate = () => {
     const e: Record<string, string> = {};
     if (!selectedTruck) e.truck = 'गाड़ी चुनें';
@@ -178,67 +210,54 @@ export default function NewBillScreen() {
   };
 
   const handleSave = async () => {
-    if (!validate() || !shop?.shopId || !selectedTruck || !selectedGrade || saving) return;
-    setSaving(true);
+    if (!validate() || !shop?.shopId || !selectedTruck || !selectedGrade || saveMutation.isPending) return;
 
     const slip = slipNumber ?? 1001;
     const gradeInfo2 = selectedTruck.gradeInventory.find((g) => g.code === selectedGrade);
     const gradeName = gradeInfo2?.name ?? selectedGrade;
     const result = calc ?? calculateCharges({ sacks, weightPerSack: wps, ratePerKg: 0, charges: { apmcPct: 0, bardanaPerSack: 0, cartagePerKg: 0 } });
 
-    await addDoc(collection(db, 'shops', shop.shopId, 'inquiries'), {
-      shopId: shop.shopId,
-      slipNumber: slip,
-      truckId: selectedTruck.id,
-      truckNumber: selectedTruck.truckNumber,
-      customerName: customerName.trim(),
-      customerPhone: customerPhone.trim(),
-      grade: selectedGrade,
-      gradeName,
-      sacks,
-      weightPerSack: wps,
-      totalWeight: result.totalWeight,
-      ratePerKg: rate,
-      grossAmount: result.gross,
-      apmcAmount: result.apmc,
-      bardanaAmount: result.bardana,
-      cartageAmount: result.cartage,
-      netAmount: result.net,
-      paymentMode,
-      upiRef: upiRef.trim(),
-      status: 'PENDING',
-      date: Date.now(),
-      createdAt: Date.now(),
+    const newInventory = selectedTruck.gradeInventory.map((g) =>
+      g.code === selectedGrade
+        ? { ...g, provisionalKg: g.provisionalKg + result.totalWeight }
+        : g
+    );
+
+    await saveMutation.mutateAsync({
+      inquiry: {
+        shopId: shop.shopId,
+        slipNumber: slip,
+        truckId: selectedTruck.id,
+        truckNumber: selectedTruck.truckNumber,
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        grade: selectedGrade,
+        gradeName,
+        sacks,
+        weightPerSack: wps,
+        totalWeight: result.totalWeight,
+        ratePerKg: rate,
+        grossAmount: result.gross,
+        apmcAmount: result.apmc,
+        bardanaAmount: result.bardana,
+        cartageAmount: result.cartage,
+        netAmount: result.net,
+        paymentMode,
+        upiRef: upiRef.trim(),
+        status: 'PENDING',
+        date: Date.now(),
+        createdAt: Date.now(),
+      },
+      truckUpdate: {
+        id: selectedTruck.id,
+        gradeInventory: newInventory,
+      },
+      buyerUpsert: customerName.trim()
+        ? { name: customerName.trim(), phone: customerPhone.trim() }
+        : null,
     });
 
-    // Update truck's provisionalKg for this grade
-    try {
-      const newInventory = selectedTruck.gradeInventory.map((g) =>
-        g.code === selectedGrade
-          ? { ...g, provisionalKg: g.provisionalKg + result.totalWeight }
-          : g
-      );
-      await updateDoc(doc(db, 'shops', shop.shopId, 'trucks', selectedTruck.id), {
-        gradeInventory: newInventory,
-      });
-    } catch { /* best-effort */ }
-
-    // Upsert buyer
-    try {
-      if (customerName.trim()) {
-        const existing = allBuyers.find((b) => b.phone === customerPhone.trim() || b.name.toLowerCase() === customerName.trim().toLowerCase());
-        if (!existing) {
-          await addDoc(collection(db, 'shops', shop.shopId, 'buyers'), {
-            name: customerName.trim(),
-            phone: customerPhone.trim(),
-            lastTransactionDate: Date.now(),
-          });
-        }
-      }
-    } catch { /* best-effort */ }
-
     setSavedSlip(slip);
-    setSaving(false);
     setSuccess(true);
   };
 
@@ -253,6 +272,7 @@ export default function NewBillScreen() {
     setPaymentMode('CASH');
     setErrors({});
     setSuccess(false);
+    saveMutation.reset();
     successY.value = 400;
     if (shop?.shopId) {
       const next = await getNextSlipNumber(shop.shopId);
@@ -563,7 +583,7 @@ export default function NewBillScreen() {
           <Pressable
             testID="save-bill-button"
             onPress={handleSave}
-            disabled={!formComplete || saving}
+            disabled={!formComplete || saveMutation.isPending}
             style={{
               height: 56,
               borderRadius: Radius.md,
@@ -571,10 +591,10 @@ export default function NewBillScreen() {
               justifyContent: 'center',
               flexDirection: 'row',
               gap: Spacing.sm,
-              backgroundColor: formComplete && !saving ? Colors.success : Colors.border,
+              backgroundColor: formComplete && !saveMutation.isPending ? Colors.success : Colors.border,
             }}
           >
-            {saving ? (
+            {saveMutation.isPending ? (
               <ActivityIndicator color="#FFF" size="small" />
             ) : (
               <Text style={{ fontSize: FontSize.md, color: '#FFF', fontWeight: '700' }}>

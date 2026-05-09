@@ -1,63 +1,35 @@
-import { useState, useEffect } from 'react';
-import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { useShop } from '@/context/ShopContext';
 import type { Buyer, Transaction } from '@/types/inquiry';
 
 export function useBuyers() {
   const { shop } = useShop();
-  const [buyers, setBuyers] = useState<Buyer[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!shop?.shopId) return;
-    const q = query(
-      collection(db, 'shops', shop.shopId, 'buyers'),
-      orderBy('name', 'asc')
-    );
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        setBuyers(snap.docs.map(d => ({ id: d.id, ...d.data() } as Buyer)));
-        setLoading(false);
-      },
-      (err) => {
-        console.error('[Firestore] useBuyers error:', err.code, err.message);
-        setLoading(false);
-      }
-    );
-    return unsub;
-  }, [shop?.shopId]);
+  const { data: buyers = [], isLoading: loading } = useQuery({
+    queryKey: ['buyers', shop?.shopId],
+    queryFn: () => api.get<Buyer[]>(`/api/buyers?shopId=${shop!.shopId}`),
+    enabled: !!shop?.shopId,
+    refetchInterval: 15000,
+  });
 
-  const getBuyer = (code: string) => buyers.find(b => b.code === code) ?? null;
+  const getBuyer = (code: string) => buyers.find((b) => b.code === code) ?? null;
 
   return { buyers, loading, getBuyer };
 }
 
 export function useBuyerTransactions(buyerCode: string) {
   const { shop } = useShop();
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    if (!shop?.shopId || !buyerCode) return;
-    const q = query(
-      collection(db, 'shops', shop.shopId, 'buyers', buyerCode, 'transactions'),
-      orderBy('date', 'desc')
-    );
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        setTransactions(snap.docs.map(d => ({ id: d.id, ...d.data() } as Transaction)));
-        setLoading(false);
-      },
-      (err) => {
-        console.error('[Firestore] useBuyerTransactions error:', err.code, err.message);
-        setLoading(false);
-      }
-    );
-    return unsub;
-  }, [shop?.shopId, buyerCode]);
+  const { data: transactions = [], isLoading: loading } = useQuery({
+    queryKey: ['transactions', shop?.shopId, buyerCode],
+    queryFn: () =>
+      api.get<Transaction[]>(
+        `/api/transactions?shopId=${shop!.shopId}&buyerCode=${buyerCode}`
+      ),
+    enabled: !!shop?.shopId && !!buyerCode,
+    refetchInterval: 15000,
+  });
 
   return { transactions, loading };
 }

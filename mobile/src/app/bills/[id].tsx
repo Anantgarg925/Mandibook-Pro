@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { View, Text, Pressable, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
-import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { useShop } from '@/context/ShopContext';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { toIndianCurrency, toIndianDate, toIndianWeight } from '@/lib/formatters';
@@ -20,22 +20,27 @@ export default function BillDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { shop } = useShop();
-  const [inquiry, setInquiry] = useState<Inquiry | null>(null);
+  const queryClient = useQueryClient();
 
-  useEffect(() => {
-    if (!shop?.shopId || !id) return;
-    const unsub = onSnapshot(
-      doc(db, 'shops', shop.shopId, 'inquiries', id),
-      (snap) => {
-        if (snap.exists()) setInquiry({ id: snap.id, ...snap.data() } as Inquiry);
-      }
-    );
-    return unsub;
-  }, [shop?.shopId, id]);
+  const { data: inquiry } = useQuery({
+    queryKey: ['inquiry', shop?.shopId, id],
+    queryFn: () => api.get<Inquiry>(`/api/inquiries/${id}?shopId=${shop!.shopId}`),
+    enabled: !!shop?.shopId && !!id,
+    refetchInterval: 10000,
+  });
 
-  const updateStatus = async (status: 'CONFIRMED' | 'CANCELLED') => {
+  const statusMutation = useMutation({
+    mutationFn: (status: 'CONFIRMED' | 'CANCELLED') =>
+      api.put(`/api/inquiries/${id}`, { shopId: shop!.shopId, status }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inquiry', shop?.shopId, id] });
+      queryClient.invalidateQueries({ queryKey: ['inquiries', shop?.shopId] });
+    },
+  });
+
+  const updateStatus = (status: 'CONFIRMED' | 'CANCELLED') => {
     if (!shop?.shopId || !id) return;
-    await updateDoc(doc(db, 'shops', shop.shopId, 'inquiries', id), { status });
+    statusMutation.mutate(status);
   };
 
   if (!inquiry) {
@@ -176,6 +181,7 @@ export default function BillDetailScreen() {
           <Pressable
             testID="cancel-bill-button"
             onPress={() => updateStatus('CANCELLED')}
+            disabled={statusMutation.isPending}
             style={{
               flex: 1,
               height: 52,
@@ -191,6 +197,7 @@ export default function BillDetailScreen() {
           <Pressable
             testID="confirm-bill-button"
             onPress={() => updateStatus('CONFIRMED')}
+            disabled={statusMutation.isPending}
             style={{
               flex: 2,
               height: 52,

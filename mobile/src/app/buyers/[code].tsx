@@ -8,10 +8,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   ArrowLeft, CreditCard, MessageCircle,
 } from 'lucide-react-native';
-import {
-  doc, addDoc, updateDoc, collection, increment,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { useShop } from '@/context/ShopContext';
 import { useBuyers, useBuyerTransactions } from '@/hooks/useBuyers';
 import { generateBalanceMessage, openWhatsApp } from '@/utils/whatsapp';
@@ -26,52 +24,64 @@ export default function BuyerLedgerScreen() {
   const { getBuyer } = useBuyers();
   const buyer = getBuyer(code);
   const { transactions, loading } = useBuyerTransactions(code);
+  const queryClient = useQueryClient();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState<PaymentMethod>('CASH');
   const [upiRef, setUpiRef] = useState('');
   const [note, setNote] = useState('');
-  const [saving, setSaving] = useState(false);
 
-  const handleSavePayment = async () => {
-    const amt = parseFloat(amount);
-    if (!amt || amt <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid amount.');
-      return;
-    }
-    if (!shop?.shopId || !buyer) return;
-    setSaving(true);
-    try {
+  const paymentMutation = useMutation({
+    mutationFn: async (payload: {
+      amount: number;
+      method: PaymentMethod;
+      upiRef: string;
+      note: string;
+    }) => {
+      if (!shop?.shopId || !buyer) throw new Error('Missing shop or buyer');
       const now = Date.now();
-      await addDoc(
-        collection(db, 'shops', shop.shopId, 'buyers', buyer.code, 'transactions'),
-        {
-          type: 'PAYMENT',
-          amount: amt,
-          date: now,
-          paymentMethod: method,
-          upiRef: upiRef.trim() || null,
-          note: note.trim() || null,
-          createdAt: now,
-        }
-      );
-      await updateDoc(doc(db, 'shops', shop.shopId, 'buyers', buyer.code), {
-        outstandingBalance: increment(-amt),
-        lastPaymentAmount: amt,
+      await api.post('/api/transactions', {
+        shopId: shop.shopId,
+        buyerCode: buyer.code,
+        type: 'PAYMENT',
+        amount: payload.amount,
+        date: now,
+        paymentMethod: payload.method,
+        upiRef: payload.upiRef || null,
+        note: payload.note || null,
+        createdAt: now,
+      });
+      // Update buyer outstanding balance
+      await api.put(`/api/buyers/${buyer.code}`, {
+        shopId: shop.shopId,
+        outstandingBalance: (buyer.outstandingBalance ?? 0) - payload.amount,
+        lastPaymentAmount: payload.amount,
         lastPaymentDate: now,
         lastTransactionDate: now,
       });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions', shop?.shopId, code] });
+      queryClient.invalidateQueries({ queryKey: ['buyers', shop?.shopId] });
       setModalVisible(false);
       setAmount('');
       setUpiRef('');
       setNote('');
       setMethod('CASH');
-    } catch {
+    },
+    onError: () => {
       Alert.alert('Error', 'Could not save payment. Try again.');
-    } finally {
-      setSaving(false);
+    },
+  });
+
+  const handleSavePayment = () => {
+    const amt = parseFloat(amount);
+    if (!amt || amt <= 0) {
+      Alert.alert('Invalid Amount', 'Please enter a valid amount.');
+      return;
     }
+    paymentMutation.mutate({ amount: amt, method, upiRef, note });
   };
 
   if (!buyer) {
@@ -255,7 +265,6 @@ export default function BuyerLedgerScreen() {
                 borderTopLeftRadius: 20, borderTopRightRadius: 20,
                 padding: Spacing.md,
               }}
-              // Prevent modal close when tapping inside
               onStartShouldSetResponder={() => true}
             >
               <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: Colors.text, marginBottom: Spacing.md }}>
@@ -351,15 +360,15 @@ export default function BuyerLedgerScreen() {
               <Pressable
                 testID="save-payment-btn"
                 onPress={handleSavePayment}
-                disabled={saving}
+                disabled={paymentMutation.isPending}
                 style={({ pressed }) => ({
                   height: 52, borderRadius: Radius.sm,
-                  backgroundColor: saving ? Colors.border : pressed ? '#1A5276' : Colors.info,
+                  backgroundColor: paymentMutation.isPending ? Colors.border : pressed ? '#1A5276' : Colors.info,
                   alignItems: 'center', justifyContent: 'center',
                 })}
               >
                 <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: '#FFF' }}>
-                  {saving ? 'Saving...' : 'Save Payment'}
+                  {paymentMutation.isPending ? 'Saving...' : 'Save Payment'}
                 </Text>
               </Pressable>
             </View>

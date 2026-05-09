@@ -106,7 +106,6 @@
     "expo-video": "3.0.14",
     "expo-video-thumbnails": "10.0.7",
     "expo-web-browser": "15.0.9",
-    "firebase": "^12.12.1",
     "fuse.js": "7.1.0",
     "lottie-react-native": "7.3.4",
     "lucide-react-native": "0.544.0",

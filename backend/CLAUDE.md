@@ -44,8 +44,16 @@
 </routes>
 
 <database>
-  No database is configured by default.
-  If the user needs to persist data or have user accounts, use the database-auth skill and then update this file to reflect the changes.
+  Prisma ORM with SQLite (file:./prisma/dev.db).
+  Schema: backend/prisma/schema.prisma
+  Models: Shop, Truck, Inquiry, Buyer, Transaction
+  Prisma client singleton: backend/src/lib/prisma.ts
+
+  JSON fields (upiApps, grades, charges, teamNames, gradeInventory) are stored as String
+  and serialized/deserialized manually with JSON.parse/stringify in route handlers.
+
+  Migrations: bunx prisma migrate deploy
+  Generate client: bunx prisma generate
 </database>
 
 <package_management>

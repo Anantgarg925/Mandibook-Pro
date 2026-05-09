@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { api } from '@/lib/api';
 
 export type Grade = { code: string; name: string };
 
@@ -87,8 +86,8 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
           const parsed: ShopData = JSON.parse(cached);
           setShop(parsed);
           setLoading(false);
-          // Background sync from Firestore
-          syncFromFirestore(parsed.shopId).then((remote) => {
+          // Background sync from API
+          syncFromApi(parsed.shopId).then((remote) => {
             if (remote) setShop(remote);
           });
         } else {
@@ -101,16 +100,15 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     load();
   }, []);
 
-  const syncFromFirestore = async (shopId: string): Promise<ShopData | null> => {
+  const syncFromApi = async (shopId: string): Promise<ShopData | null> => {
     try {
-      const snap = await getDoc(doc(db, 'shops', shopId));
-      if (snap.exists()) {
-        const data = snap.data() as ShopData;
+      const data = await api.get<ShopData>(`/api/shops/${shopId}`);
+      if (data) {
         await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
         return data;
       }
     } catch (err: any) {
-      console.warn('[Firebase] Sync failed (offline? rules?):', err?.code, err?.message);
+      console.warn('[API] Sync failed:', err?.message);
     }
     return null;
   };
@@ -119,9 +117,14 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     setShop(data);
     try {
-      await setDoc(doc(db, 'shops', data.shopId), data);
+      // Try to update via API; if shop doesn't exist yet, create it
+      try {
+        await api.put<ShopData>(`/api/shops/${data.shopId}`, data);
+      } catch {
+        await api.post<ShopData>('/api/shops', data);
+      }
     } catch (err: any) {
-      console.warn('[Firebase] Save failed (will retry when online):', err?.code, err?.message);
+      console.warn('[API] Save failed (will use local cache):', err?.message);
     }
   }, []);
 

@@ -7,13 +7,12 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
-  FlatList,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Truck } from 'lucide-react-native';
-import { collection, addDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { useShop } from '@/context/ShopContext';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { toIndianNumber } from '@/lib/formatters';
@@ -60,6 +59,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 export default function RegisterTruckScreen() {
   const router = useRouter();
   const { shop } = useShop();
+  const queryClient = useQueryClient();
 
   const [truckNumber, setTruckNumber] = useState('');
   const [senderName, setSenderName] = useState('');
@@ -68,7 +68,6 @@ export default function RegisterTruckScreen() {
   const [totalKg, setTotalKg] = useState('');
   const [freightAmount, setFreightAmount] = useState('');
   const [gradeWeights, setGradeWeights] = useState<Record<string, string>>({});
-  const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
 
   const grades = shop?.grades ?? [];
@@ -77,9 +76,18 @@ export default function RegisterTruckScreen() {
   const diff = Math.abs(totalKgNum - totalEntered);
   const formComplete = truckNumber.trim() && senderName.trim() && totalKgNum > 0;
 
+  const mutation = useMutation({
+    mutationFn: (payload: object) => api.post('/api/trucks', payload),
+    onSuccess: () => {
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      queryClient.invalidateQueries({ queryKey: ['trucks', shop?.shopId] });
+      setSuccess(true);
+    },
+  });
+
   const handleSubmit = async () => {
-    if (!shop?.shopId || !formComplete || submitting) return;
-    setSubmitting(true);
+    if (!shop?.shopId || !formComplete || mutation.isPending) return;
 
     const gradeInventory: GradeInventory[] = grades.map((g) => ({
       code: g.code,
@@ -89,7 +97,7 @@ export default function RegisterTruckScreen() {
       provisionalKg: 0,
     }));
 
-    await addDoc(collection(db, 'shops', shop.shopId, 'trucks'), {
+    mutation.mutate({
       shopId: shop.shopId,
       truckNumber: truckNumber.toUpperCase(),
       senderName,
@@ -102,9 +110,6 @@ export default function RegisterTruckScreen() {
       date: Date.now(),
       createdAt: Date.now(),
     });
-
-    setSubmitting(false);
-    setSuccess(true);
   };
 
   const resetForm = () => {
@@ -116,6 +121,7 @@ export default function RegisterTruckScreen() {
     setFreightAmount('');
     setGradeWeights({});
     setSuccess(false);
+    mutation.reset();
   };
 
   if (success) {
@@ -397,7 +403,7 @@ export default function RegisterTruckScreen() {
           <Pressable
             testID="submit-truck-button"
             onPress={handleSubmit}
-            disabled={!formComplete || submitting}
+            disabled={!formComplete || mutation.isPending}
             style={{
               height: 56,
               borderRadius: Radius.md,
@@ -405,12 +411,12 @@ export default function RegisterTruckScreen() {
               justifyContent: 'center',
               flexDirection: 'row',
               gap: Spacing.sm,
-              backgroundColor: formComplete && !submitting ? Colors.primary : Colors.border,
+              backgroundColor: formComplete && !mutation.isPending ? Colors.primary : Colors.border,
             }}
           >
             <Truck size={20} color="#FFF" />
             <Text style={{ fontSize: FontSize.md, color: '#FFF', fontWeight: '700' }}>
-              {submitting ? 'रजिस्टर हो रही है…' : 'गाड़ी रजिस्टर करें'}
+              {mutation.isPending ? 'रजिस्टर हो रही है…' : 'गाड़ी रजिस्टर करें'}
             </Text>
           </Pressable>
         </View>

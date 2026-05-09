@@ -6,27 +6,31 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
-import { writeBatch, doc, setDoc, collection, addDoc, updateDoc, getDoc, getDocs, query, where, increment } from 'firebase/firestore';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { generateCode } from '@/utils/buyerCode';
 import { useRouter } from 'expo-router';
-import { db } from '@/lib/firebase';
+import { api } from '@/lib/api';
 import { useShop } from '@/context/ShopContext';
+import { useBuyers } from '@/hooks/useBuyers';
 import PaymentSelector from './PaymentSelector';
 import { calculateCharges } from '@/utils/calculations';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { toIndianCurrency } from '@/lib/formatters';
-import type { Inquiry, PaymentMode } from '@/types/inquiry';
+import type { Inquiry, PaymentMode, Buyer } from '@/types/inquiry';
+import type { Truck } from '@/types/truck';
 
 type Props = { inquiry: Inquiry };
 
 export default function PendingInquiryCard({ inquiry }: Props) {
   const router = useRouter();
   const { shop } = useShop();
+  const { buyers } = useBuyers();
+  const queryClient = useQueryClient();
+
   const [rate, setRate] = useState(inquiry.ratePerKg > 0 ? String(inquiry.ratePerKg) : '');
   const [paymentMode, setPaymentMode] = useState<PaymentMode>(inquiry.paymentMode);
   const [upiRef, setUpiRef] = useState(inquiry.upiRef);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [authorizing, setAuthorizing] = useState(false);
   const lastTapRef = useRef<number>(0);
   const shakeRate = useSharedValue(0);
 
@@ -61,8 +65,114 @@ export default function PendingInquiryCard({ inquiry }: Props) {
     );
   };
 
+  const authorizeMutation = useMutation({
+    mutationFn: async () => {
+      if (!shop?.shopId || !calc) throw new Error('Missing data');
+      const result = calc;
+      const now = Date.now();
+
+      // 1. Update inquiry status
+      await api.put(`/api/inquiries/${inquiry.id}`, {
+        shopId: shop.shopId,
+        status: 'CONFIRMED',
+        authorizedAt: now,
+        ratePerKg: rateNum,
+        grossAmount: result.gross,
+        apmcAmount: result.apmc,
+        bardanaAmount: result.bardana,
+        cartageAmount: result.cartage,
+        netAmount: result.net,
+        paymentMode,
+        upiRef: upiRef.trim(),
+      });
+
+      // 2. Update truck gradeInventory (best-effort)
+      try {
+        const truck = await api.get<Truck>(`/api/trucks/${inquiry.truckId}?shopId=${shop.shopId}`);
+        const newInventory = truck.gradeInventory.map((g) =>
+          g.code === inquiry.grade
+            ? {
+                ...g,
+                provisionalKg: Math.max(0, g.provisionalKg - result.totalWeight),
+                confirmedKg: g.confirmedKg + result.totalWeight,
+              }
+            : g
+        );
+        await api.put(`/api/trucks/${inquiry.truckId}`, {
+          shopId: shop.shopId,
+          gradeInventory: newInventory,
+        });
+      } catch { /* best-effort */ }
+
+      // 3. Auto-create/update buyer and add SALE transaction (best-effort)
+      try {
+        const existingCodes = buyers.map((b) => b.code);
+        const existingBuyer = buyers.find(
+          (b) =>
+            (inquiry.customerPhone && b.phone === inquiry.customerPhone) ||
+            b.name.toLowerCase() === inquiry.customerName.toLowerCase()
+        );
+
+        let buyerCode: string;
+
+        if (!existingBuyer) {
+          buyerCode = generateCode(inquiry.customerName, existingCodes);
+          await api.post<Buyer>('/api/buyers', {
+            shopId: shop.shopId,
+            code: buyerCode,
+            name: inquiry.customerName,
+            phone: inquiry.customerPhone || '',
+            outstandingBalance: paymentMode === 'UDHAARI' ? result.net : 0,
+            lastTransactionDate: now,
+            createdAt: now,
+          });
+        } else {
+          buyerCode = existingBuyer.code;
+          await api.put(`/api/buyers/${buyerCode}`, {
+            shopId: shop.shopId,
+            outstandingBalance:
+              paymentMode === 'UDHAARI'
+                ? (existingBuyer.outstandingBalance ?? 0) + result.net
+                : existingBuyer.outstandingBalance ?? 0,
+            lastTransactionDate: now,
+          });
+        }
+
+        await api.post('/api/transactions', {
+          shopId: shop.shopId,
+          buyerCode,
+          type: 'SALE',
+          amount: result.net,
+          date: now,
+          slipNumber: inquiry.slipNumber,
+          createdAt: now,
+        });
+      } catch { /* best-effort */ }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inquiries', shop?.shopId] });
+      queryClient.invalidateQueries({ queryKey: ['trucks', shop?.shopId] });
+      queryClient.invalidateQueries({ queryKey: ['buyers', shop?.shopId] });
+      router.push(`/slip/${inquiry.id}`);
+    },
+    onError: () => {
+      setErrors({ rate: 'Save failed. Try again.' });
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: () =>
+      api.put(`/api/inquiries/${inquiry.id}`, {
+        shopId: shop!.shopId,
+        status: 'CANCELLED',
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inquiries', shop?.shopId] });
+    },
+  });
+
   const handleAuthorize = async () => {
-    if (!shop?.shopId || authorizing) return;
+    if (!shop?.shopId || authorizeMutation.isPending) return;
     const now = Date.now();
     if (now - lastTapRef.current < 3000) return;
     lastTapRef.current = now;
@@ -72,107 +182,14 @@ export default function PendingInquiryCard({ inquiry }: Props) {
     setErrors(e);
     if (e.rate) { shake(shakeRate); return; }
 
-    setAuthorizing(true);
     // 1-second visual pause (double-tap guard)
     await new Promise((r) => setTimeout(r, 1000));
-
-    const result = calc!;
-    const batch = writeBatch(db);
-
-    // 1. Update inquiry
-    const inquiryRef = doc(db, 'shops', shop.shopId, 'inquiries', inquiry.id);
-    batch.update(inquiryRef, {
-      status: 'CONFIRMED',
-      authorizedAt: Date.now(),
-      ratePerKg: rateNum,
-      grossAmount: result.gross,
-      apmcAmount: result.apmc,
-      bardanaAmount: result.bardana,
-      cartageAmount: result.cartage,
-      netAmount: result.net,
-      paymentMode,
-      upiRef: upiRef.trim(),
-    });
-
-    // 2. Commit the batch
-    try {
-      await batch.commit();
-    } catch (err) {
-      setAuthorizing(false);
-      setErrors({ rate: 'Save failed. Try again.' });
-      return;
-    }
-
-    // 3. Deduct from truck gradeInventory (best-effort, post-commit)
-    try {
-      const truckRef = doc(db, 'shops', shop.shopId, 'trucks', inquiry.truckId);
-      const truckSnap = await getDoc(truckRef);
-      if (truckSnap.exists()) {
-        const truck = truckSnap.data();
-        const newInventory = (truck.gradeInventory as Array<{
-          code: string;
-          provisionalKg: number;
-          confirmedKg: number;
-        }>).map((g) =>
-          g.code === inquiry.grade
-            ? {
-                ...g,
-                provisionalKg: Math.max(0, g.provisionalKg - result.totalWeight),
-                confirmedKg: g.confirmedKg + result.totalWeight,
-              }
-            : g
-        );
-        await updateDoc(truckRef, { gradeInventory: newInventory });
-      }
-    } catch { /* best-effort */ }
-
-    // 4. Auto-create/update buyer and add SALE transaction (best-effort)
-    try {
-      const allBuyerCodes = (await getDocs(collection(db, 'shops', shop.shopId, 'buyers'))).docs.map(d => d.data().code as string);
-      const buyerQ = query(
-        collection(db, 'shops', shop.shopId, 'buyers'),
-        where('phone', '==', inquiry.customerPhone || '')
-      );
-      const buyerSnap = await getDocs(buyerQ);
-      let buyerCode: string;
-
-      if (buyerSnap.empty) {
-        buyerCode = generateCode(inquiry.customerName, allBuyerCodes);
-        await setDoc(doc(db, 'shops', shop.shopId, 'buyers', buyerCode), {
-          code: buyerCode,
-          name: inquiry.customerName,
-          phone: inquiry.customerPhone || '',
-          outstandingBalance: paymentMode === 'UDHAARI' ? result.net : 0,
-          lastTransactionDate: Date.now(),
-          createdAt: Date.now(),
-        });
-      } else {
-        buyerCode = buyerSnap.docs[0].data().code as string;
-        await updateDoc(doc(db, 'shops', shop.shopId, 'buyers', buyerCode), {
-          outstandingBalance: paymentMode === 'UDHAARI' ? increment(result.net) : increment(0),
-          lastTransactionDate: Date.now(),
-        });
-      }
-
-      await addDoc(collection(db, 'shops', shop.shopId, 'buyers', buyerCode, 'transactions'), {
-        type: 'SALE',
-        amount: result.net,
-        date: Date.now(),
-        slipNumber: inquiry.slipNumber,
-        createdAt: Date.now(),
-      });
-    } catch { /* best-effort */ }
-
-    setAuthorizing(false);
-    router.push(`/slip/${inquiry.id}`);
+    authorizeMutation.mutate();
   };
 
-  const handleCancel = async () => {
+  const handleCancel = () => {
     if (!shop?.shopId) return;
-    const { updateDoc } = await import('firebase/firestore');
-    await updateDoc(doc(db, 'shops', shop.shopId, 'inquiries', inquiry.id), {
-      status: 'CANCELLED',
-    });
+    cancelMutation.mutate();
   };
 
   return (
@@ -355,6 +372,7 @@ export default function PendingInquiryCard({ inquiry }: Props) {
         <Pressable
           testID={`cancel-inquiry-${inquiry.id}`}
           onPress={handleCancel}
+          disabled={cancelMutation.isPending}
           style={{
             flex: 1,
             height: 48,
@@ -373,7 +391,7 @@ export default function PendingInquiryCard({ inquiry }: Props) {
         <Pressable
           testID={`authorize-${inquiry.id}`}
           onPress={handleAuthorize}
-          disabled={authorizing}
+          disabled={authorizeMutation.isPending}
           style={({ pressed }) => ({
             flex: 2,
             height: 48,
@@ -381,12 +399,12 @@ export default function PendingInquiryCard({ inquiry }: Props) {
             alignItems: 'center',
             justifyContent: 'center',
             backgroundColor:
-              authorizing || pressed
+              authorizeMutation.isPending || pressed
                 ? '#1B5E20'
                 : Colors.success,
           })}
         >
-          {authorizing ? (
+          {authorizeMutation.isPending ? (
             <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>
               ⏳ Processing…
             </Text>

@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { collection, query, where, orderBy, limit, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { api } from '@/lib/api';
+import type { Inquiry } from '@/types/inquiry';
 
 const STORAGE_KEY = 'today_slip_counter';
 
@@ -14,24 +14,16 @@ export async function getNextSlipNumber(shopId: string): Promise<number> {
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
 
-    const q = query(
-      collection(db, 'shops', shopId, 'inquiries'),
-      where('date', '>=', startOfToday.getTime()),
-      orderBy('slipNumber', 'desc'),
-      limit(1)
+    const inquiries = await api.get<Inquiry[]>(
+      `/api/inquiries?shopId=${shopId}&date=${startOfToday.getTime()}`
     );
 
-    const snap = await getDocs(q);
-    if (!snap.empty) {
-      const last = snap.docs[0].data().slipNumber as number;
-      const next = last + 1;
-      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ key: getTodayKey(), value: next }));
-      return next;
-    }
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ key: getTodayKey(), value: 1001 }));
-    return 1001;
+    const maxSlip = inquiries.reduce((max, inq) => Math.max(max, inq.slipNumber ?? 0), 0);
+    const next = maxSlip > 0 ? maxSlip + 1 : 1001;
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ key: getTodayKey(), value: next }));
+    return next;
   } catch {
-    // Firestore unavailable — fall back to AsyncStorage
+    // API unavailable — fall back to AsyncStorage
     try {
       const raw = await AsyncStorage.getItem(STORAGE_KEY);
       if (raw) {

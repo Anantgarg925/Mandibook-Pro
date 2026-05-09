@@ -1,6 +1,5 @@
-import { useState, useEffect } from 'react';
-import { collection, query, orderBy, onSnapshot, addDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { useShop } from '@/context/ShopContext';
 import type { CashEntry } from '@/utils/pdfGenerator';
 
@@ -11,36 +10,49 @@ function dateKey(date: Date): string {
   return `${y}-${m}-${d}`;
 }
 
+function startOfDay(date: Date): number {
+  const d = new Date(date);
+  d.setHours(0, 0, 0, 0);
+  return d.getTime();
+}
+
 export function useCashEntries(date: Date) {
   const { shop } = useShop();
-  const [entries, setEntries] = useState<CashEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   const key = dateKey(date);
+  const dateParam = startOfDay(date);
+  const queryKey = ['cash-entries', shop?.shopId, key, dateParam];
 
-  useEffect(() => {
-    if (!shop?.shopId) return;
-    const q = query(
-      collection(db, 'shops', shop.shopId, 'daySummary', key, 'cashEntries'),
-      orderBy('createdAt', 'asc')
-    );
-    const unsub = onSnapshot(
-      q,
-      snap => {
-        setEntries(snap.docs.map(d => ({ id: d.id, ...d.data() } as CashEntry)));
-        setLoading(false);
-      },
-      (err) => {
-        console.error('[Firestore] useCashEntries error:', err.code, err.message);
-        setLoading(false);
-      }
-    );
-    return unsub;
-  }, [shop?.shopId, key]);
+  const { data: entries = [], isLoading: loading } = useQuery({
+    queryKey,
+    queryFn: () =>
+      api.get<CashEntry[]>(
+        `/api/transactions?shopId=${shop!.shopId}&buyerCode=__cashbook__&date=${dateParam}`
+      ),
+    enabled: !!shop?.shopId,
+    refetchInterval: 15000,
+  });
+
+  const addMutation = useMutation({
+    mutationFn: (entry: Omit<CashEntry, 'id'>) =>
+      api.post<CashEntry>('/api/transactions', {
+        shopId: shop!.shopId,
+        buyerCode: '__cashbook__',
+        type: entry.type,
+        description: entry.description,
+        amount: entry.amount,
+        createdAt: entry.createdAt,
+        date: dateParam,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey });
+    },
+  });
 
   const addEntry = async (entry: Omit<CashEntry, 'id'>) => {
     if (!shop?.shopId) return;
-    await addDoc(collection(db, 'shops', shop.shopId, 'daySummary', key, 'cashEntries'), entry);
+    await addMutation.mutateAsync(entry);
   };
 
   return { entries, loading, addEntry };

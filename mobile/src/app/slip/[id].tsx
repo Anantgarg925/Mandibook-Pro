@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -11,8 +11,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { useShop } from '@/context/ShopContext';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { toIndianCurrency, toIndianDate } from '@/lib/formatters';
@@ -66,23 +66,21 @@ export default function SlipPreviewScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { shop } = useShop();
-  const [inquiry, setInquiry] = useState<Inquiry | null>(null);
   const [printing, setPrinting] = useState(false);
 
-  useEffect(() => {
-    if (!shop?.shopId || !id) return;
-    const unsub = onSnapshot(doc(db, 'shops', shop.shopId, 'inquiries', id), (snap) => {
-      if (snap.exists()) setInquiry({ id: snap.id, ...snap.data() } as Inquiry);
-    });
-    return unsub;
-  }, [shop?.shopId, id]);
+  const { data: inquiry } = useQuery({
+    queryKey: ['inquiry', shop?.shopId, id],
+    queryFn: () => api.get<Inquiry>(`/api/inquiries/${id}?shopId=${shop!.shopId}`),
+    enabled: !!shop?.shopId && !!id,
+    refetchInterval: 10000,
+  });
 
   const handlePrint = async () => {
     if (!inquiry || !shop) return;
     setPrinting(true);
     try {
       await printSlip(inquiry, shop);
-    } catch (e) {
+    } catch {
       Alert.alert('Print Error', 'Could not print. Try Share as PDF instead.');
     } finally {
       setPrinting(false);

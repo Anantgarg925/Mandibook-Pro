@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Shop {
+  id          String  @id @default(cuid())
+  firmName    String
+  ownerName   String
+  address     String
+  city        String
+  phone1      String
+  phone2      String
+  upiId       String
+  upiApps     String  // JSON array of strings
+  commodity   String
+  grades      String  // JSON array of Grade objects
+  charges     String  // JSON ShopCharges object
+  adminPin    String
+  teamNames   String  // JSON array of strings
+  createdAt   Int
+
+  trucks       Truck[]
+  inquiries    Inquiry[]
+  buyers       Buyer[]
+  transactions Transaction[]
+}
+
+model Truck {
+  id             String  @id @default(cuid())
+  shopId         String
+  truckNumber    String
+  senderName     String
+  senderCode     String
+  chlNumber      String
+  totalKg        Float
+  freightAmount  Float
+  gradeInventory String  // JSON array
+  status         String  @default("ACTIVE")
+  date           Int
+  createdAt      Int
+
+  shop       Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  inquiries  Inquiry[]
+}
+
+model Inquiry {
+  id             String  @id @default(cuid())
+  shopId         String
+  slipNumber     Int
+  truckId        String
+  truckNumber    String
+  customerName   String
+  customerPhone  String
+  grade          String
+  gradeName      String
+  sacks          Int
+  weightPerSack  Float
+  totalWeight    Float
+  ratePerKg      Float
+  grossAmount    Float
+  apmcAmount     Float
+  bardanaAmount  Float
+  cartageAmount  Float
+  netAmount      Float
+  paymentMode    String
+  upiRef         String  @default("")
+  status         String  @default("PENDING")
+  date           Int
+  createdAt      Int
+
+  shop  Shop  @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  truck Truck @relation(fields: [truckId], references: [id], onDelete: Cascade)
+}
+
+model Buyer {
+  id                   String  @id @default(cuid())
+  shopId               String
+  code                 String
+  name                 String
+  phone                String
+  outstandingBalance   Float   @default(0)
+  lastTransactionDate  Int
+  lastPaymentAmount    Float?
+  lastPaymentDate      Int?
+  createdAt            Int
+
+  shop         Shop          @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+
+  @@unique([shopId, code])
+}
+
+model Transaction {
+  id            String  @id @default(cuid())
+  shopId        String
+  buyerCode     String
+  type          String  // 'SALE' | 'PAYMENT'
+  amount        Float
+  date          Int
+  paymentMethod String?
+  upiRef        String?
+  note          String?
+  slipNumber    Int?
+  createdAt     Int
+
+  shop  Shop  @relation(fields: [shopId], references: [id], onDelete: Cascade)
+  buyer Buyer @relation(fields: [buyerCode, shopId], references: [code, shopId], onDelete: Cascade)
+}

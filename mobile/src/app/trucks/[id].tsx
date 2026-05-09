@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Pressable, FlatList, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, Pressable, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, Plus } from 'lucide-react-native';
-import { doc, onSnapshot } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { useQuery } from '@tanstack/react-query';
+import { api } from '@/lib/api';
 import { useShop } from '@/context/ShopContext';
 import InventoryBar from '@/components/truck/InventoryBar';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
@@ -17,16 +17,14 @@ export default function TruckDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { shop } = useShop();
-  const [truck, setTruck] = useState<Truck | null>(null);
   const [tab, setTab] = useState<BillTab>('all');
 
-  useEffect(() => {
-    if (!shop?.shopId || !id) return;
-    const unsub = onSnapshot(doc(db, 'shops', shop.shopId, 'trucks', id), (snap) => {
-      if (snap.exists()) setTruck({ id: snap.id, ...snap.data() } as Truck);
-    });
-    return unsub;
-  }, [shop?.shopId, id]);
+  const { data: truck } = useQuery({
+    queryKey: ['truck', shop?.shopId, id],
+    queryFn: () => api.get<Truck>(`/api/trucks/${id}?shopId=${shop!.shopId}`),
+    enabled: !!shop?.shopId && !!id,
+    refetchInterval: 10000,
+  });
 
   if (!truck) {
     return (
