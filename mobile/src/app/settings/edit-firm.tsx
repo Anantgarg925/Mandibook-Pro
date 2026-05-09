@@ -127,7 +127,7 @@ export default function EditFirmScreen() {
             paddingVertical: 8,
             paddingHorizontal: Spacing.md,
             borderRadius: Radius.round,
-            backgroundColor: saving ? Colors.border : pressed ? '#E55A00' : Colors.primary,
+            backgroundColor: saving ? Colors.border : pressed ? Colors.primaryPressed : Colors.primary,
           })}
         >
           {saving ? (

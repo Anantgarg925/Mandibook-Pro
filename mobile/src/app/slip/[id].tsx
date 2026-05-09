@@ -382,7 +382,7 @@ export default function SlipPreviewScreen() {
               borderRadius: Radius.sm,
               alignItems: 'center',
               justifyContent: 'center',
-              backgroundColor: printing ? Colors.border : pressed ? '#E55A00' : Colors.primary,
+              backgroundColor: printing ? Colors.border : pressed ? Colors.primaryPressed : Colors.primary,
             })}
           >
             <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>

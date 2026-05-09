@@ -216,7 +216,7 @@ export default function TruckDetailScreen() {
           width: 60,
           height: 60,
           borderRadius: 30,
-          backgroundColor: pressed ? '#E55A00' : Colors.primary,
+          backgroundColor: pressed ? Colors.primaryPressed : Colors.primary,
           alignItems: 'center',
           justifyContent: 'center',
           shadowColor: '#000',

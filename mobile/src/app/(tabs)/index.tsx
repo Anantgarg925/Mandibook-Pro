@@ -5,19 +5,19 @@ import {
   FlatList,
   Pressable,
   ActivityIndicator,
+  ScrollView,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { Plus, Users, BarChart2, Settings } from 'lucide-react-native';
+import { Plus, Search, Bell, Settings, ChevronRight, Truck } from 'lucide-react-native';
 import { useShop } from '@/context/ShopContext';
 import { useInquiries } from '@/hooks/useInquiries';
 import { useTodayTrucks } from '@/hooks/useTodayTrucks';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { toIndianCurrency, toIndianDate } from '@/lib/formatters';
-import type { Inquiry, InquiryStatus } from '@/types/inquiry';
-
-type FilterTab = 'ALL' | 'PENDING' | 'CONFIRMED' | 'UDHAARI';
+import type { Inquiry } from '@/types/inquiry';
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: Colors.warning,
@@ -25,39 +25,71 @@ const STATUS_COLOR: Record<string, string> = {
   CANCELLED: Colors.danger,
 };
 
-function MetricCard({
-  label,
-  value,
-  sub,
-  accent,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  accent: string;
-}) {
+const STATUS_BG: Record<string, string> = {
+  PENDING: '#FFF3E0',
+  CONFIRMED: '#E8F5E9',
+  CANCELLED: '#FFEBEE',
+  UDHAARI: '#FFEBEE',
+};
+
+function MetricCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent: string }) {
   return (
-    <View
-      style={{
-        flex: 1,
-        backgroundColor: Colors.surface,
-        borderRadius: Radius.md,
-        padding: Spacing.md,
-        borderLeftWidth: 4,
-        borderLeftColor: accent,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 1 },
-        shadowOpacity: 0.06,
-        shadowRadius: 4,
-        elevation: 2,
-      }}
-    >
+    <View style={{
+      flex: 1,
+      backgroundColor: Colors.surface,
+      borderRadius: Radius.md,
+      padding: Spacing.md,
+      borderLeftWidth: 4,
+      borderLeftColor: accent,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 4,
+      elevation: 2,
+    }}>
       <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginBottom: 4 }}>{label}</Text>
       <Text style={{ fontSize: FontSize.xl, fontWeight: '800', color: Colors.text }}>{value}</Text>
-      {sub ? (
-        <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 2 }}>{sub}</Text>
-      ) : null}
+      {sub ? <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 2 }}>{sub}</Text> : null}
     </View>
+  );
+}
+
+function TruckChip({ truck, onPress }: { truck: any; onPress: () => void }) {
+  const available = truck.gradeInventory.reduce(
+    (s: number, g: any) => s + Math.max(0, g.totalKg - g.confirmedKg - g.provisionalKg), 0
+  );
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => ({
+        backgroundColor: pressed ? '#E8F5E9' : Colors.surface,
+        borderRadius: Radius.md,
+        padding: Spacing.md,
+        marginRight: Spacing.sm,
+        width: 160,
+        borderWidth: 1,
+        borderColor: Colors.border,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 1 },
+        shadowOpacity: 0.05,
+        shadowRadius: 3,
+        elevation: 1,
+      })}
+    >
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+        <View style={{ width: 28, height: 28, borderRadius: 6, backgroundColor: '#E8F5E9', alignItems: 'center', justifyContent: 'center' }}>
+          <Truck size={14} color={Colors.primary} />
+        </View>
+        <Text style={{ fontSize: FontSize.xs, fontWeight: '800', color: Colors.primary }} numberOfLines={1}>
+          {truck.truckNumber}
+        </Text>
+      </View>
+      <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }} numberOfLines={1}>{truck.senderName}</Text>
+      <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text, marginTop: 4 }}>
+        {Math.round(available / 1000 * 10) / 10} t
+      </Text>
+      <Text style={{ fontSize: 10, color: Colors.textSecond }}>available</Text>
+    </Pressable>
   );
 }
 
@@ -76,9 +108,7 @@ function BillRow({ item, onPress }: { item: Inquiry; onPress: () => void }) {
         borderBottomColor: Colors.border,
       })}
     >
-      <Text
-        style={{ width: 52, fontSize: FontSize.xs, fontWeight: '700', color: Colors.textSecond }}
-      >
+      <Text style={{ width: 52, fontSize: FontSize.xs, fontWeight: '700', color: Colors.textSecond }}>
         #{item.slipNumber}
       </Text>
       <View style={{ flex: 1 }}>
@@ -90,26 +120,12 @@ function BillRow({ item, onPress }: { item: Inquiry; onPress: () => void }) {
         </Text>
       </View>
       <View style={{ alignItems: 'flex-end', gap: 4 }}>
-        <View
-          style={{
-            paddingHorizontal: 8,
-            paddingVertical: 3,
-            borderRadius: Radius.round,
-            backgroundColor:
-              item.status === 'CONFIRMED'
-                ? '#E8F5E9'
-                : item.status === 'PENDING'
-                  ? '#FFF8E1'
-                  : '#FFEBEE',
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 10,
-              fontWeight: '700',
-              color: STATUS_COLOR[item.status] ?? Colors.textSecond,
-            }}
-          >
+        <View style={{
+          paddingHorizontal: 8, paddingVertical: 3,
+          borderRadius: Radius.round,
+          backgroundColor: STATUS_BG[item.status] ?? '#F5F5F5',
+        }}>
+          <Text style={{ fontSize: 10, fontWeight: '700', color: STATUS_COLOR[item.status] ?? Colors.textSecond }}>
             {item.status}
           </Text>
         </View>
@@ -126,9 +142,9 @@ function BillRow({ item, onPress }: { item: Inquiry; onPress: () => void }) {
 export default function HomeScreen() {
   const router = useRouter();
   const { shop, loading: shopLoading } = useShop();
-  const { inquiries, pending, confirmed, udhaari, loading: billsLoading } = useInquiries();
+  const { inquiries, pending, confirmed, loading: billsLoading } = useInquiries();
   const { trucks } = useTodayTrucks();
-  const [activeFilter, setActiveFilter] = useState<FilterTab>('ALL');
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     if (shopLoading) return;
@@ -138,10 +154,7 @@ export default function HomeScreen() {
 
   if (shopLoading) {
     return (
-      <View
-        testID="home-loading"
-        style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background }}
-      >
+      <View testID="home-loading" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background }}>
         <ActivityIndicator color={Colors.primary} size="large" />
       </View>
     );
@@ -151,36 +164,25 @@ export default function HomeScreen() {
 
   const todaySale = confirmed.reduce((s, i) => s + i.grossAmount, 0);
   const totalStock = trucks.reduce(
-    (sum, t) =>
-      sum +
-      t.gradeInventory.reduce(
-        (s, g) => s + Math.max(0, g.totalKg - g.confirmedKg - g.provisionalKg),
-        0
-      ),
-    0
+    (sum, t) => sum + t.gradeInventory.reduce(
+      (s, g) => s + Math.max(0, g.totalKg - g.confirmedKg - g.provisionalKg), 0
+    ), 0
   );
 
-  const filteredBills: Inquiry[] =
-    activeFilter === 'ALL'
-      ? inquiries
-      : activeFilter === 'PENDING'
-        ? pending
-        : activeFilter === 'CONFIRMED'
-          ? confirmed
-          : udhaari;
+  const initials = shop.firmName.split(' ').slice(0, 2).map((w: string) => w[0]).join('').toUpperCase();
 
-  const FILTERS: { key: FilterTab; label: string; count: number }[] = [
-    { key: 'ALL', label: 'सभी', count: inquiries.length },
-    { key: 'PENDING', label: 'Pending', count: pending.length },
-    { key: 'CONFIRMED', label: 'Confirmed', count: confirmed.length },
-    { key: 'UDHAARI', label: 'उधारी', count: udhaari.length },
-  ];
+  const filteredBills = search
+    ? inquiries.filter(i =>
+        i.customerName.toLowerCase().includes(search.toLowerCase()) ||
+        i.slipNumber.toString().includes(search)
+      )
+    : inquiries.slice(0, 30);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top']}>
       <FlatList
         testID="home-feed"
-        data={filteredBills.slice(0, 50)}
+        data={filteredBills}
         keyExtractor={(i) => i.id}
         renderItem={({ item }) => (
           <BillRow item={item} onPress={() => router.push(`/bills/${item.id}`)} />
@@ -188,186 +190,157 @@ export default function HomeScreen() {
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View>
-            {/* Top bar */}
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                paddingHorizontal: Spacing.md,
-                paddingTop: Spacing.sm,
-                paddingBottom: Spacing.xs,
-              }}
-            >
-              <View>
-                <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: Colors.text }}>
-                  {shop.firmName}
-                </Text>
-                <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>
-                  {toIndianDate(Date.now())}
-                </Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
-                <Pressable
-                  testID="reports-nav-btn"
-                  onPress={() => router.push('/reports' as any)}
-                  style={({ pressed }) => ({
-                    width: 40, height: 40, borderRadius: Radius.round,
+            {/* Header */}
+            <View style={{
+              backgroundColor: Colors.headerBg,
+              paddingHorizontal: Spacing.md,
+              paddingTop: Spacing.sm,
+              paddingBottom: Spacing.lg,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+                  <View style={{
+                    width: 40, height: 40, borderRadius: 20,
+                    backgroundColor: 'rgba(255,255,255,0.2)',
                     alignItems: 'center', justifyContent: 'center',
-                    backgroundColor: pressed ? Colors.border : Colors.surface,
-                    borderWidth: 1, borderColor: Colors.border,
-                  })}
-                >
-                  <BarChart2 size={20} color={Colors.primary} />
-                </Pressable>
-                <Pressable
-                  testID="settings-nav-btn"
-                  onPress={() => router.push('/settings' as any)}
-                  style={({ pressed }) => ({
-                    width: 40, height: 40, borderRadius: Radius.round,
-                    alignItems: 'center', justifyContent: 'center',
-                    backgroundColor: pressed ? Colors.border : Colors.surface,
-                    borderWidth: 1, borderColor: Colors.border,
-                  })}
-                >
-                  <Settings size={20} color={Colors.textSecond} />
-                </Pressable>
-                <Pressable
-                  testID="buyers-nav-btn"
-                  onPress={() => router.push('/buyers' as any)}
-                  style={({ pressed }) => ({
-                    width: 40, height: 40, borderRadius: Radius.round,
-                    alignItems: 'center', justifyContent: 'center',
-                    backgroundColor: pressed ? Colors.border : Colors.surface,
-                    borderWidth: 1, borderColor: Colors.border,
-                  })}
-                >
-                  <Users size={20} color={Colors.info} />
-                </Pressable>
-                <Pressable
-                  testID="new-bill-fab"
-                  onPress={() => router.push('/bills/new')}
-                  style={({ pressed }) => ({
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 6,
-                    backgroundColor: pressed ? '#E55A00' : Colors.primary,
-                    paddingVertical: 10,
-                    paddingHorizontal: Spacing.md,
-                    borderRadius: Radius.round,
-                  })}
-                >
-                  <Plus size={16} color="#FFF" strokeWidth={3} />
-                  <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>
-                    नया बिल
-                  </Text>
-                </Pressable>
-              </View>
-            </View>
-
-            {/* Metric cards 2×2 */}
-            <View
-              style={{
-                flexDirection: 'row',
-                gap: Spacing.sm,
-                paddingHorizontal: Spacing.md,
-                marginTop: Spacing.sm,
-              }}
-            >
-              <MetricCard
-                label="Today's Sale"
-                value={toIndianCurrency(todaySale)}
-                accent={Colors.success}
-              />
-              <MetricCard
-                label="Confirmed"
-                value={String(confirmed.length)}
-                sub="bills"
-                accent={Colors.info}
-              />
-            </View>
-            <View
-              style={{
-                flexDirection: 'row',
-                gap: Spacing.sm,
-                paddingHorizontal: Spacing.md,
-                marginTop: Spacing.sm,
-                marginBottom: Spacing.md,
-              }}
-            >
-              <MetricCard
-                label="Pending"
-                value={String(pending.length)}
-                sub="awaiting"
-                accent={Colors.warning}
-              />
-              <MetricCard
-                label="Stock Left"
-                value={`${Math.round(totalStock / 1000 * 10) / 10} t`}
-                sub={`${trucks.length} trucks`}
-                accent={Colors.primary}
-              />
-            </View>
-
-            {/* Filter chips */}
-            <View
-              style={{
-                flexDirection: 'row',
-                paddingHorizontal: Spacing.md,
-                gap: Spacing.xs,
-                marginBottom: Spacing.xs,
-              }}
-            >
-              {FILTERS.map(({ key, label, count }) => (
-                <Pressable
-                  key={key}
-                  testID={`filter-${key}`}
-                  onPress={() => setActiveFilter(key)}
-                  style={{
-                    paddingVertical: 7,
-                    paddingHorizontal: Spacing.sm,
-                    borderRadius: Radius.round,
-                    backgroundColor: activeFilter === key ? Colors.primary : Colors.surface,
-                    borderWidth: 1,
-                    borderColor: activeFilter === key ? Colors.primary : Colors.border,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: FontSize.xs,
-                      fontWeight: '700',
-                      color: activeFilter === key ? '#FFF' : Colors.textSecond,
-                    }}
+                    borderWidth: 1.5, borderColor: 'rgba(255,255,255,0.4)',
+                  }}>
+                    <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: '#FFF' }}>{initials}</Text>
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: '#FFF' }}>{shop.firmName}</Text>
+                    <Text style={{ fontSize: FontSize.xs, color: 'rgba(255,255,255,0.7)' }}>{toIndianDate(Date.now())}</Text>
+                  </View>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                  <Pressable
+                    testID="reports-nav-btn"
+                    onPress={() => router.push('/reports' as any)}
+                    style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}
                   >
-                    {label} {count > 0 ? `(${count})` : null}
-                  </Text>
-                </Pressable>
-              ))}
+                    <Bell size={18} color="#FFF" />
+                  </Pressable>
+                  <Pressable
+                    testID="settings-nav-btn"
+                    onPress={() => router.push('/settings' as any)}
+                    style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <Settings size={18} color="#FFF" />
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+
+            {/* Metric cards */}
+            <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.md, gap: Spacing.sm }}>
+              <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+                <MetricCard label="आज की बिक्री" value={toIndianCurrency(todaySale)} accent={Colors.success} />
+                <MetricCard label="Confirmed" value={String(confirmed.length)} sub="bills" accent={Colors.info} />
+              </View>
+              <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+                <MetricCard label="Pending" value={String(pending.length)} sub="awaiting" accent={Colors.warning} />
+                <MetricCard label="Stock Left" value={`${Math.round(totalStock / 1000 * 10) / 10} t`} sub={`${trucks.length} trucks`} accent={Colors.primary} />
+              </View>
+            </View>
+
+            {/* Search bar */}
+            <View style={{
+              marginHorizontal: Spacing.md,
+              marginTop: Spacing.md,
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: Colors.surface,
+              borderRadius: Radius.md,
+              paddingHorizontal: Spacing.sm,
+              paddingVertical: Spacing.xs,
+              borderWidth: 1,
+              borderColor: Colors.border,
+              gap: Spacing.xs,
+            }}>
+              <Search size={16} color={Colors.textSecond} />
+              <TextInput
+                testID="home-search"
+                placeholder="Search bills or buyer name..."
+                placeholderTextColor={Colors.textSecond}
+                value={search}
+                onChangeText={setSearch}
+                style={{ flex: 1, fontSize: FontSize.sm, color: Colors.text, paddingVertical: 6 }}
+              />
+            </View>
+
+            {/* Today's Trucks section */}
+            {trucks.length > 0 ? (
+              <View style={{ marginTop: Spacing.md }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, marginBottom: Spacing.sm }}>
+                  <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: Colors.text }}>Today's Trucks</Text>
+                  <Pressable testID="view-all-trucks" onPress={() => router.push('/(tabs)/trucks' as any)} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                    <Text style={{ fontSize: FontSize.xs, color: Colors.primary, fontWeight: '700' }}>View All</Text>
+                    <ChevronRight size={14} color={Colors.primary} />
+                  </Pressable>
+                </View>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={{ paddingHorizontal: Spacing.md, paddingBottom: Spacing.xs }}
+                  style={{ flexGrow: 0 }}
+                >
+                  {trucks.map(t => (
+                    <TruckChip key={t.id} truck={t} onPress={() => router.push(`/trucks/${t.id}` as any)} />
+                  ))}
+                </ScrollView>
+              </View>
+            ) : null}
+
+            {/* Live Bill Feed header */}
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: Spacing.md, marginTop: Spacing.md, marginBottom: Spacing.xs }}>
+              <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: Colors.text }}>Live Bill Feed</Text>
+              <Pressable testID="buyers-nav-btn" onPress={() => router.push('/buyers' as any)} style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}>
+                <Text style={{ fontSize: FontSize.xs, color: Colors.primary, fontWeight: '700' }}>Buyers</Text>
+                <ChevronRight size={14} color={Colors.primary} />
+              </Pressable>
             </View>
 
             {billsLoading ? (
-              <ActivityIndicator
-                testID="bills-loading"
-                color={Colors.primary}
-                style={{ marginVertical: Spacing.lg }}
-              />
+              <ActivityIndicator testID="bills-loading" color={Colors.primary} style={{ marginVertical: Spacing.lg }} />
             ) : null}
           </View>
         }
         ListEmptyComponent={
           billsLoading ? null : (
-            <View
-              testID="bills-empty"
-              style={{ alignItems: 'center', paddingVertical: 48 }}
-            >
+            <View testID="bills-empty" style={{ alignItems: 'center', paddingVertical: 48 }}>
               <Text style={{ fontSize: 40, marginBottom: Spacing.sm }}>📋</Text>
-              <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond }}>
-                {activeFilter === 'ALL' ? 'आज कोई बिल नहीं' : 'No bills in this filter'}
-              </Text>
+              <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond }}>आज कोई बिल नहीं</Text>
             </View>
           )
         }
+        ListFooterComponent={<View style={{ height: 80 }} />}
       />
+
+      {/* FAB */}
+      <Pressable
+        testID="new-bill-fab"
+        onPress={() => router.push('/bills/new')}
+        style={({ pressed }) => ({
+          position: 'absolute',
+          bottom: 24,
+          right: 20,
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 6,
+          backgroundColor: pressed ? Colors.primaryPressed : Colors.primary,
+          paddingVertical: 14,
+          paddingHorizontal: Spacing.lg,
+          borderRadius: Radius.round,
+          shadowColor: Colors.primary,
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.4,
+          shadowRadius: 8,
+          elevation: 6,
+        })}
+      >
+        <Plus size={18} color="#FFF" strokeWidth={3} />
+        <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '800' }}>नया बिल</Text>
+      </Pressable>
     </SafeAreaView>
   );
 }

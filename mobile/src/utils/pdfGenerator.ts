@@ -142,7 +142,7 @@ export function generateDayReportHTML(params: {
 
   const header = `
     <div style="text-align:center; margin-bottom:12px;">
-      <div style="font-size:18px; font-weight:900; color:#FF6B00;">${shop.firmName}</div>
+      <div style="font-size:18px; font-weight:900; color:#1B5E20;">${shop.firmName}</div>
       <div style="font-size:11px; color:#616161;">${shop.address}, ${shop.city}</div>
       <div style="font-size:11px; color:#616161;">Date: ${toIndianDate(date)}</div>
     </div>
@@ -183,9 +183,9 @@ export function generateDayReportHTML(params: {
     <meta charset="utf-8"/>
     <style>
       body { font-family: monospace; font-size: 12px; color: #1A1A1A; padding: 16px; }
-      h2 { font-size: 14px; font-weight: 900; color: #FF6B00; margin: 16px 0 8px; border-bottom: 2px solid #FF6B00; padding-bottom: 4px; }
+      h2 { font-size: 14px; font-weight: 900; color: #1B5E20; margin: 16px 0 8px; border-bottom: 2px solid #1B5E20; padding-bottom: 4px; }
       table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-      th { background: #FF6B00; color: white; padding: 6px 8px; text-align: left; font-size: 11px; }
+      th { background: #1B5E20; color: white; padding: 6px 8px; text-align: left; font-size: 11px; }
       td { padding: 5px 8px; border-bottom: 1px solid #E0E0E0; font-size: 11px; }
       .foot td { background: #2E7D32; color: white; font-weight: 900; }
       .account-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #E0E0E0; }

@@ -74,7 +74,7 @@ export default function TeamScreen() {
             paddingVertical: 8,
             paddingHorizontal: Spacing.md,
             borderRadius: Radius.round,
-            backgroundColor: saving ? Colors.border : pressed ? '#E55A00' : Colors.primary,
+            backgroundColor: saving ? Colors.border : pressed ? Colors.primaryPressed : Colors.primary,
           })}
         >
           {saving ? (
@@ -121,7 +121,7 @@ export default function TeamScreen() {
             width: 44,
             height: 44,
             borderRadius: Radius.sm,
-            backgroundColor: pressed ? '#E55A00' : Colors.primary,
+            backgroundColor: pressed ? Colors.primaryPressed : Colors.primary,
             alignItems: 'center',
             justifyContent: 'center',
           })}

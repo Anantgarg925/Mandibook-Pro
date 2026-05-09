@@ -25,30 +25,47 @@ export default function BuyerListScreen() {
     [buyers, search]
   );
 
+  const totalOutstanding = buyers.reduce((s, b) => s + b.outstandingBalance, 0);
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top']}>
       {/* Header */}
       <View style={{
-        flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
-        paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
-        backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.border,
+        backgroundColor: Colors.headerBg,
+        paddingHorizontal: Spacing.md,
+        paddingTop: Spacing.sm,
+        paddingBottom: Spacing.md,
       }}>
-        <Pressable onPress={() => router.back()} style={{ padding: 4 }} testID="buyers-back">
-          <ArrowLeft size={24} color={Colors.text} />
-        </Pressable>
-        <Text style={{ flex: 1, fontSize: FontSize.lg, fontWeight: '800', color: Colors.text }}>
-          Buyers / खरीदार
-        </Text>
-        {buyers.length > 0 && (
-          <View style={{
-            backgroundColor: Colors.info, borderRadius: Radius.round,
-            paddingHorizontal: 10, paddingVertical: 4,
-          }}>
-            <Text style={{ fontSize: FontSize.xs, fontWeight: '800', color: '#FFF' }}>
-              {buyers.length}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
+          <Pressable
+            onPress={() => router.back()}
+            style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.15)', alignItems: 'center', justifyContent: 'center' }}
+            testID="buyers-back"
+          >
+            <ArrowLeft size={20} color="#FFF" />
+          </Pressable>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: '#FFF' }}>
+              Buyers / खरीदार
             </Text>
+            {totalOutstanding > 0 ? (
+              <Text style={{ fontSize: FontSize.xs, color: 'rgba(255,255,255,0.7)' }}>
+                उधारी: {toIndianCurrency(totalOutstanding)}
+              </Text>
+            ) : null}
           </View>
-        )}
+          {buyers.length > 0 ? (
+            <View style={{
+              backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: Radius.round,
+              paddingHorizontal: 10, paddingVertical: 4,
+              borderWidth: 1, borderColor: 'rgba(255,255,255,0.3)',
+            }}>
+              <Text style={{ fontSize: FontSize.xs, fontWeight: '800', color: '#FFF' }}>
+                {buyers.length}
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </View>
 
       {/* Search */}
@@ -83,10 +100,20 @@ export default function BuyerListScreen() {
               testID={`buyer-row-${item.code}`}
               onPress={() => router.push(`/buyers/${item.code}` as any)}
               style={({ pressed }) => ({
-                flexDirection: 'row', alignItems: 'center',
-                paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
                 backgroundColor: pressed ? Colors.background : Colors.surface,
-                borderBottomWidth: 1, borderBottomColor: Colors.border,
+                marginHorizontal: Spacing.md,
+                marginBottom: Spacing.sm,
+                borderRadius: Radius.md,
+                padding: Spacing.md,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.05,
+                shadowRadius: 3,
+                elevation: 1,
+                borderWidth: 1,
+                borderColor: Colors.border,
+                flexDirection: 'row',
+                alignItems: 'center',
                 gap: Spacing.sm,
               })}
             >
@@ -107,19 +134,28 @@ export default function BuyerListScreen() {
                 ) : null}
               </View>
               <View style={{ alignItems: 'flex-end' }}>
+                <View style={{
+                  paddingHorizontal: 8, paddingVertical: 3,
+                  borderRadius: Radius.round,
+                  backgroundColor: item.outstandingBalance > 0 ? '#FFEBEE' : '#E8F5E9',
+                }}>
+                  <Text style={{
+                    fontSize: 10, fontWeight: '800',
+                    color: item.outstandingBalance > 0 ? Colors.danger : Colors.success,
+                  }}>
+                    {item.outstandingBalance > 0 ? 'UDHAARI' : 'CONFIRMED'}
+                  </Text>
+                </View>
                 <Text style={{
-                  fontSize: FontSize.sm, fontWeight: '800',
+                  fontSize: FontSize.sm, fontWeight: '800', marginTop: 4,
                   color: item.outstandingBalance > 0 ? Colors.danger : Colors.success,
                 }}>
-                  {item.outstandingBalance > 0 ? toIndianCurrency(item.outstandingBalance) : '✓ Clear'}
+                  {item.outstandingBalance > 0 ? toIndianCurrency(item.outstandingBalance) : 'Clear'}
                 </Text>
-                {item.outstandingBalance > 0 && (
-                  <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>उधारी</Text>
-                )}
               </View>
             </Pressable>
           )}
-          contentContainerStyle={{ paddingBottom: Spacing.xl }}
+          contentContainerStyle={{ paddingTop: Spacing.md, paddingBottom: Spacing.xl }}
           ListEmptyComponent={
             <View style={{ alignItems: 'center', paddingVertical: 64 }} testID="buyers-empty">
               <Text style={{ fontSize: 48, marginBottom: Spacing.sm }}>👥</Text>

@@ -59,7 +59,7 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
               paddingVertical: Spacing.sm,
               paddingHorizontal: Spacing.xl,
               borderRadius: Radius.round,
-              backgroundColor: pressed ? '#E55A00' : Colors.primary,
+              backgroundColor: pressed ? Colors.primaryPressed : Colors.primary,
             })}
           >
             <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: '#FFF' }}>

@@ -211,7 +211,7 @@ export default function DaySummaryScreen() {
             paddingVertical: 8,
             paddingHorizontal: Spacing.sm,
             borderRadius: Radius.round,
-            backgroundColor: exporting ? Colors.border : pressed ? '#E55A00' : Colors.primary,
+            backgroundColor: exporting ? Colors.border : pressed ? Colors.primaryPressed : Colors.primary,
           })}
         >
           <FileText size={16} color="#FFF" />
@@ -509,7 +509,7 @@ export default function DaySummaryScreen() {
                     height: 44,
                     borderRadius: Radius.sm,
                     marginBottom: Spacing.md,
-                    backgroundColor: pressed ? '#E55A00' : Colors.primary,
+                    backgroundColor: pressed ? Colors.primaryPressed : Colors.primary,
                   })}
                 >
                   <Plus size={16} color="#FFF" />
@@ -625,7 +625,7 @@ export default function DaySummaryScreen() {
                 height: 52,
                 borderRadius: Radius.sm,
                 marginBottom: Spacing.sm,
-                backgroundColor: pressed ? '#E55A00' : Colors.primary,
+                backgroundColor: pressed ? Colors.primaryPressed : Colors.primary,
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -738,7 +738,7 @@ export default function DaySummaryScreen() {
               style={({ pressed }) => ({
                 height: 52,
                 borderRadius: Radius.sm,
-                backgroundColor: savingEntry ? Colors.border : pressed ? '#E55A00' : Colors.primary,
+                backgroundColor: savingEntry ? Colors.border : pressed ? Colors.primaryPressed : Colors.primary,
                 alignItems: 'center',
                 justifyContent: 'center',
               })}

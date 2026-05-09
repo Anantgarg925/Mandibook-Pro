@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, FlatList, Pressable } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Plus } from 'lucide-react-native';
 import { useTodayTrucks } from '@/hooks/useTodayTrucks';
@@ -10,37 +11,38 @@ import type { Truck } from '@/types/truck';
 
 function ListHeader({ onAdd }: { onAdd: () => void }) {
   return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: Spacing.md,
-        paddingVertical: Spacing.md,
-      }}
-    >
-      <View>
-        <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: Colors.text }}>
-          आज की गाड़ियां
-        </Text>
-        <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond }}>Today's Trucks</Text>
+    <View style={{
+      backgroundColor: Colors.headerBg,
+      paddingHorizontal: Spacing.md,
+      paddingTop: Spacing.sm,
+      paddingBottom: Spacing.md,
+    }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View>
+          <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: '#FFF' }}>
+            आज की गाड़ियां
+          </Text>
+          <Text style={{ fontSize: FontSize.xs, color: 'rgba(255,255,255,0.7)' }}>Today's Trucks</Text>
+        </View>
+        <Pressable
+          testID="add-truck-button"
+          onPress={onAdd}
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            backgroundColor: pressed ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.15)',
+            paddingVertical: 10,
+            paddingHorizontal: Spacing.md,
+            borderRadius: Radius.round,
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.3)',
+          })}
+        >
+          <Plus size={16} color="#FFF" strokeWidth={3} />
+          <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>नई गाड़ी</Text>
+        </Pressable>
       </View>
-      <Pressable
-        testID="add-truck-button"
-        onPress={onAdd}
-        style={({ pressed }) => ({
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 6,
-          backgroundColor: pressed ? '#E55A00' : Colors.primary,
-          paddingVertical: 10,
-          paddingHorizontal: Spacing.md,
-          borderRadius: 999,
-        })}
-      >
-        <Plus size={16} color="#FFF" strokeWidth={3} />
-        <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>नई गाड़ी</Text>
-      </Pressable>
     </View>
   );
 }
@@ -65,7 +67,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
           paddingVertical: Spacing.sm,
           paddingHorizontal: Spacing.lg,
           borderRadius: Radius.round,
-          backgroundColor: pressed ? '#E55A00' : Colors.primary,
+          backgroundColor: pressed ? Colors.primaryPressed : Colors.primary,
         })}
       >
         <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: '#FFF' }}>+ गाड़ी जोड़ें</Text>
@@ -83,24 +85,26 @@ export default function TrucksScreen() {
 
   if (loading) {
     return (
-      <View testID="trucks-loading" style={{ flex: 1, backgroundColor: Colors.background }}>
+      <SafeAreaView testID="trucks-loading" style={{ flex: 1, backgroundColor: Colors.background }} edges={['top']}>
         <ListHeader onAdd={handleAdd} />
         <SkeletonTable rows={3} />
-      </View>
+      </SafeAreaView>
     );
   }
 
   return (
-    <FlatList
-      testID="truck-list"
-      data={trucks}
-      keyExtractor={(t) => t.id}
-      renderItem={({ item }) => <TruckCard truck={item} onPress={() => handlePress(item)} />}
-      ListHeaderComponent={<ListHeader onAdd={handleAdd} />}
-      ListEmptyComponent={<EmptyState onAdd={handleAdd} />}
-      contentContainerStyle={{ paddingBottom: Spacing.xl, backgroundColor: Colors.background }}
-      style={{ backgroundColor: Colors.background }}
-      showsVerticalScrollIndicator={false}
-    />
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top']}>
+      <FlatList
+        testID="truck-list"
+        data={trucks}
+        keyExtractor={(t) => t.id}
+        renderItem={({ item }) => <TruckCard truck={item} onPress={() => handlePress(item)} />}
+        ListHeaderComponent={<ListHeader onAdd={handleAdd} />}
+        ListEmptyComponent={<EmptyState onAdd={handleAdd} />}
+        contentContainerStyle={{ paddingBottom: Spacing.xl, backgroundColor: Colors.background }}
+        style={{ backgroundColor: Colors.background }}
+        showsVerticalScrollIndicator={false}
+      />
+    </SafeAreaView>
   );
 }

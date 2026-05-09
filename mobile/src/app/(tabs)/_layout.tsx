@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Home, Truck, ShieldCheck } from 'lucide-react-native';
+import { Home, FileText, Truck, BarChart2, Settings } from 'lucide-react-native';
 import { useClientOnlyValue } from '@/lib/useClientOnlyValue';
 import { Colors } from '@/lib/theme';
 
@@ -10,7 +10,12 @@ export default function TabLayout() {
       screenOptions={{
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textSecond,
-        tabBarStyle: { borderTopColor: Colors.border },
+        tabBarStyle: {
+          borderTopColor: Colors.border,
+          backgroundColor: Colors.surface,
+          height: 60,
+          paddingBottom: 8,
+        },
         headerShown: useClientOnlyValue(false, true),
       }}
     >
@@ -19,34 +24,48 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarButtonTestID: 'tab-home',
-          tabBarIcon: ({ color }: { color: string }) => <Home size={24} color={color} />,
+          tabBarIcon: ({ color }: { color: string }) => <Home size={22} color={color} />,
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="bills"
+        options={{
+          title: 'Bills',
+          tabBarButtonTestID: 'tab-bills',
+          tabBarIcon: ({ color }: { color: string }) => <FileText size={22} color={color} />,
           headerShown: false,
         }}
       />
       <Tabs.Screen
         name="trucks"
         options={{
-          title: 'गाड़ियां',
+          title: 'Trucks',
           tabBarButtonTestID: 'tab-trucks',
-          tabBarIcon: ({ color }: { color: string }) => <Truck size={24} color={color} />,
+          tabBarIcon: ({ color }: { color: string }) => <Truck size={22} color={color} />,
           headerShown: false,
         }}
       />
       <Tabs.Screen
-        name="auth"
+        name="reports"
         options={{
-          title: 'Authorize',
-          tabBarButtonTestID: 'tab-auth',
-          tabBarIcon: ({ color }: { color: string }) => <ShieldCheck size={24} color={color} />,
+          title: 'Reports',
+          tabBarButtonTestID: 'tab-reports',
+          tabBarIcon: ({ color }: { color: string }) => <BarChart2 size={22} color={color} />,
           headerShown: false,
         }}
       />
       <Tabs.Screen
-        name="two"
+        name="settings"
         options={{
-          href: null,
+          title: 'Settings',
+          tabBarButtonTestID: 'tab-settings',
+          tabBarIcon: ({ color }: { color: string }) => <Settings size={22} color={color} />,
+          headerShown: false,
         }}
       />
+      <Tabs.Screen name="auth" options={{ href: null }} />
+      <Tabs.Screen name="two" options={{ href: null }} />
     </Tabs>
   );
 }

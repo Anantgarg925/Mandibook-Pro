@@ -132,7 +132,7 @@ export default function ChangePinScreen() {
           style={({ pressed }) => ({
             height: 52,
             borderRadius: Radius.sm,
-            backgroundColor: saving ? Colors.border : pressed ? '#E55A00' : Colors.primary,
+            backgroundColor: saving ? Colors.border : pressed ? Colors.primaryPressed : Colors.primary,
             alignItems: 'center',
             justifyContent: 'center',
             marginHorizontal: Spacing.md,
