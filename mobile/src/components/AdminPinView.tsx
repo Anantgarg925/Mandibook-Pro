@@ -20,6 +20,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const CONTAINER_W = Math.min(SCREEN_WIDTH - 40, 300);
 const KEY_SIZE = Math.floor((CONTAINER_W - 48) / 3);
+const KEY_FONT_SIZE = Math.floor(KEY_SIZE * 0.38);
 
 const PIN_LENGTH = 4;
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'back'] as const;
@@ -330,7 +331,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffdad6',
   },
   keyText: {
-    fontSize: 22,
+    fontSize: KEY_FONT_SIZE,
     fontWeight: '700',
     color: '#071e27',
   },

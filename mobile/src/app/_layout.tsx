@@ -9,6 +9,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { ShopProvider } from '@/context/ShopContext';
 import { LaunchProvider } from '@/context/LaunchContext';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
+import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 
 export const unstable_settings = {
   // Ensure that reloading on `/modal` keeps a back button present.
@@ -52,6 +53,12 @@ function RootLayoutNav({ colorScheme }: { colorScheme: 'light' | 'dark' | null |
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
+  useFonts({
+    Inter_400Regular,
+    Inter_500Medium,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
 
   return (
     <ErrorBoundary>
@@ -60,7 +67,7 @@ export default function RootLayout() {
           <KeyboardProvider>
             <LaunchProvider>
               <ShopProvider>
-                <StatusBar style={colorScheme === 'dark' ? 'light' : 'dark'} />
+                <StatusBar style="light" />
                 <RootLayoutNav colorScheme={colorScheme} />
               </ShopProvider>
             </LaunchProvider>

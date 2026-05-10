@@ -248,6 +248,8 @@ export default function BuyerLedgerScreen() {
         visible={modalVisible}
         transparent
         animationType="slide"
+        hardwareAccelerated={true}
+        statusBarTranslucent={true}
         onRequestClose={() => setModalVisible(false)}
       >
         <KeyboardAvoidingView

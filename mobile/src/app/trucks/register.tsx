@@ -29,6 +29,8 @@ const inputStyle = {
   color: '#00450d',
   fontWeight: '700' as const,
   backgroundColor: '#fff',
+  includeFontPadding: false,
+  textAlignVertical: 'center' as const,
 };
 
 // ─── two-column field wrapper ────────────────────────────────────────────────
@@ -42,7 +44,7 @@ function GridField({
   children: React.ReactNode;
 }) {
   return (
-    <View style={{ width: '47%', marginRight: 12, marginBottom: 12 }}>
+    <View style={{ width: '47%', marginRight: 12, marginBottom: 12, flexShrink: 1 }}>
       <View
         style={{
           flexDirection: 'row',
@@ -333,7 +335,7 @@ export default function RegisterTruckScreen() {
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
         <ScrollView

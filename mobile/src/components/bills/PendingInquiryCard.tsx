@@ -297,6 +297,7 @@ export default function PendingInquiryCard({ inquiry }: Props) {
         <Animated.View style={shakeRateStyle}>
           <TextInput
             testID={`rate-input-${inquiry.id}`}
+            disableFullscreenUI={true}
             style={{
               height: 52,
               borderWidth: errors.rate ? 2 : 1,

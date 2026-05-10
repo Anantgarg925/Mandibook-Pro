@@ -41,7 +41,6 @@ export default function InventoryBar({ totalKg, confirmedKg, provisionalKg, comp
 
   const provisionalStyle = useAnimatedStyle(() => ({
     width: provisionalWidth.value,
-    transform: [{ translateX: confirmedWidth.value }],
   }));
 
   const onLayout = (e: LayoutChangeEvent) => {
@@ -56,19 +55,17 @@ export default function InventoryBar({ totalKg, confirmedKg, provisionalKg, comp
           height: 24,
           borderRadius: 12,
           backgroundColor: Colors.border,
+          flexDirection: 'row',
           overflow: 'hidden',
-          position: 'relative',
         }}
       >
         <Animated.View
           style={[
             {
-              position: 'absolute',
-              top: 0,
-              left: 0,
               height: 24,
               backgroundColor: Colors.success,
-              borderRadius: 12,
+              borderTopLeftRadius: 12,
+              borderBottomLeftRadius: 12,
             },
             confirmedStyle,
           ]}
@@ -76,11 +73,8 @@ export default function InventoryBar({ totalKg, confirmedKg, provisionalKg, comp
         <Animated.View
           style={[
             {
-              position: 'absolute',
-              top: 0,
               height: 24,
               backgroundColor: Colors.warning,
-              borderRadius: 12,
             },
             provisionalStyle,
           ]}

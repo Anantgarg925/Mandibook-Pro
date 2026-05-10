@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import { View, Text, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Check } from 'lucide-react-native';
@@ -179,7 +179,7 @@ export default function OnboardingScreen() {
         {STEP_TITLES[step]}
       </Text>
 
-      <View style={{ flex: 1 }}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         {step === 0 ? (
           <Step1_FirmDetails
             data={form}
@@ -207,7 +207,7 @@ export default function OnboardingScreen() {
             onPinSet={(adminPin) => patch({ adminPin })}
           />
         )}
-      </View>
+      </KeyboardAvoidingView>
 
       <View
         style={{

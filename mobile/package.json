@@ -14,6 +14,7 @@
     "@babel/plugin-proposal-export-namespace-from": "^7.18.9",
     "@bottom-tabs/react-navigation": "^0.12.2",
     "@codeherence/react-native-header": "^1.0.0",
+    "@expo-google-fonts/inter": "^0.4.2",
     "@expo/html-elements": "^0.13.7",
     "@expo/metro-runtime": "6.1.2",
     "@expo/multipart-body-parser": "2.0.0",

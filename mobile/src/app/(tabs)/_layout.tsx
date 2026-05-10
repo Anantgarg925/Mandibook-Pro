@@ -1,5 +1,5 @@
 import React from 'react';
-import { Platform } from 'react-native';
+import { Platform, View, Text } from 'react-native';
 import { Tabs } from 'expo-router';
 import { Home, FileText, Truck, BarChart2, Settings } from 'lucide-react-native';
 import { useClientOnlyValue } from '@/lib/useClientOnlyValue';
@@ -18,8 +18,9 @@ export default function TabLayout() {
           ? {
               borderTopColor: Colors.border,
               backgroundColor: Colors.surface,
-              paddingBottom: Platform.OS === 'android' ? 4 : 8,
+              paddingBottom: Platform.OS === 'android' ? 8 : 8,
               paddingTop: 4,
+              height: Platform.OS === 'android' ? 68 : 60,
             }
           : { display: 'none' },
         headerShown: useClientOnlyValue(false, true),
@@ -31,6 +32,12 @@ export default function TabLayout() {
           title: 'Home',
           tabBarButtonTestID: 'tab-home',
           tabBarIcon: ({ color }: { color: string }) => <Home size={22} color={color} />,
+          tabBarLabel: ({ color }: { color: string }) => (
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 10, fontWeight: '600', color }}>Home</Text>
+              <Text style={{ fontSize: 8, color: color + '99' }}>होम</Text>
+            </View>
+          ),
           headerShown: false,
         }}
       />
@@ -40,6 +47,12 @@ export default function TabLayout() {
           title: 'Bills',
           tabBarButtonTestID: 'tab-bills',
           tabBarIcon: ({ color }: { color: string }) => <FileText size={22} color={color} />,
+          tabBarLabel: ({ color }: { color: string }) => (
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 10, fontWeight: '600', color }}>Bills</Text>
+              <Text style={{ fontSize: 8, color: color + '99' }}>बिल</Text>
+            </View>
+          ),
           headerShown: false,
         }}
       />
@@ -49,6 +62,12 @@ export default function TabLayout() {
           title: 'Trucks',
           tabBarButtonTestID: 'tab-trucks',
           tabBarIcon: ({ color }: { color: string }) => <Truck size={22} color={color} />,
+          tabBarLabel: ({ color }: { color: string }) => (
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 10, fontWeight: '600', color }}>Trucks</Text>
+              <Text style={{ fontSize: 8, color: color + '99' }}>गाड़ियां</Text>
+            </View>
+          ),
           headerShown: false,
         }}
       />
@@ -58,6 +77,12 @@ export default function TabLayout() {
           title: 'Reports',
           tabBarButtonTestID: 'tab-reports',
           tabBarIcon: ({ color }: { color: string }) => <BarChart2 size={22} color={color} />,
+          tabBarLabel: ({ color }: { color: string }) => (
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 10, fontWeight: '600', color }}>Reports</Text>
+              <Text style={{ fontSize: 8, color: color + '99' }}>रिपोर्ट</Text>
+            </View>
+          ),
           headerShown: false,
         }}
       />
@@ -67,6 +92,12 @@ export default function TabLayout() {
           title: 'Settings',
           tabBarButtonTestID: 'tab-settings',
           tabBarIcon: ({ color }: { color: string }) => <Settings size={22} color={color} />,
+          tabBarLabel: ({ color }: { color: string }) => (
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 10, fontWeight: '600', color }}>Settings</Text>
+              <Text style={{ fontSize: 8, color: color + '99' }}>सेटिंग</Text>
+            </View>
+          ),
           headerShown: false,
         }}
       />

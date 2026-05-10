@@ -196,6 +196,8 @@ export default function AuthorizationScreen() {
         visible={truckModalVisible}
         transparent
         animationType="slide"
+        hardwareAccelerated={true}
+        statusBarTranslucent={true}
         onRequestClose={() => setTruckModalVisible(false)}
       >
         <Pressable
@@ -250,6 +252,8 @@ export default function AuthorizationScreen() {
         visible={gradeModalVisible}
         transparent
         animationType="slide"
+        hardwareAccelerated={true}
+        statusBarTranslucent={true}
         onRequestClose={() => setGradeModalVisible(false)}
       >
         <Pressable

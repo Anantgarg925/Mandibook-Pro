@@ -268,7 +268,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 10,
     elevation: 5,
-    overflow: 'hidden',
   },
   adminBtnPressed: {
     backgroundColor: '#003a0b',
@@ -398,5 +397,6 @@ const styles = StyleSheet.create({
     right: 0,
     height: 3,
     opacity: 0.5,
+    zIndex: 1,
   },
 });

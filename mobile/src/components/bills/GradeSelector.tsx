@@ -13,7 +13,7 @@ type Props = {
 };
 
 const TILE_GAP = 8;
-const SIDE_PADDING = 16;
+const SIDE_PADDING = 24;
 const tileWidth = (Dimensions.get('window').width - SIDE_PADDING * 2 - TILE_GAP) / 2;
 
 export default function GradeSelector({ grades, selectedGrade, onSelect, truckInventory }: Props) {

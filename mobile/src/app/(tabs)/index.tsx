@@ -73,7 +73,7 @@ function MetricCard({
           marginBottom: 2,
           fontWeight: '700',
           textTransform: 'uppercase',
-          letterSpacing: 0.4,
+          letterSpacing: Platform.OS === 'android' ? 0 : 0.4,
         }}
       >
         {label}
@@ -482,7 +482,7 @@ export default function HomeScreen() {
                         fontSize: FontSize.xs,
                         color: Colors.textSecond,
                         textTransform: 'uppercase',
-                        letterSpacing: 0.5,
+                        letterSpacing: Platform.OS === 'android' ? 0 : 0.5,
                       }}
                     >
                       {toIndianDate(Date.now())} {'\u2022'} ADMIN
@@ -573,6 +573,8 @@ export default function HomeScreen() {
                   fontSize: FontSize.sm,
                   color: Colors.text,
                   paddingVertical: 6,
+                  includeFontPadding: false,
+                  textAlignVertical: 'center',
                 }}
               />
             </View>

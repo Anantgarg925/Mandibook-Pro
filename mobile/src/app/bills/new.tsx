@@ -42,6 +42,8 @@ const inputStyle = {
   fontSize: FontSize.md,
   backgroundColor: Colors.surface,
   color: Colors.text,
+  includeFontPadding: false,
+  textAlignVertical: 'center' as const,
 };
 
 function SectionHeader({ title }: { title: string }) {
@@ -309,7 +311,7 @@ export default function NewBillScreen() {
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
         <ScrollView
@@ -612,6 +614,8 @@ export default function NewBillScreen() {
         visible={truckPickerVisible}
         transparent
         animationType="slide"
+        hardwareAccelerated={true}
+        statusBarTranslucent={true}
         onRequestClose={() => setTruckPickerVisible(false)}
       >
         <Pressable

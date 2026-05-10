@@ -37,3 +37,10 @@ export const Radius = {
   lg: 16,
   round: 999,
 } as const;
+
+export const Fonts = {
+  regular: 'Inter_400Regular',
+  medium: 'Inter_500Medium',
+  semiBold: 'Inter_600SemiBold',
+  bold: 'Inter_700Bold',
+} as const;

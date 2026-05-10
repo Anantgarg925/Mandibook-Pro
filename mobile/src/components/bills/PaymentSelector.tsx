@@ -47,6 +47,7 @@ export default function PaymentSelector({ selected, onSelect, upiRef, onUpiRefCh
               onPress={() => onSelect(mode)}
               style={{
                 flex: 1,
+                flexShrink: 1,
                 height: 48,
                 borderRadius: Radius.sm,
                 alignItems: 'center',

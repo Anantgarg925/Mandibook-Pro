@@ -264,6 +264,7 @@ export default function DaySummaryScreen() {
             borderRadius: 14,
             padding: 4,
             flexDirection: 'row',
+            overflow: 'visible',
           }}>
             {TAB_ORDER.map(key => {
               const active = activeTab === key;
@@ -824,6 +825,8 @@ export default function DaySummaryScreen() {
         visible={showExportMenu}
         transparent
         animationType="slide"
+        hardwareAccelerated={true}
+        statusBarTranslucent={true}
         onRequestClose={() => setShowExportMenu(false)}
       >
         <Pressable
@@ -867,6 +870,8 @@ export default function DaySummaryScreen() {
         visible={showEntryModal}
         transparent
         animationType="slide"
+        hardwareAccelerated={true}
+        statusBarTranslucent={true}
         onRequestClose={() => setShowEntryModal(false)}
       >
         <Pressable

@@ -158,7 +158,7 @@ export default function SlipPreviewScreen() {
                 style={{
                   fontSize: 11,
                   color: '#64748B',
-                  letterSpacing: 0.5,
+                  letterSpacing: Platform.OS === 'android' ? 0 : 0.5,
                 }}
               >
                 M: {shop.phone1}
@@ -168,7 +168,7 @@ export default function SlipPreviewScreen() {
                   style={{
                     fontSize: 11,
                     color: '#64748B',
-                    letterSpacing: 0.5,
+                    letterSpacing: Platform.OS === 'android' ? 0 : 0.5,
                   }}
                 >
                   M: {shop.phone2}
@@ -273,7 +273,7 @@ export default function SlipPreviewScreen() {
                   fontWeight: '700',
                   color: '#64748B',
                   textTransform: 'uppercase',
-                  letterSpacing: 0.5,
+                  letterSpacing: Platform.OS === 'android' ? 0 : 0.5,
                 }}
               >
                 Item
@@ -285,7 +285,7 @@ export default function SlipPreviewScreen() {
                   fontWeight: '700',
                   color: '#64748B',
                   textTransform: 'uppercase',
-                  letterSpacing: 0.5,
+                  letterSpacing: Platform.OS === 'android' ? 0 : 0.5,
                   textAlign: 'right',
                 }}
               >
@@ -298,7 +298,7 @@ export default function SlipPreviewScreen() {
                   fontWeight: '700',
                   color: '#64748B',
                   textTransform: 'uppercase',
-                  letterSpacing: 0.5,
+                  letterSpacing: Platform.OS === 'android' ? 0 : 0.5,
                   textAlign: 'right',
                 }}
               >
@@ -311,7 +311,7 @@ export default function SlipPreviewScreen() {
                   fontWeight: '700',
                   color: '#64748B',
                   textTransform: 'uppercase',
-                  letterSpacing: 0.5,
+                  letterSpacing: Platform.OS === 'android' ? 0 : 0.5,
                   textAlign: 'right',
                 }}
               >
@@ -497,7 +497,7 @@ export default function SlipPreviewScreen() {
                 <View
                   key={i}
                   style={{
-                    width: w * 2.5,
+                    width: Math.max(1, w * 2.5),
                     height: '100%',
                     backgroundColor: '#071e27',
                   }}
