@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,13 @@ import {
   Platform,
   Pressable,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withRepeat,
+  withTiming,
+  Easing,
+} from 'react-native-reanimated';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
@@ -58,6 +65,40 @@ function GridField({
       </View>
       {children}
     </View>
+  );
+}
+
+// ─── pulsing mismatch badge ──────────────────────────────────────────────────
+function MismatchBadge({ diff }: { diff: number }) {
+  const opacity = useSharedValue(1);
+
+  useEffect(() => {
+    opacity.value = withRepeat(
+      withTiming(0.6, { duration: 700, easing: Easing.inOut(Easing.ease) }),
+      -1,
+      true
+    );
+  }, [opacity]);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+  }));
+
+  return (
+    <Animated.View
+      style={[
+        {
+          backgroundColor: '#ffdad6',
+          borderRadius: 8,
+          padding: 8,
+        },
+        animatedStyle,
+      ]}
+    >
+      <Text style={{ fontSize: 11, fontWeight: '700', color: '#93000a' }}>
+        {'\u26A0'} {toIndianNumber(diff)} kg Mismatch
+      </Text>
+    </Animated.View>
   );
 }
 
@@ -113,7 +154,7 @@ function BottomBar({
               marginBottom: 2,
             }}
           >
-            Live Breakdown
+            Live Breakdown Calculation
           </Text>
           <Text style={{ fontSize: 14, fontWeight: '700', color: '#071e27' }}>
             Total Entered: {toIndianNumber(totalEntered)} kg / Truck: {toIndianNumber(totalKgNum)} kg
@@ -121,17 +162,7 @@ function BottomBar({
         </View>
 
         {diff > 0 && totalKgNum > 0 ? (
-          <View
-            style={{
-              backgroundColor: '#FFF3E0',
-              borderRadius: 8,
-              padding: 8,
-            }}
-          >
-            <Text style={{ fontSize: 11, fontWeight: '700', color: '#7e5700' }}>
-              ⚠ {toIndianNumber(diff)} kg Mismatch
-            </Text>
-          </View>
+          <MismatchBadge diff={diff} />
         ) : null}
       </View>
 
@@ -312,7 +343,7 @@ export default function RegisterTruckScreen() {
 
   // ── registration form ───────────────────────────────────────────────────────
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F0F4F0' }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#f3faff' }} edges={['top']}>
       {/* Header */}
       <View
         style={{
@@ -343,6 +374,20 @@ export default function RegisterTruckScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          {/* ── Section label ──────────────────────────────────────────────── */}
+          <Text
+            style={{
+              fontSize: 13,
+              fontWeight: '600',
+              color: '#00450d',
+              marginLeft: 16,
+              marginTop: 8,
+              marginBottom: 4,
+            }}
+          >
+            Truck Details / {'\u0917\u093E\u0921\u093C\u0940 \u0915\u0940 \u091C\u093E\u0928\u0915\u093E\u0930\u0940'}
+          </Text>
+
           {/* ── Truck Details card ─────────────────────────────────────────── */}
           <View
             style={{
@@ -352,6 +397,7 @@ export default function RegisterTruckScreen() {
               borderRadius: 12,
               padding: 16,
               margin: 16,
+              marginTop: 0,
             }}
           >
             <View
@@ -425,15 +471,45 @@ export default function RegisterTruckScreen() {
 
               {/* Freight */}
               <GridField label="Freight (₹)" labelHi="भाड़ा (₹)">
-                <TextInput
-                  testID="freight-input"
-                  style={inputStyle}
-                  placeholder="0.00"
-                  placeholderTextColor="#c0c9bb"
-                  value={freightAmount}
-                  onChangeText={setFreightAmount}
-                  keyboardType="numeric"
-                />
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    height: 56,
+                    borderWidth: 1,
+                    borderColor: '#c0c9bb',
+                    borderRadius: 10,
+                    backgroundColor: '#fff',
+                    paddingHorizontal: 14,
+                  }}
+                >
+                  <Text
+                    style={{
+                      fontSize: 16,
+                      fontWeight: '700',
+                      color: '#00450d',
+                      marginRight: 4,
+                    }}
+                  >
+                    {'\u20B9'}
+                  </Text>
+                  <TextInput
+                    testID="freight-input"
+                    style={{
+                      flex: 1,
+                      fontSize: 16,
+                      color: '#00450d',
+                      fontWeight: '700',
+                      includeFontPadding: false,
+                      textAlignVertical: 'center',
+                    }}
+                    placeholder="0.00"
+                    placeholderTextColor="#c0c9bb"
+                    value={freightAmount}
+                    onChangeText={setFreightAmount}
+                    keyboardType="numeric"
+                  />
+                </View>
               </GridField>
             </View>
           </View>
@@ -488,10 +564,10 @@ export default function RegisterTruckScreen() {
                   marginBottom: 12,
                 }}
               >
-                <Text style={{ fontSize: 14, fontWeight: '700', color: '#071e27' }}>
+                <Text style={{ fontSize: 15, fontWeight: '700', color: '#071e27' }}>
                   {grade.name}
                 </Text>
-                <Text style={{ fontSize: 11, color: '#64748B', marginTop: 2 }}>
+                <Text style={{ fontSize: 11, color: '#41493e', marginTop: 2 }}>
                   {grade.code}
                 </Text>
                 <View
