@@ -1,17 +1,22 @@
 {
   "expo": {
-    "name": "vibecode",
-    "slug": "vibecode",
-    "scheme": "vibecode",
+    "name": "MandiBook Pro",
+    "slug": "mandibook-pro",
+    "scheme": "mandibook",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "bundleIdentifier": "com.mandibook.pro",
+      "supportsTablet": false
     },
     "android": {
-      "edgeToEdgeEnabled": true
+      "package": "com.mandibook.pro",
+      "edgeToEdgeEnabled": true,
+      "adaptiveIcon": {
+        "backgroundColor": "#00450d"
+      }
     },
     "plugins": ["expo-router"],
     "experiments": {
