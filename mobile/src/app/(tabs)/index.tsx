@@ -12,7 +12,6 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useLaunch } from '@/context/LaunchContext';
-import * as SplashScreen from 'expo-splash-screen';
 import { Plus, Search, Settings, Truck, ChevronRight } from 'lucide-react-native';
 import { useShop } from '@/context/ShopContext';
 import { useInquiries } from '@/hooks/useInquiries';
@@ -373,18 +372,6 @@ export default function HomeScreen() {
     const timer = setTimeout(() => setMinTimeElapsed(true), 3000);
     return () => clearTimeout(timer);
   }, []);
-
-  useEffect(() => {
-    if (launchComplete) return;
-    if (shopLoading || !minTimeElapsed) return;
-    SplashScreen.hideAsync();
-    if (!shop) {
-      setSplashGone(true);
-      router.replace('/onboarding');
-    }
-  }, [shopLoading, minTimeElapsed, shop, router, launchComplete]);
-
-  if (!shop && !shopLoading) return null;
 
   const todaySale = confirmed.reduce((s, i) => s + i.grossAmount, 0);
   const totalStock = trucks.reduce(
@@ -751,7 +738,11 @@ export default function HomeScreen() {
           visible={shopLoading || !minTimeElapsed}
           onHide={() => {
             setSplashGone(true);
-            if (shop) setTimeout(() => setLaunchVisible(true), 0);
+            if (shop) {
+              setTimeout(() => setLaunchVisible(true), 0);
+            } else {
+              router.replace('/onboarding');
+            }
           }}
         />
       )}

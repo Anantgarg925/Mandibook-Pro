@@ -10,6 +10,7 @@ import { ShopProvider } from '@/context/ShopContext';
 import { LaunchProvider } from '@/context/LaunchContext';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
+import { useEffect } from 'react';
 
 export const unstable_settings = {
   // Ensure that reloading on `/modal` keeps a back button present.
@@ -60,10 +61,14 @@ export default function RootLayout() {
     Inter_700Bold,
   });
 
+  useEffect(() => {
+    SplashScreen.hideAsync().catch(() => {});
+  }, []);
+
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <GestureHandlerRootView style={{ flex: 1 }}>
+        <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#F0F4F0' }}>
           <KeyboardProvider>
             <LaunchProvider>
               <ShopProvider>
