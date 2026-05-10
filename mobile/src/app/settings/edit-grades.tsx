@@ -13,6 +13,109 @@ import { useRouter } from 'expo-router';
 import { ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react-native';
 import { useShop, type Grade } from '@/context/ShopContext';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
+import { useResponsive } from '@/hooks/useResponsive';
+
+type GradeRowProps = {
+  item: Grade;
+  index: number;
+  total: number;
+  onUpdate: (idx: number, field: keyof Grade, value: string) => void;
+  onMoveUp: (idx: number) => void;
+  onMoveDown: (idx: number) => void;
+  onRemove: (idx: number) => void;
+};
+
+function GradeRow({ item, index, total, onUpdate, onMoveUp, onMoveDown, onRemove }: GradeRowProps) {
+  const { codeInputWidth } = useResponsive();
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: Spacing.sm,
+        paddingHorizontal: Spacing.md,
+        paddingVertical: 10,
+        minHeight: 56,
+        backgroundColor: Colors.surface,
+        borderBottomWidth: 1,
+        borderBottomColor: Colors.border,
+      }}
+    >
+      {/* Up/Down arrows */}
+      <View style={{ gap: 2 }}>
+        <Pressable
+          testID={`grade-up-${index}`}
+          onPress={() => onMoveUp(index)}
+          style={{ padding: 4 }}
+        >
+          <ChevronUp size={16} color={index === 0 ? Colors.border : Colors.textSecond} />
+        </Pressable>
+        <Pressable
+          testID={`grade-down-${index}`}
+          onPress={() => onMoveDown(index)}
+          style={{ padding: 4 }}
+        >
+          <ChevronDown
+            size={16}
+            color={index === total - 1 ? Colors.border : Colors.textSecond}
+          />
+        </Pressable>
+      </View>
+
+      {/* Code input */}
+      <TextInput
+        testID={`grade-code-${index}`}
+        value={item.code}
+        onChangeText={v => onUpdate(index, 'code', v.toUpperCase())}
+        placeholder="II"
+        placeholderTextColor={Colors.textSecond}
+        autoCapitalize="characters"
+        style={{
+          width: codeInputWidth,
+          borderWidth: 1,
+          borderColor: Colors.border,
+          borderRadius: Radius.sm,
+          paddingHorizontal: 8,
+          paddingVertical: 8,
+          fontSize: FontSize.sm,
+          fontWeight: '800',
+          color: Colors.text,
+          textAlign: 'center',
+          backgroundColor: Colors.background,
+        }}
+      />
+
+      {/* Name input */}
+      <TextInput
+        testID={`grade-name-${index}`}
+        value={item.name}
+        onChangeText={v => onUpdate(index, 'name', v)}
+        placeholder="Medium"
+        placeholderTextColor={Colors.textSecond}
+        style={{
+          flex: 1,
+          borderWidth: 1,
+          borderColor: Colors.border,
+          borderRadius: Radius.sm,
+          paddingHorizontal: Spacing.sm,
+          paddingVertical: 8,
+          fontSize: FontSize.sm,
+          color: Colors.text,
+          backgroundColor: Colors.background,
+        }}
+      />
+
+      {/* Delete */}
+      <Pressable
+        testID={`grade-delete-${index}`}
+        onPress={() => onRemove(index)}
+        style={{ padding: 8 }}
+      >
+        <Trash2 size={18} color={Colors.danger} />
+      </Pressable>
+    </View>
+  );
+}
 
 export default function EditGradesScreen() {
   const router = useRouter();
@@ -112,91 +215,15 @@ export default function EditGradesScreen() {
         data={grades}
         keyExtractor={(_, i) => String(i)}
         renderItem={({ item, index }) => (
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: Spacing.sm,
-              paddingHorizontal: Spacing.md,
-              paddingVertical: 10,
-              backgroundColor: Colors.surface,
-              borderBottomWidth: 1,
-              borderBottomColor: Colors.border,
-            }}
-          >
-            {/* Up/Down arrows */}
-            <View style={{ gap: 2 }}>
-              <Pressable
-                testID={`grade-up-${index}`}
-                onPress={() => moveUp(index)}
-                style={{ padding: 4 }}
-              >
-                <ChevronUp size={16} color={index === 0 ? Colors.border : Colors.textSecond} />
-              </Pressable>
-              <Pressable
-                testID={`grade-down-${index}`}
-                onPress={() => moveDown(index)}
-                style={{ padding: 4 }}
-              >
-                <ChevronDown
-                  size={16}
-                  color={index === grades.length - 1 ? Colors.border : Colors.textSecond}
-                />
-              </Pressable>
-            </View>
-
-            {/* Code input */}
-            <TextInput
-              testID={`grade-code-${index}`}
-              value={item.code}
-              onChangeText={v => update(index, 'code', v.toUpperCase())}
-              placeholder="II"
-              placeholderTextColor={Colors.textSecond}
-              autoCapitalize="characters"
-              style={{
-                width: 52,
-                borderWidth: 1,
-                borderColor: Colors.border,
-                borderRadius: Radius.sm,
-                paddingHorizontal: 8,
-                paddingVertical: 8,
-                fontSize: FontSize.sm,
-                fontWeight: '800',
-                color: Colors.text,
-                textAlign: 'center',
-                backgroundColor: Colors.background,
-              }}
-            />
-
-            {/* Name input */}
-            <TextInput
-              testID={`grade-name-${index}`}
-              value={item.name}
-              onChangeText={v => update(index, 'name', v)}
-              placeholder="Medium"
-              placeholderTextColor={Colors.textSecond}
-              style={{
-                flex: 1,
-                borderWidth: 1,
-                borderColor: Colors.border,
-                borderRadius: Radius.sm,
-                paddingHorizontal: Spacing.sm,
-                paddingVertical: 8,
-                fontSize: FontSize.sm,
-                color: Colors.text,
-                backgroundColor: Colors.background,
-              }}
-            />
-
-            {/* Delete */}
-            <Pressable
-              testID={`grade-delete-${index}`}
-              onPress={() => remove(index)}
-              style={{ padding: 8 }}
-            >
-              <Trash2 size={18} color={Colors.danger} />
-            </Pressable>
-          </View>
+          <GradeRow
+            item={item}
+            index={index}
+            total={grades.length}
+            onUpdate={update}
+            onMoveUp={moveUp}
+            onMoveDown={moveDown}
+            onRemove={remove}
+          />
         )}
         ListFooterComponent={
           <Pressable

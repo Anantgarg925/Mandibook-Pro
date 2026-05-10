@@ -15,6 +15,7 @@ import {
   ChevronRight,
 } from 'lucide-react-native';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
+import { useResponsive } from '@/hooks/useResponsive';
 
 type SettingsItem = {
   icon: React.FC<{ size: number; color: string }>;
@@ -24,6 +25,7 @@ type SettingsItem = {
 };
 
 function Section({ title, items }: { title: string; items: SettingsItem[] }) {
+  const { contentHPad } = useResponsive();
   return (
     <View style={{ marginBottom: Spacing.md }}>
       <Text
@@ -44,7 +46,7 @@ function Section({ title, items }: { title: string; items: SettingsItem[] }) {
           backgroundColor: Colors.surface,
           borderRadius: Radius.md,
           overflow: 'hidden',
-          marginHorizontal: Spacing.md,
+          marginHorizontal: contentHPad,
         }}
       >
         {items.map((item, idx) => {
@@ -159,7 +161,7 @@ export default function SettingsContent({ showBottomNav = false }: SettingsConte
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingVertical: Spacing.md }}>
+      <ScrollView contentContainerStyle={{ paddingVertical: Spacing.md, maxWidth: 600, alignSelf: 'center' as const, width: '100%' }}>
         <Section
           title="Firm / दुकान"
           items={[

@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import { useShop, type ShopCharges } from '@/context/ShopContext';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
+import { useResponsive } from '@/hooks/useResponsive';
 
 function ChargeRow({
   label,
@@ -27,6 +28,7 @@ function ChargeRow({
   onChange: (v: string) => void;
   testID?: string;
 }) {
+  const { rowInputWidth } = useResponsive();
   return (
     <View
       style={{
@@ -50,7 +52,7 @@ function ChargeRow({
         onChangeText={onChange}
         keyboardType="decimal-pad"
         style={{
-          width: 90,
+          width: rowInputWidth,
           borderWidth: 1,
           borderColor: Colors.border,
           borderRadius: Radius.sm,

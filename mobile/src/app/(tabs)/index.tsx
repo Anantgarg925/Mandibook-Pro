@@ -9,6 +9,7 @@ import {
   Animated,
   Platform,
 } from 'react-native';
+import { useResponsive } from '@/hooks/useResponsive';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useLaunch } from '@/context/LaunchContext';
@@ -92,6 +93,9 @@ function MetricCard({
         <View style={{ marginBottom: 6 }} />
       )}
       <Text
+        numberOfLines={1}
+        adjustsFontSizeToFit={true}
+        minimumFontScale={0.7}
         style={{
           fontSize: FontSize.xl,
           fontWeight: '700',
@@ -116,6 +120,7 @@ function MetricCard({
 }
 
 function TruckCard({ truck, onPress }: { truck: any; onPress: () => void }) {
+  const { contentHPad } = useResponsive();
   const totalKg: number = truck.gradeInventory.reduce(
     (s: number, g: any) => s + g.totalKg,
     0
@@ -138,7 +143,7 @@ function TruckCard({ truck, onPress }: { truck: any; onPress: () => void }) {
         backgroundColor: pressed ? '#F1F8F1' : Colors.surface,
         borderRadius: Radius.md,
         padding: Spacing.md,
-        marginHorizontal: Spacing.md,
+        marginHorizontal: contentHPad,
         marginBottom: Spacing.sm,
         borderWidth: 1,
         borderColor: Colors.border,
@@ -229,6 +234,7 @@ function getInitials(name: string): string {
 }
 
 function BillRow({ item, onPress }: { item: Inquiry; onPress: () => void }) {
+  const { contentHPad } = useResponsive();
   const initials = getInitials(item.customerName);
   return (
     <Pressable
@@ -238,7 +244,7 @@ function BillRow({ item, onPress }: { item: Inquiry; onPress: () => void }) {
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: 12,
-        paddingHorizontal: Spacing.md,
+        paddingHorizontal: contentHPad,
         backgroundColor: pressed ? Colors.background : Colors.surface,
         borderBottomWidth: 1,
         borderBottomColor: Colors.border,
@@ -355,6 +361,7 @@ function PulseDot() {
 export default function HomeScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { isSmall, contentHPad, rowInputWidth } = useResponsive();
   const { launchComplete, setLaunchComplete } = useLaunch();
   const { shop, loading: shopLoading } = useShop();
   const { inquiries, pending, confirmed, loading: billsLoading } = useInquiries();
@@ -456,6 +463,7 @@ export default function HomeScreen() {
                   </View>
                   <View>
                     <Text
+                      numberOfLines={1}
                       style={{
                         fontSize: FontSize.md,
                         fontWeight: '700',
@@ -465,6 +473,7 @@ export default function HomeScreen() {
                       {shop?.firmName ?? ''}
                     </Text>
                     <Text
+                      numberOfLines={1}
                       style={{
                         fontSize: FontSize.xs,
                         color: Colors.textSecond,
@@ -496,7 +505,7 @@ export default function HomeScreen() {
             </View>
 
             {/* ── Metric cards (2x2 grid) ── */}
-            <View style={{ paddingHorizontal: Spacing.md, paddingTop: Spacing.md }}>
+            <View style={{ paddingHorizontal: contentHPad, paddingTop: Spacing.md }}>
               <View style={{ flexDirection: 'row', marginBottom: Spacing.sm }}>
                 <View style={{ flex: 1, marginRight: Spacing.sm }}>
                   <MetricCard
@@ -535,7 +544,7 @@ export default function HomeScreen() {
             {/* ── Search bar ── */}
             <View
               style={{
-                marginHorizontal: Spacing.md,
+                marginHorizontal: contentHPad,
                 marginTop: Spacing.md,
                 flexDirection: 'row',
                 alignItems: 'center',
@@ -575,7 +584,7 @@ export default function HomeScreen() {
                     flexDirection: 'row',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    paddingHorizontal: Spacing.md,
+                    paddingHorizontal: contentHPad,
                     marginBottom: Spacing.sm,
                   }}
                 >
@@ -624,7 +633,7 @@ export default function HomeScreen() {
                   <Pressable
                     onPress={() => router.push('/(tabs)/trucks' as any)}
                     style={{
-                      marginHorizontal: Spacing.md,
+                      marginHorizontal: contentHPad,
                       marginBottom: Spacing.sm,
                       paddingVertical: Spacing.sm,
                       alignItems: 'center',
@@ -650,7 +659,7 @@ export default function HomeScreen() {
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'space-between',
-                paddingHorizontal: Spacing.md,
+                paddingHorizontal: contentHPad,
                 marginTop: Spacing.md,
                 marginBottom: Spacing.xs,
               }}

@@ -4,8 +4,8 @@ import {
   Text,
   Pressable,
   StyleSheet,
-  Dimensions,
   Vibration,
+  useWindowDimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -17,11 +17,6 @@ import Animated, {
 } from 'react-native-reanimated';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const KEYPAD_W = SCREEN_WIDTH - 32;
-const KEY_SIZE = Math.floor((KEYPAD_W - 48) / 3);
-const KEY_FONT_SIZE = Math.floor(KEY_SIZE * 0.42);
 
 const PIN_LENGTH = 4;
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'back'] as const;
@@ -42,6 +37,11 @@ export function AdminPinView({ visible, onHide, onSuccess, onCancel, correctPin 
   const animRef = useRef(false);
   const wasVisible = useRef(false);
   const shakeX = useSharedValue(0);
+
+  const { width: screenWidth } = useWindowDimensions();
+  const keypadW = screenWidth - 32;
+  const keySize = Math.floor((keypadW - 48) / 3);
+  const keyFontSize = Math.floor(keySize * 0.42);
 
   useEffect(() => {
     if (visible) {
@@ -158,13 +158,13 @@ export function AdminPinView({ visible, onHide, onSuccess, onCancel, correctPin 
         </View>
 
         {/* Keypad */}
-        <View style={styles.keypad}>
+        <View style={[styles.keypad, { width: keypadW }]}>
           {KEYS.map((key, idx) => {
             if (key === '') {
               return (
                 <View
                   key={idx}
-                  style={{ width: KEY_SIZE, height: KEY_SIZE, margin: 8 }}
+                  style={{ width: keySize, height: keySize, margin: 8 }}
                 />
               );
             }
@@ -174,14 +174,14 @@ export function AdminPinView({ visible, onHide, onSuccess, onCancel, correctPin 
                   key={idx}
                   testID="pin-backspace"
                   onPress={() => handleKey('back')}
-                  style={{ width: KEY_SIZE, height: KEY_SIZE, margin: 8 }}
-                  android_ripple={{ color: '#ffdad6', borderless: true, radius: KEY_SIZE / 2 }}
+                  style={{ width: keySize, height: keySize, margin: 8 }}
+                  android_ripple={{ color: '#ffdad6', borderless: true, radius: keySize / 2 }}
                 >
                   {({ pressed }) => (
                     <View
                       style={[
                         styles.keyBtn,
-                        { width: KEY_SIZE, height: KEY_SIZE, borderRadius: KEY_SIZE / 2 },
+                        { width: keySize, height: keySize, borderRadius: keySize / 2 },
                         pressed && styles.backBtnPressed,
                       ]}
                     >
@@ -196,19 +196,19 @@ export function AdminPinView({ visible, onHide, onSuccess, onCancel, correctPin 
                 key={idx}
                 testID={`pin-key-${key}`}
                 onPress={() => handleKey(key)}
-                style={{ width: KEY_SIZE, height: KEY_SIZE, margin: 8 }}
-                android_ripple={{ color: '#acf4a4', borderless: true, radius: KEY_SIZE / 2 }}
+                style={{ width: keySize, height: keySize, margin: 8 }}
+                android_ripple={{ color: '#acf4a4', borderless: true, radius: keySize / 2 }}
               >
                 {({ pressed }) => (
                   <View
                     style={[
                       styles.keyBtn,
                       styles.numBtn,
-                      { width: KEY_SIZE, height: KEY_SIZE, borderRadius: KEY_SIZE / 2 },
+                      { width: keySize, height: keySize, borderRadius: keySize / 2 },
                       pressed && styles.numBtnPressed,
                     ]}
                   >
-                    <Text style={styles.keyText}>{key}</Text>
+                    <Text style={[styles.keyText, { fontSize: keyFontSize }]}>{key}</Text>
                   </View>
                 )}
               </Pressable>
@@ -349,7 +349,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
     alignItems: 'center',
-    width: KEYPAD_W,
   },
   keyBtn: {
     alignItems: 'center',
@@ -372,7 +371,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffdad6',
   },
   keyText: {
-    fontSize: KEY_FONT_SIZE,
     fontWeight: '700',
     color: '#071e27',
   },
