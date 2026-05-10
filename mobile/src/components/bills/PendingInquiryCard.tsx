@@ -33,6 +33,7 @@ export default function PendingInquiryCard({ inquiry }: Props) {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const lastTapRef = useRef<number>(0);
   const shakeRate = useSharedValue(0);
+  const shakePayment = useSharedValue(0);
 
   const charges = shop?.charges;
   const rateNum = parseFloat(rate) || 0;
@@ -53,6 +54,10 @@ export default function PendingInquiryCard({ inquiry }: Props) {
 
   const shakeRateStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: shakeRate.value }],
+  }));
+
+  const shakePaymentStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shakePayment.value }],
   }));
 
   const shake = (sv: typeof shakeRate) => {
@@ -178,9 +183,14 @@ export default function PendingInquiryCard({ inquiry }: Props) {
     lastTapRef.current = now;
 
     const e: Record<string, string> = {};
-    if (!rate.trim() || rateNum <= 0) e.rate = 'रेट डालें';
+    if (!rate.trim() || rateNum <= 0) e.rate = 'रेट डालें / Enter rate';
+    if (paymentMode === 'PENDING') e.payment = 'भुगतान मोड चुनें / Select payment mode';
     setErrors(e);
-    if (e.rate) { shake(shakeRate); return; }
+    if (Object.keys(e).length > 0) {
+      if (e.rate) shake(shakeRate);
+      if (e.payment) shake(shakePayment);
+      return;
+    }
 
     // 1-second visual pause (double-tap guard)
     await new Promise((r) => setTimeout(r, 1000));
@@ -351,12 +361,22 @@ export default function PendingInquiryCard({ inquiry }: Props) {
 
       {/* Payment selector */}
       <View style={{ padding: Spacing.md }}>
-        <PaymentSelector
-          selected={paymentMode}
-          onSelect={setPaymentMode}
-          upiRef={upiRef}
-          onUpiRefChange={setUpiRef}
-        />
+        <Animated.View style={shakePaymentStyle}>
+          <PaymentSelector
+            selected={paymentMode}
+            onSelect={(m) => {
+              setPaymentMode(m);
+              if (errors.payment) setErrors((prev) => { const { payment, ...rest } = prev; return rest; });
+            }}
+            upiRef={upiRef}
+            onUpiRefChange={setUpiRef}
+          />
+          {errors.payment ? (
+            <Text style={{ color: Colors.danger, fontSize: FontSize.xs, marginTop: 4 }}>
+              {errors.payment}
+            </Text>
+          ) : null}
+        </Animated.View>
       </View>
 
       {/* Divider */}
