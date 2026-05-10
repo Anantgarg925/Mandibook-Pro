@@ -1,5 +1,5 @@
 export type InquiryStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED';
-export type PaymentMode = 'CASH' | 'UPI' | 'UDHAARI';
+export type PaymentMode = 'CASH' | 'UPI' | 'UDHAARI' | 'PENDING';
 
 export type Inquiry = {
   id: string;

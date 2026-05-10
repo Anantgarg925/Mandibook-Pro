@@ -25,13 +25,12 @@ import { useShop } from '@/context/ShopContext';
 import { useTodayTrucks } from '@/hooks/useTodayTrucks';
 import { useBuyers } from '@/hooks/useBuyers';
 import GradeSelector from '@/components/bills/GradeSelector';
-import PaymentSelector from '@/components/bills/PaymentSelector';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { toIndianCurrency, toIndianNumber, toIndianWeight } from '@/lib/formatters';
 import { calculateCharges } from '@/utils/calculations';
 import { getNextSlipNumber } from '@/utils/slipNumber';
 import type { Truck } from '@/types/truck';
-import type { PaymentMode, Buyer } from '@/types/inquiry';
+import type { Buyer } from '@/types/inquiry';
 
 const inputStyle = {
   height: 56,
@@ -82,8 +81,6 @@ export default function NewBillScreen() {
   const [sacks, setSacks] = useState(0);
   const [weightPerSack, setWeightPerSack] = useState('');
   const [ratePerKg, setRatePerKg] = useState('');
-  const [paymentMode, setPaymentMode] = useState<PaymentMode>('CASH');
-  const [upiRef, setUpiRef] = useState('');
   const [success, setSuccess] = useState(false);
   const [savedSlip, setSavedSlip] = useState<number | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -244,8 +241,8 @@ export default function NewBillScreen() {
         bardanaAmount: result.bardana,
         cartageAmount: result.cartage,
         netAmount: result.net,
-        paymentMode,
-        upiRef: upiRef.trim(),
+        paymentMode: 'PENDING',
+        upiRef: '',
         status: 'PENDING',
         date: (() => { const d = new Date(); d.setHours(0,0,0,0); return d.getTime(); })(),
         createdAt: Date.now(),
@@ -270,8 +267,6 @@ export default function NewBillScreen() {
     setRatePerKg('');
     setCustomerName('');
     setCustomerPhone('');
-    setUpiRef('');
-    setPaymentMode('CASH');
     setErrors({});
     setSuccess(false);
     saveMutation.reset();
@@ -560,14 +555,6 @@ export default function NewBillScreen() {
             </View>
           ) : null}
 
-          {/* Payment mode */}
-          <SectionHeader title="भुगतान / Payment" />
-          <PaymentSelector
-            selected={paymentMode}
-            onSelect={setPaymentMode}
-            upiRef={upiRef}
-            onUpiRefChange={setUpiRef}
-          />
         </ScrollView>
 
         {/* Save button */}
