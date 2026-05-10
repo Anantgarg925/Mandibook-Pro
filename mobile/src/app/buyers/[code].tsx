@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View, Text, FlatList, Pressable, TextInput,
   Modal, ActivityIndicator, Alert, KeyboardAvoidingView, Platform,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
-  ArrowLeft, CreditCard, MessageCircle,
+  ArrowLeft, CreditCard, MessageCircle, Phone,
 } from 'lucide-react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -16,6 +17,22 @@ import { generateBalanceMessage, openWhatsApp } from '@/utils/whatsapp';
 import { toIndianCurrency, toIndianDate } from '@/lib/formatters';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import type { PaymentMethod, Transaction } from '@/types/inquiry';
+
+type EnrichedTransaction = Transaction & { balanceAfter: number };
+
+function computeRunningBalances(transactions: Transaction[]): EnrichedTransaction[] {
+  const sorted = [...transactions].sort((a, b) => a.date - b.date);
+  let running = 0;
+  const withBalance = sorted.map(txn => {
+    if (txn.type === 'SALE') {
+      running += txn.amount;
+    } else {
+      running -= txn.amount;
+    }
+    return { ...txn, balanceAfter: Math.max(0, running) };
+  });
+  return withBalance.reverse();
+}
 
 export default function BuyerLedgerScreen() {
   const router = useRouter();
@@ -31,6 +48,18 @@ export default function BuyerLedgerScreen() {
   const [method, setMethod] = useState<PaymentMethod>('CASH');
   const [upiRef, setUpiRef] = useState('');
   const [note, setNote] = useState('');
+
+  const enrichedTransactions = useMemo(
+    () => computeRunningBalances(transactions),
+    [transactions],
+  );
+
+  const totalPurchases = useMemo(
+    () => transactions
+      .filter(t => t.type === 'SALE')
+      .reduce((sum, t) => sum + t.amount, 0),
+    [transactions],
+  );
 
   const paymentMutation = useMutation({
     mutationFn: async (payload: {
@@ -52,7 +81,6 @@ export default function BuyerLedgerScreen() {
         note: payload.note || null,
         createdAt: now,
       });
-      // Update buyer outstanding balance
       await api.put(`/api/buyers/${buyer.code}`, {
         shopId: shop.shopId,
         outstandingBalance: (buyer.outstandingBalance ?? 0) - payload.amount,
@@ -92,6 +120,9 @@ export default function BuyerLedgerScreen() {
     );
   }
 
+  const balance = buyer.outstandingBalance;
+  const balanceColor = balance > 0 ? Colors.danger : Colors.success;
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top']}>
       {/* Header */}
@@ -106,23 +137,15 @@ export default function BuyerLedgerScreen() {
         <Text style={{ flex: 1, fontSize: FontSize.lg, fontWeight: '800', color: Colors.text }}>
           {buyer.name}
         </Text>
-        <View style={{
-          backgroundColor: buyer.outstandingBalance > 0 ? Colors.danger : Colors.success,
-          borderRadius: Radius.round, paddingHorizontal: 10, paddingVertical: 4,
-        }}>
-          <Text style={{ fontSize: FontSize.xs, fontWeight: '800', color: '#FFF' }}>
-            {buyer.code}
-          </Text>
-        </View>
       </View>
 
       <FlatList
         testID="transactions-list"
-        data={transactions}
+        data={enrichedTransactions}
         keyExtractor={t => t.id}
         ListHeaderComponent={
           <>
-            {/* Balance card */}
+            {/* Summary card */}
             <View style={{
               margin: Spacing.md, borderRadius: Radius.md,
               backgroundColor: Colors.surface,
@@ -130,22 +153,92 @@ export default function BuyerLedgerScreen() {
               shadowOpacity: 0.08, shadowRadius: 6, elevation: 3,
               overflow: 'hidden',
             }}>
+              {/* Row 1: Outstanding balance */}
               <View style={{
-                backgroundColor: buyer.outstandingBalance > 0 ? Colors.danger : Colors.success,
+                backgroundColor: balanceColor,
                 padding: Spacing.md, alignItems: 'center',
               }}>
                 <Text style={{ fontSize: FontSize.xs, color: 'rgba(255,255,255,0.8)', fontWeight: '600' }}>
-                  Outstanding Balance
+                  Outstanding / बकाया
                 </Text>
                 <Text style={{ fontSize: 32, fontWeight: '900', color: '#FFF', marginTop: 4 }}>
-                  {toIndianCurrency(buyer.outstandingBalance)}
+                  {toIndianCurrency(balance)}
                 </Text>
-              </View>
-              {buyer.phone ? (
-                <View style={{ padding: Spacing.sm, alignItems: 'center' }}>
-                  <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>📞 {buyer.phone}</Text>
+                <View style={{
+                  marginTop: 6,
+                  backgroundColor: 'rgba(255,255,255,0.25)',
+                  borderRadius: Radius.round, paddingHorizontal: 10, paddingVertical: 2,
+                }}>
+                  <Text style={{ fontSize: FontSize.xs, fontWeight: '800', color: '#FFF' }}>
+                    {balance > 0 ? 'Dr' : balance === 0 ? 'Nil' : 'Cr'}
+                  </Text>
                 </View>
-              ) : null}
+              </View>
+
+              {/* Row 2: Last payment + Total purchases */}
+              <View style={{
+                flexDirection: 'row', padding: Spacing.md,
+                borderBottomWidth: 1, borderBottomColor: Colors.border,
+              }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, fontWeight: '600' }}>
+                    Last Payment
+                  </Text>
+                  {buyer.lastPaymentDate ? (
+                    <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: Colors.text, marginTop: 2 }}>
+                      {toIndianCurrency(buyer.lastPaymentAmount ?? 0)}{' '}
+                      <Text style={{ fontSize: FontSize.xs, fontWeight: '600', color: Colors.textSecond }}>
+                        on {toIndianDate(buyer.lastPaymentDate)}
+                      </Text>
+                    </Text>
+                  ) : (
+                    <Text style={{ fontSize: FontSize.sm, fontWeight: '600', color: Colors.textSecond, marginTop: 2 }}>
+                      No payment yet
+                    </Text>
+                  )}
+                </View>
+                <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                  <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, fontWeight: '600' }}>
+                    Total Purchases
+                  </Text>
+                  <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: Colors.text, marginTop: 2 }}>
+                    {toIndianCurrency(totalPurchases)}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Row 3: Code + phone + WhatsApp */}
+              <View style={{
+                flexDirection: 'row', alignItems: 'center',
+                padding: Spacing.sm, paddingHorizontal: Spacing.md, gap: Spacing.sm,
+              }}>
+                <View style={{
+                  backgroundColor: balanceColor,
+                  borderRadius: Radius.round, paddingHorizontal: 10, paddingVertical: 3,
+                }}>
+                  <Text style={{ fontSize: FontSize.xs, fontWeight: '800', color: '#FFF' }}>
+                    {buyer.code}
+                  </Text>
+                </View>
+                {buyer.phone ? (
+                  <>
+                    <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, flex: 1 }}>
+                      {buyer.phone}
+                    </Text>
+                    <Pressable
+                      testID="whatsapp-icon-btn"
+                      onPress={() => openWhatsApp(buyer.phone, generateBalanceMessage(buyer, shop!))}
+                      style={{ padding: 4 }}
+                    >
+                      <MessageCircle size={20} color="#25D366" />
+                    </Pressable>
+                  </>
+                ) : (
+                  <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, flex: 1 }}>
+                    No phone
+                  </Text>
+                )}
+              </View>
             </View>
 
             {/* Action buttons */}
@@ -191,52 +284,95 @@ export default function BuyerLedgerScreen() {
             </Text>
           </>
         }
-        renderItem={({ item }: { item: Transaction }) => (
-          <View style={{
-            flexDirection: 'row', alignItems: 'center',
-            paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
-            backgroundColor: Colors.surface,
-            borderBottomWidth: 1, borderBottomColor: Colors.border,
-            gap: Spacing.sm,
-          }}>
+        renderItem={({ item }: { item: EnrichedTransaction }) => {
+          const isSale = item.type === 'SALE';
+          const borderColor = isSale ? Colors.danger : Colors.success;
+          const amountColor = isSale ? Colors.danger : Colors.success;
+
+          let description = '';
+          let secondLine: string | null = null;
+
+          if (isSale) {
+            description = `Sale #${item.slipNumber ?? ''}`;
+            if (item.note) description += ` — ${item.note}`;
+          } else {
+            description = `Payment — ${item.paymentMethod ?? 'Cash'}`;
+            if (item.upiRef) {
+              secondLine = `Ref: ${item.upiRef}`;
+            } else if (item.note) {
+              secondLine = item.note;
+            }
+          }
+
+          return (
             <View style={{
-              width: 36, height: 36, borderRadius: Radius.sm,
-              backgroundColor: item.type === 'PAYMENT' ? '#E8F5E9' : '#FFEBEE',
-              alignItems: 'center', justifyContent: 'center',
+              marginHorizontal: Spacing.md, marginBottom: Spacing.sm,
+              backgroundColor: Colors.surface,
+              borderRadius: Radius.sm,
+              borderLeftWidth: 3, borderLeftColor: borderColor,
+              shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.04, shadowRadius: 3, elevation: 1,
+              padding: Spacing.sm, paddingHorizontal: Spacing.md,
             }}>
-              <Text style={{
-                fontSize: FontSize.xs, fontWeight: '900',
-                color: item.type === 'PAYMENT' ? Colors.success : Colors.danger,
-              }}>
-                {item.type === 'PAYMENT' ? 'Cr' : 'Dr'}
+              {/* Top line */}
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm }}>
+                <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, fontWeight: '600', minWidth: 52 }}>
+                  {toIndianDate(item.date)}
+                </Text>
+                <Text style={{ flex: 1, fontSize: FontSize.sm, fontWeight: '700', color: Colors.text }}>
+                  {description}
+                </Text>
+              </View>
+
+              {/* Second line */}
+              {secondLine ? (
+                <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 2, marginLeft: 52 + Spacing.sm }}>
+                  {secondLine}
+                </Text>
+              ) : null}
+
+              {/* Bottom line: DR/CR + BAL */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: Spacing.sm }}>
+                <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: amountColor }}>
+                  {isSale ? 'DR' : 'CR'} {toIndianCurrency(item.amount)}
+                </Text>
+                <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.textSecond }}>
+                  BAL {toIndianCurrency(item.balanceAfter)}
+                </Text>
+              </View>
+            </View>
+          );
+        }}
+        ListFooterComponent={
+          enrichedTransactions.length > 0 ? (
+            <View style={{
+              marginHorizontal: Spacing.md, marginTop: Spacing.sm, marginBottom: Spacing.lg,
+              backgroundColor: '#E8E8E8', borderRadius: Radius.sm,
+              padding: Spacing.md, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: Colors.text }}>
+                NET BALANCE
+              </Text>
+              <Text style={{ fontSize: FontSize.lg, fontWeight: '900', color: Colors.text }}>
+                {toIndianCurrency(balance)}{' '}
+                <Text style={{ fontSize: FontSize.sm, fontWeight: '700' }}>
+                  {balance > 0 ? 'Dr' : balance === 0 ? 'Nil' : 'Cr'}
+                </Text>
               </Text>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text }}>
-                {item.type === 'PAYMENT'
-                  ? `Payment (${item.paymentMethod})`
-                  : `Sale #${item.slipNumber ?? ''}`}
-              </Text>
-              <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>
-                {toIndianDate(item.date)}
-                {item.note ? ` · ${item.note}` : null}
-                {item.upiRef ? ` · ${item.upiRef}` : null}
-              </Text>
-            </View>
-            <Text style={{
-              fontSize: FontSize.sm, fontWeight: '800',
-              color: item.type === 'PAYMENT' ? Colors.success : Colors.danger,
-            }}>
-              {item.type === 'PAYMENT' ? '-' : '+'}{toIndianCurrency(item.amount)}
-            </Text>
-          </View>
-        )}
+          ) : null
+        }
         ListEmptyComponent={
           loading ? (
             <ActivityIndicator color={Colors.primary} size="large" style={{ marginTop: 48 }} />
           ) : (
             <View style={{ alignItems: 'center', paddingVertical: 48 }} testID="transactions-empty">
-              <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond }}>No transactions yet</Text>
+              <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.textSecond }}>
+                No transactions yet
+              </Text>
+              <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 4 }}>
+                Ledger will show all sales and payments here
+              </Text>
             </View>
           )
         }

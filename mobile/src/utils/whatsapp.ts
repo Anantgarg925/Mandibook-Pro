@@ -1,7 +1,7 @@
 import { Linking, Alert } from 'react-native';
 import type { Inquiry, Buyer } from '@/types/inquiry';
 import type { ShopData } from '@/context/ShopContext';
-import { toIndianCurrency } from '@/lib/formatters';
+import { toIndianCurrency, toIndianDate } from '@/lib/formatters';
 
 export function generateCustomerMessage(inquiry: Inquiry, shop: ShopData): string {
   const upiLine =
@@ -40,7 +40,26 @@ export function generateThekedaarMessage(inquiry: Inquiry, shop: ShopData): stri
 
 export function generateBalanceMessage(buyer: Buyer, shop: ShopData): string {
   const bal = toIndianCurrency(buyer.outstandingBalance);
-  return `नमस्ते ${buyer.name} जी,\n\n${shop.firmName} में आपका बकाया:\n*${bal}*\n\nकृपया जल्द भुगतान करें।\nधन्यवाद 🙏`;
+  const today = new Date();
+  const dd = String(today.getDate()).padStart(2, '0');
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const yy = String(today.getFullYear()).slice(-2);
+  const dateStr = `${dd}/${mm}/${yy}`;
+
+  const lastPaymentLine = buyer.lastPaymentDate
+    ? `\nआखिरी भुगतान: ${toIndianCurrency(buyer.lastPaymentAmount ?? 0)} on ${toIndianDate(buyer.lastPaymentDate)}`
+    : '';
+
+  return (
+    `📒 *${shop.firmName}* — बकाया सूचना / Balance Due\n\n` +
+    `नाम: ${buyer.name} (${buyer.code})\n` +
+    `दिनांक: ${dateStr}\n\n` +
+    `*बकाया राशि: ${bal}*\n` +
+    `${lastPaymentLine}\n\n` +
+    `कृपया जल्द भुगतान करें।\n` +
+    `📞 ${shop.phone1}\n` +
+    `धन्यवाद! 🙏`
+  );
 }
 
 export async function openWhatsApp(phone: string, message: string): Promise<void> {
