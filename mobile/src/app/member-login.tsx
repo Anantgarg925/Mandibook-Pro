@@ -38,7 +38,7 @@ export default function MemberLoginScreen() {
     if (pin === correctPin) {
       setPinError(false);
       setLaunchComplete(true);
-      router.replace('/authorization');
+      router.replace('/member-dashboard');
     } else {
       setPinError(true);
     }
