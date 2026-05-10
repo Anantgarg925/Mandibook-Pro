@@ -33,6 +33,7 @@ function RootLayoutNav({ colorScheme }: { colorScheme: 'light' | 'dark' | null |
         <Stack.Screen name="bills/new" options={{ headerShown: false }} />
         <Stack.Screen name="bills/[id]" options={{ headerShown: false }} />
         <Stack.Screen name="slip/[id]" options={{ headerShown: false }} />
+        <Stack.Screen name="member-login" options={{ headerShown: false }} />
         <Stack.Screen name="authorization" options={{ headerShown: false }} />
         <Stack.Screen name="buyers" options={{ headerShown: false }} />
         <Stack.Screen name="buyers/[code]" options={{ headerShown: false }} />

@@ -767,8 +767,7 @@ export default function HomeScreen() {
           }}
           onMemberPress={() => {
             setLaunchGone(true);
-            setLaunchComplete(true);
-            router.push('/authorization' as any);
+            router.push('/member-login' as any);
           }}
         />
       ) : null}
