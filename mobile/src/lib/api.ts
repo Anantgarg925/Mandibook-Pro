@@ -5,7 +5,7 @@ type ApiResponse<T> = { data: T };
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const url = `${BASE_URL}${path}`;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
   try {
     const res = await fetch(url, {
       headers: { 'Content-Type': 'application/json', ...(options?.headers ?? {}) },
