@@ -100,18 +100,23 @@ export function LaunchView({ visible, onHide, onAdminPress, onMemberPress, shopN
             <Pressable
               testID="launch-admin-btn"
               onPress={() => dismiss(onAdminPress)}
-              style={({ pressed }) => [styles.adminBtn, pressed && styles.adminBtnPressed]}
+              style={styles.adminBtnOuter}
+              android_ripple={{ color: 'rgba(255,255,255,0.2)', borderless: false }}
             >
-              <View style={styles.btnLeft}>
-                <View style={styles.adminIconWrap}>
-                  <MaterialIcons name="admin-panel-settings" size={24} color="#fff" />
+              {({ pressed }) => (
+                <View style={[styles.adminBtn, pressed && styles.adminBtnPressed]}>
+                  <View style={styles.btnLeft}>
+                    <View style={styles.adminIconWrap}>
+                      <MaterialIcons name="admin-panel-settings" size={24} color="#fff" />
+                    </View>
+                    <View>
+                      <Text style={styles.adminBtnTitle}>Admin Login</Text>
+                      <Text style={styles.adminBtnSub}>एडमिन लॉगिन</Text>
+                    </View>
+                  </View>
+                  <MaterialIcons name="arrow-forward-ios" size={16} color="rgba(255,255,255,0.75)" />
                 </View>
-                <View>
-                  <Text style={styles.adminBtnTitle}>Admin Login</Text>
-                  <Text style={styles.adminBtnSub}>एडमिन लॉगिन</Text>
-                </View>
-              </View>
-              <MaterialIcons name="arrow-forward-ios" size={16} color="rgba(255,255,255,0.75)" />
+              )}
             </Pressable>
 
             {/* Member Access */}
@@ -245,6 +250,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 16,
   },
+  adminBtnOuter: {
+    borderRadius: 14,
+    marginBottom: 12,
+    overflow: 'hidden',
+  },
   adminBtn: {
     backgroundColor: '#00450d',
     borderRadius: 14,
@@ -253,7 +263,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 18,
-    marginBottom: 12,
     shadowColor: '#00450d',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
