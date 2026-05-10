@@ -353,12 +353,10 @@ function PulseDot() {
 }
 
 export default function HomeScreen() {
-  console.log('[HOME] HomeScreen rendering');
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { launchComplete, setLaunchComplete } = useLaunch();
   const { shop, loading: shopLoading } = useShop();
-  console.log('[HOME] shop:', shop ? shop.firmName : 'null', 'loading:', shopLoading, 'launchComplete:', launchComplete);
   const { inquiries, pending, confirmed, loading: billsLoading } = useInquiries();
   const { trucks } = useTodayTrucks();
   const [search, setSearch] = useState('');

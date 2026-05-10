@@ -17,8 +17,6 @@ export const unstable_settings = {
   initialRouteName: '(tabs)',
 };
 
-console.log('[APP] _layout.tsx module loaded');
-
 SplashScreen.preventAutoHideAsync().catch(() => {});
 
 const queryClient = new QueryClient();
@@ -54,7 +52,6 @@ function RootLayoutNav({ colorScheme }: { colorScheme: 'light' | 'dark' | null |
 
 
 export default function RootLayout() {
-  console.log('[APP] RootLayout rendering');
   const colorScheme = useColorScheme();
   useFonts({
     Inter_400Regular,
