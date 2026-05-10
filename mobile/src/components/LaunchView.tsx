@@ -17,9 +17,10 @@ interface Props {
   onAdminPress: () => void;
   onMemberPress: () => void;
   shopName: string;
+  shopCity?: string;
 }
 
-export function LaunchView({ visible, onHide, onAdminPress, onMemberPress, shopName }: Props) {
+export function LaunchView({ visible, onHide, onAdminPress, onMemberPress, shopName, shopCity }: Props) {
   const opacity = useSharedValue(0);
   const animationStarted = useRef(false);
   const [imageError, setImageError] = useState<boolean>(false);
@@ -86,7 +87,9 @@ export function LaunchView({ visible, onHide, onAdminPress, onMemberPress, shopN
             <View style={styles.identityCard}>
               <Text style={styles.brandName}>MandiBook Pro</Text>
               <View style={styles.brandUnderline} />
-              <Text style={styles.shopName}>{shopName}</Text>
+              <Text style={styles.shopName}>
+                {shopCity ? `${shopName}, ${shopCity}` : shopName}
+              </Text>
               <View style={styles.dateRow}>
                 <MaterialIcons name="calendar-today" size={14} color="#41493e" />
                 <Text style={styles.dateText}>{today}</Text>

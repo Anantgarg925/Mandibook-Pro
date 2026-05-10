@@ -762,6 +762,7 @@ export default function HomeScreen() {
         <LaunchView
           visible={launchVisible}
           shopName={shop?.firmName ?? ''}
+          shopCity={shop?.city ?? ''}
           onHide={() => setLaunchGone(true)}
           onAdminPress={() => {
             setPinGone(false);
