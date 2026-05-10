@@ -13,7 +13,7 @@ import { useResponsive } from '@/hooks/useResponsive';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useLaunch } from '@/context/LaunchContext';
-import { Plus, Search, Bell, Truck, ChevronRight } from 'lucide-react-native';
+import { Plus, Search, Settings, Truck, ChevronRight } from 'lucide-react-native';
 import { useShop } from '@/context/ShopContext';
 import { useInquiries } from '@/hooks/useInquiries';
 import { useTodayTrucks } from '@/hooks/useTodayTrucks';
@@ -443,18 +443,20 @@ export default function HomeScreen() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}>
                   <View
                     style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 20,
-                      backgroundColor: 'rgba(232,245,233,0.6)',
+                      width: 44,
+                      height: 44,
+                      borderRadius: 22,
+                      backgroundColor: '#E8F5E9',
                       alignItems: 'center',
                       justifyContent: 'center',
+                      borderWidth: 2,
+                      borderColor: Colors.primary,
                     }}
                   >
                     <Text
                       style={{
                         fontSize: FontSize.sm,
-                        fontWeight: '700',
+                        fontWeight: '800',
                         color: Colors.primary,
                       }}
                     >
@@ -486,10 +488,10 @@ export default function HomeScreen() {
                   </View>
                 </View>
 
-                {/* Right: notifications */}
+                {/* Right: settings */}
                 <Pressable
-                  testID="notifications-nav-btn"
-                  onPress={() => router.push('/notifications' as any)}
+                  testID="settings-nav-btn"
+                  onPress={() => router.push('/settings' as any)}
                   style={{
                     width: 36,
                     height: 36,
@@ -499,7 +501,7 @@ export default function HomeScreen() {
                     justifyContent: 'center',
                   }}
                 >
-                  <Bell size={18} color={Colors.textSecond} />
+                  <Settings size={18} color={Colors.textSecond} />
                 </Pressable>
               </View>
             </View>
@@ -534,7 +536,7 @@ export default function HomeScreen() {
                 <View style={{ flex: 1 }}>
                   <MetricCard
                     label="Stock Remaining"
-                    value={`${Math.round((totalStock / 1000) * 10) / 10} t`}
+                    value={`${Math.round(totalStock).toLocaleString('en-IN')} kg`}
                     sub={`${trucks.length} trucks`}
                   />
                 </View>

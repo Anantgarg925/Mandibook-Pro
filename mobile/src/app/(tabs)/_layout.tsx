@@ -1,7 +1,7 @@
 import React from 'react';
 import { Platform, View, Text } from 'react-native';
 import { Tabs } from 'expo-router';
-import { Home, FileText, Truck, BarChart2, Settings } from 'lucide-react-native';
+import { Home, Truck, PlusSquare, BarChart2 } from 'lucide-react-native';
 import { useClientOnlyValue } from '@/lib/useClientOnlyValue';
 import { Colors } from '@/lib/theme';
 import { useLaunch } from '@/context/LaunchContext';
@@ -34,23 +34,8 @@ export default function TabLayout() {
           tabBarIcon: ({ color }: { color: string }) => <Home size={22} color={color} />,
           tabBarLabel: ({ color }: { color: string }) => (
             <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 10, fontWeight: '600', color }}>Home</Text>
+              <Text style={{ fontSize: 10, fontWeight: '600', color }}>HOME /</Text>
               <Text style={{ fontSize: 8, color: color + '99' }}>होम</Text>
-            </View>
-          ),
-          headerShown: false,
-        }}
-      />
-      <Tabs.Screen
-        name="bills"
-        options={{
-          title: 'Bills',
-          tabBarButtonTestID: 'tab-bills',
-          tabBarIcon: ({ color }: { color: string }) => <FileText size={22} color={color} />,
-          tabBarLabel: ({ color }: { color: string }) => (
-            <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 10, fontWeight: '600', color }}>Bills</Text>
-              <Text style={{ fontSize: 8, color: color + '99' }}>बिल</Text>
             </View>
           ),
           headerShown: false,
@@ -64,8 +49,23 @@ export default function TabLayout() {
           tabBarIcon: ({ color }: { color: string }) => <Truck size={22} color={color} />,
           tabBarLabel: ({ color }: { color: string }) => (
             <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 10, fontWeight: '600', color }}>Trucks</Text>
-              <Text style={{ fontSize: 8, color: color + '99' }}>गाड़ियां</Text>
+              <Text style={{ fontSize: 10, fontWeight: '600', color }}>TRUCKS /</Text>
+              <Text style={{ fontSize: 8, color: color + '99' }}>ट्रक</Text>
+            </View>
+          ),
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
+        name="bills"
+        options={{
+          title: 'New Bill',
+          tabBarButtonTestID: 'tab-new-bill',
+          tabBarIcon: ({ color }: { color: string }) => <PlusSquare size={22} color={color} />,
+          tabBarLabel: ({ color }: { color: string }) => (
+            <View style={{ alignItems: 'center' }}>
+              <Text style={{ fontSize: 10, fontWeight: '600', color }}>NEW BILL /</Text>
+              <Text style={{ fontSize: 8, color: color + '99' }}>नया बिल</Text>
             </View>
           ),
           headerShown: false,
@@ -79,23 +79,8 @@ export default function TabLayout() {
           tabBarIcon: ({ color }: { color: string }) => <BarChart2 size={22} color={color} />,
           tabBarLabel: ({ color }: { color: string }) => (
             <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 10, fontWeight: '600', color }}>Reports</Text>
+              <Text style={{ fontSize: 10, fontWeight: '600', color }}>REPORTS /</Text>
               <Text style={{ fontSize: 8, color: color + '99' }}>रिपोर्ट</Text>
-            </View>
-          ),
-          headerShown: false,
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'Settings',
-          tabBarButtonTestID: 'tab-settings',
-          tabBarIcon: ({ color }: { color: string }) => <Settings size={22} color={color} />,
-          tabBarLabel: ({ color }: { color: string }) => (
-            <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 10, fontWeight: '600', color }}>Settings</Text>
-              <Text style={{ fontSize: 8, color: color + '99' }}>सेटिंग</Text>
             </View>
           ),
           headerShown: false,
@@ -103,6 +88,7 @@ export default function TabLayout() {
       />
       <Tabs.Screen name="auth" options={{ href: null }} />
       <Tabs.Screen name="two" options={{ href: null }} />
+      <Tabs.Screen name="settings" options={{ href: null }} />
     </Tabs>
   );
 }
