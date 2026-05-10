@@ -19,10 +19,12 @@ import {
   Plus,
   Share2,
 } from 'lucide-react-native';
+import { useQuery } from '@tanstack/react-query';
 import { useDateInquiries } from '@/hooks/useDateInquiries';
 import { useDateTrucks } from '@/hooks/useDateTrucks';
 import { useCashEntries } from '@/hooks/useCashEntries';
 import { useShop } from '@/context/ShopContext';
+import { api } from '@/lib/api';
 import { exportAndShareReport, type CashEntry } from '@/utils/pdfGenerator';
 import { toIndianCurrency, toIndianDate } from '@/lib/formatters';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
@@ -67,6 +69,15 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
   const { inquiries, loading: inqLoading } = useDateInquiries(date);
   const { trucks, loading: trucksLoading } = useDateTrucks(date);
   const { entries: cashEntries, loading: cashLoading, addEntry } = useCashEntries(date);
+
+  const dateParam = useMemo(() => { const d = new Date(date); d.setHours(0,0,0,0); return d.getTime(); }, [date]);
+  const { data: allInquiries = [] } = useQuery({
+    queryKey: ['inquiries', shop?.shopId, dateParam],
+    queryFn: () => api.get<Inquiry[]>(`/api/inquiries?shopId=${shop!.shopId}&date=${dateParam}`),
+    enabled: !!shop?.shopId,
+    refetchInterval: 15000,
+  });
+  const pendingCount = allInquiries.filter(i => i.status === 'PENDING').length;
 
   const loading = inqLoading || trucksLoading;
 
@@ -570,6 +581,27 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
             {/* TAB 2: Accounts */}
             {activeTab === 'accounts' ? (
               <View style={{ marginHorizontal: 16, marginTop: 12, marginBottom: 24 }}>
+                {pendingCount > 0 ? (
+                  <View
+                    testID="pending-warning-banner"
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: '#FFF8E1',
+                      borderWidth: 1,
+                      borderColor: '#FFE082',
+                      borderRadius: 10,
+                      padding: 12,
+                      marginBottom: 12,
+                      gap: 8,
+                    }}
+                  >
+                    <Text style={{ fontSize: 16 }}>⚠</Text>
+                    <Text style={{ flex: 1, fontSize: 13, color: '#7e5700', fontWeight: '600' }}>
+                      {pendingCount} bill{pendingCount > 1 ? 's' : null} still pending authorization — not included in this summary
+                    </Text>
+                  </View>
+                ) : null}
                 <View style={{
                   backgroundColor: '#ffffff',
                   borderWidth: 1,
