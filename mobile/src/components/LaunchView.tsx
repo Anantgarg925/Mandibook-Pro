@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Image, StyleSheet, Pressable, ScrollView, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -22,6 +22,7 @@ interface Props {
 export function LaunchView({ visible, onHide, onAdminPress, onMemberPress, shopName }: Props) {
   const opacity = useSharedValue(0);
   const animationStarted = useRef(false);
+  const [imageError, setImageError] = useState<boolean>(false);
 
   useEffect(() => {
     if (visible) {
@@ -63,11 +64,19 @@ export function LaunchView({ visible, onHide, onAdminPress, onMemberPress, shopN
         >
           {/* Hero Image Section */}
           <View style={styles.heroContainer}>
-            <Image
-              source={{ uri: 'https://images.unsplash.com/photo-1542838687-2f4c1a6e2a25?w=900&q=80' }}
-              style={StyleSheet.absoluteFill}
-              resizeMode="cover"
-            />
+            {imageError ? (
+              <LinearGradient
+                colors={['#1a5c1f', '#2d7a34', '#f3faff']}
+                style={StyleSheet.absoluteFill}
+              />
+            ) : (
+              <Image
+                source={{ uri: 'https://images.unsplash.com/photo-1610348725531-843dff563e2c?w=900&q=80' }}
+                style={StyleSheet.absoluteFill}
+                resizeMode="cover"
+                onError={() => setImageError(true)}
+              />
+            )}
             <LinearGradient
               colors={['rgba(0,69,13,0.15)', 'rgba(0,69,13,0.05)', '#f3faff']}
               style={StyleSheet.absoluteFill}
@@ -250,6 +259,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 10,
     elevation: 5,
+    overflow: 'hidden',
   },
   adminBtnPressed: {
     backgroundColor: '#003a0b',
