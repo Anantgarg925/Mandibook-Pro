@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Plus, Settings, Share2, FileText } from 'lucide-react-native';
+import { ArrowLeft, Plus, Pencil, Share2, FileText } from 'lucide-react-native';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { useShop } from '@/context/ShopContext';
@@ -112,9 +112,20 @@ export default function TruckDetailScreen() {
         <Pressable
           testID="edit-grades-button"
           onPress={() => router.push({ pathname: '/trucks/edit-grades', params: { truckId: id } })}
-          style={{ padding: 8 }}
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 4,
+            paddingVertical: 6,
+            paddingHorizontal: 10,
+            borderRadius: Radius.round,
+            backgroundColor: pressed ? '#E8F5E9' : '#F0F4F0',
+          })}
         >
-          <Settings size={20} color="#64748B" />
+          <Pencil size={14} color={Colors.primary} />
+          <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: Colors.primary }}>
+            Edit Grades
+          </Text>
         </Pressable>
       </View>
 
