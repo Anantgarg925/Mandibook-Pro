@@ -9,6 +9,7 @@ import { KeyboardProvider } from 'react-native-keyboard-controller';
 import { ShopProvider } from '@/context/ShopContext';
 import { LaunchProvider } from '@/context/LaunchContext';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
+import OfflineBanner from '@/components/common/OfflineBanner';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { useEffect } from 'react';
 
@@ -72,6 +73,7 @@ export default function RootLayout() {
             <LaunchProvider>
               <ShopProvider>
                 <StatusBar style="light" />
+                <OfflineBanner />
                 <RootLayoutNav colorScheme={colorScheme} />
               </ShopProvider>
             </LaunchProvider>
