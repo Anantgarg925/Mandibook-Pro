@@ -16,11 +16,12 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { MaterialIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const CONTAINER_W = Math.min(SCREEN_WIDTH - 40, 300);
-const KEY_SIZE = Math.floor((CONTAINER_W - 48) / 3);
-const KEY_FONT_SIZE = Math.floor(KEY_SIZE * 0.38);
+const KEYPAD_W = SCREEN_WIDTH - 32;
+const KEY_SIZE = Math.floor((KEYPAD_W - 48) / 3);
+const KEY_FONT_SIZE = Math.floor(KEY_SIZE * 0.42);
 
 const PIN_LENGTH = 4;
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'back'] as const;
@@ -107,50 +108,65 @@ export function AdminPinView({ visible, onHide, onSuccess, onCancel, correctPin 
           <MaterialIcons name="shield" size={22} color="#00450d" />
           <Text style={styles.headerTitle}>MandiBook Pro</Text>
         </View>
+        <Pressable
+          testID="pin-cancel"
+          onPress={onCancel}
+          style={styles.cancelBtn}
+        >
+          <Text style={styles.cancelText}>Cancel</Text>
+        </Pressable>
       </View>
 
       {/* Body */}
       <View style={styles.body}>
-        {/* Lock icon */}
-        <View style={styles.lockCircle}>
-          <MaterialIcons name="lock" size={48} color="#00450d" />
-        </View>
+        {/* Upper section */}
+        <View style={styles.upperSection}>
+          {/* Lock icon */}
+          <View style={styles.lockCircle}>
+            <MaterialIcons name="lock" size={52} color="#00450d" />
+          </View>
 
-        <Text style={styles.heading}>Enter Admin PIN</Text>
-        <Text style={styles.headingHindi}>एडमिन पिन डालें</Text>
+          <Text style={styles.heading}>Enter Admin PIN</Text>
+          <Text style={styles.headingHindi}>एडमिन पिन डालें</Text>
 
-        {/* PIN dots */}
-        <Animated.View style={[styles.dotsRow, dotsStyle]}>
-          {Array.from({ length: PIN_LENGTH }).map((_, i) => (
-            <View
-              key={i}
-              style={[
-                styles.dot,
-                i < entered.length
-                  ? error
-                    ? styles.dotError
-                    : styles.dotFilled
-                  : styles.dotEmpty,
-              ]}
-            />
-          ))}
-        </Animated.View>
+          {/* PIN dots */}
+          <Animated.View style={[styles.dotsRow, dotsStyle]}>
+            {Array.from({ length: PIN_LENGTH }).map((_, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.dot,
+                  i < entered.length
+                    ? error
+                      ? styles.dotError
+                      : styles.dotFilled
+                    : styles.dotEmpty,
+                ]}
+              />
+            ))}
+          </Animated.View>
 
-        {/* Error message */}
-        <View style={styles.errorRow}>
-          {error ? (
-            <>
-              <MaterialIcons name="error" size={15} color="#ba1a1a" />
-              <Text style={styles.errorText}>Wrong PIN / गलत PIN</Text>
-            </>
-          ) : null}
+          {/* Error message */}
+          <View style={styles.errorRow}>
+            {error ? (
+              <>
+                <MaterialIcons name="error" size={15} color="#ba1a1a" />
+                <Text style={styles.errorText}>Wrong PIN / गलत PIN</Text>
+              </>
+            ) : null}
+          </View>
         </View>
 
         {/* Keypad */}
-        <View style={[styles.keypad, { width: CONTAINER_W }]}>
+        <View style={styles.keypad}>
           {KEYS.map((key, idx) => {
             if (key === '') {
-              return <View key={idx} style={{ width: KEY_SIZE, height: KEY_SIZE, margin: 12 }} />;
+              return (
+                <View
+                  key={idx}
+                  style={{ width: KEY_SIZE, height: KEY_SIZE, margin: 8 }}
+                />
+              );
             }
             if (key === 'back') {
               return (
@@ -158,16 +174,18 @@ export function AdminPinView({ visible, onHide, onSuccess, onCancel, correctPin 
                   key={idx}
                   testID="pin-backspace"
                   onPress={() => handleKey('back')}
-                  style={{ width: KEY_SIZE, height: KEY_SIZE, margin: 12 }}
+                  style={{ width: KEY_SIZE, height: KEY_SIZE, margin: 8 }}
                   android_ripple={{ color: '#ffdad6', borderless: true, radius: KEY_SIZE / 2 }}
                 >
                   {({ pressed }) => (
-                    <View style={[
-                      styles.keyBtn,
-                      { width: KEY_SIZE, height: KEY_SIZE, borderRadius: KEY_SIZE / 2 },
-                      pressed && styles.backBtnPressed,
-                    ]}>
-                      <MaterialIcons name="backspace" size={26} color="#ba1a1a" />
+                    <View
+                      style={[
+                        styles.keyBtn,
+                        { width: KEY_SIZE, height: KEY_SIZE, borderRadius: KEY_SIZE / 2 },
+                        pressed && styles.backBtnPressed,
+                      ]}
+                    >
+                      <MaterialIcons name="backspace" size={28} color="#ba1a1a" />
                     </View>
                   )}
                 </Pressable>
@@ -178,16 +196,18 @@ export function AdminPinView({ visible, onHide, onSuccess, onCancel, correctPin 
                 key={idx}
                 testID={`pin-key-${key}`}
                 onPress={() => handleKey(key)}
-                style={{ width: KEY_SIZE, height: KEY_SIZE, margin: 12 }}
+                style={{ width: KEY_SIZE, height: KEY_SIZE, margin: 8 }}
                 android_ripple={{ color: '#acf4a4', borderless: true, radius: KEY_SIZE / 2 }}
               >
                 {({ pressed }) => (
-                  <View style={[
-                    styles.keyBtn,
-                    styles.numBtn,
-                    { width: KEY_SIZE, height: KEY_SIZE, borderRadius: KEY_SIZE / 2 },
-                    pressed && styles.numBtnPressed,
-                  ]}>
+                  <View
+                    style={[
+                      styles.keyBtn,
+                      styles.numBtn,
+                      { width: KEY_SIZE, height: KEY_SIZE, borderRadius: KEY_SIZE / 2 },
+                      pressed && styles.numBtnPressed,
+                    ]}
+                  >
                     <Text style={styles.keyText}>{key}</Text>
                   </View>
                 )}
@@ -198,13 +218,21 @@ export function AdminPinView({ visible, onHide, onSuccess, onCancel, correctPin 
       </View>
 
       {/* Footer */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
         <View style={styles.footerPill}>
           <MaterialIcons name="fingerprint" size={15} color="#003d65" />
           <Text style={styles.footerPillText}>Biometric entry available</Text>
         </View>
         <Text style={styles.footerNote}>Forgot PIN? Contact support.</Text>
       </View>
+
+      {/* Bottom accent */}
+      <LinearGradient
+        colors={['#00450d', '#feb300', '#00450d']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.bottomAccent}
+      />
     </Animated.View>
   );
 }
@@ -218,6 +246,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingBottom: 12,
     backgroundColor: '#ffffff',
@@ -235,33 +264,46 @@ const styles = StyleSheet.create({
     color: '#00450d',
     letterSpacing: -0.3,
   },
+  cancelBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 4,
+  },
+  cancelText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#00450d',
+  },
   body: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingTop: 32,
+    paddingBottom: 16,
+  },
+  upperSection: {
+    alignItems: 'center',
   },
   lockCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: 'rgba(27,94,32,0.08)',
+    width: 108,
+    height: 108,
+    borderRadius: 54,
+    backgroundColor: 'rgba(0,69,13,0.10)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(27,94,32,0.15)',
+    borderWidth: 2,
+    borderColor: 'rgba(254,179,0,0.35)',
     marginBottom: 24,
   },
   heading: {
-    fontSize: 26,
+    fontSize: 28,
     fontWeight: '800',
     color: '#00450d',
     letterSpacing: -0.5,
     marginBottom: 4,
   },
   headingHindi: {
-    fontSize: 12,
+    fontSize: 13,
     color: '#717a6d',
     textTransform: 'uppercase',
     letterSpacing: 2,
@@ -269,20 +311,20 @@ const styles = StyleSheet.create({
   },
   dotsRow: {
     flexDirection: 'row',
-    gap: 16,
+    gap: 20,
     marginBottom: 8,
   },
   dot: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
   },
   dotEmpty: {
     backgroundColor: '#c0c9bb',
   },
   dotFilled: {
     backgroundColor: '#00450d',
-    shadowColor: '#acf4a4',
+    shadowColor: '#feb300',
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 1,
     shadowRadius: 6,
@@ -296,7 +338,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
-    marginBottom: 28,
   },
   errorText: {
     fontSize: 13,
@@ -308,7 +349,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'center',
     alignItems: 'center',
-    width: CONTAINER_W,
+    width: KEYPAD_W,
   },
   keyBtn: {
     alignItems: 'center',
@@ -316,16 +357,16 @@ const styles = StyleSheet.create({
   },
   numBtn: {
     backgroundColor: '#ffffff',
-    borderWidth: 1,
+    borderWidth: 1.5,
     borderColor: '#c0c9bb',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.07,
     shadowRadius: 2,
-    elevation: 1,
+    elevation: 2,
   },
   numBtnPressed: {
-    backgroundColor: '#acf4a4',
+    backgroundColor: '#e8f5e9',
   },
   backBtnPressed: {
     backgroundColor: '#ffdad6',
@@ -358,5 +399,14 @@ const styles = StyleSheet.create({
   footerNote: {
     fontSize: 12,
     color: '#717a6d',
+  },
+  bottomAccent: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    opacity: 0.6,
+    zIndex: 1,
   },
 });
