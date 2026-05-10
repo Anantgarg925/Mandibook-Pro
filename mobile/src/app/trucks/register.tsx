@@ -182,10 +182,10 @@ function BottomBar({
           borderColor: '#E5E7EB',
         }}
       >
-        <Text style={{ fontSize: 17, fontWeight: '800', color: '#fff' }}>
+        <Text style={{ fontSize: 17, fontWeight: '800', color: formComplete && !isPending ? '#fff' : '#9CA3AF' }}>
           {isPending ? 'Registering…' : 'Register Truck'}
         </Text>
-        <Text style={{ fontSize: 10, color: '#fff', opacity: 0.85 }}>
+        <Text style={{ fontSize: 10, color: formComplete && !isPending ? '#fff' : '#9CA3AF', opacity: 0.85 }}>
           {isPending ? 'रजिस्टर हो रही है…' : 'गाड़ी रजिस्टर करें'}
         </Text>
       </Pressable>
