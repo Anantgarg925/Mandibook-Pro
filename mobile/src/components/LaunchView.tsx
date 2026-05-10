@@ -39,8 +39,8 @@ export function LaunchView({ visible, onHide, onAdminPress, onMemberPress, shopN
       hide();
       setTimeout(cb, 0);
     };
-    opacity.value = withTiming(0, { duration: 380 }, (finished) => {
-      if (finished) runOnJS(handleFinish)();
+    opacity.value = withTiming(0, { duration: 380 }, () => {
+      runOnJS(handleFinish)();
     });
   };
 

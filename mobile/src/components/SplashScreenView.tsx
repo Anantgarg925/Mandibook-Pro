@@ -32,8 +32,8 @@ export function SplashScreenView({ visible, onHide }: Props) {
       animationStarted.current = true;
       const hideCallback = onHide;
       progressWidth.value = withTiming(192, { duration: 250 }, () => {
-        opacity.value = withTiming(0, { duration: 650 }, (finished) => {
-          if (finished) runOnJS(hideCallback)();
+        opacity.value = withTiming(0, { duration: 650 }, () => {
+          runOnJS(hideCallback)();
         });
       });
     }
