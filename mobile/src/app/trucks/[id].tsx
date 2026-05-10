@@ -68,13 +68,14 @@ export default function TruckDetailScreen() {
 
   const totalConfirmed = truck.gradeInventory.reduce((s, g) => s + g.confirmedKg, 0);
   const totalProvisional = truck.gradeInventory.reduce((s, g) => s + g.provisionalKg, 0);
-  const totalKg = truck.totalKg;
+  const inventoryTotalKg = truck.gradeInventory.reduce((s, g) => s + g.totalKg, 0);
+  const totalKg = Math.max(truck.totalKg, inventoryTotalKg);
   const isActive = truck.status === 'ACTIVE';
 
-  const confirmedPct = totalKg > 0 ? totalConfirmed / totalKg : 0;
-  const provisionalPct = totalKg > 0 ? totalProvisional / totalKg : 0;
+  const confirmedPct = totalKg > 0 ? Math.min(totalConfirmed / totalKg, 1) : 0;
+  const provisionalPct = totalKg > 0 ? Math.min(totalProvisional / totalKg, 1 - confirmedPct) : 0;
   const availableKg = Math.max(0, totalKg - totalConfirmed - totalProvisional);
-  const availablePct = totalKg > 0 ? availableKg / totalKg : 0;
+  const availablePct = totalKg > 0 ? Math.max(0, 1 - confirmedPct - provisionalPct) : 0;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top']}>
@@ -200,48 +201,59 @@ export default function TruckDetailScreen() {
               backgroundColor: '#c7dde9',
             }}
           >
-            {confirmedPct > 0 && (
+            {confirmedPct > 0 ? (
               <View
                 style={{
-                  width: `${confirmedPct * 100}%`,
+                  flex: confirmedPct,
+                  minWidth: confirmedPct > 0 ? 4 : 0,
                   backgroundColor: Colors.primary,
                   alignItems: 'center',
                   justifyContent: 'center',
+                  paddingHorizontal: 2,
                 }}
               >
-                <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: '#FFFFFF' }} numberOfLines={1}>
-                  {toIndianWeight(totalConfirmed)}
-                </Text>
+                {confirmedPct >= 0.12 ? (
+                  <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: '#FFFFFF' }} numberOfLines={1}>
+                    {toIndianWeight(totalConfirmed)}
+                  </Text>
+                ) : null}
               </View>
-            )}
-            {provisionalPct > 0 && (
+            ) : null}
+            {provisionalPct > 0 ? (
               <View
                 style={{
-                  width: `${provisionalPct * 100}%`,
+                  flex: provisionalPct,
+                  minWidth: provisionalPct > 0 ? 4 : 0,
                   backgroundColor: '#7e5700',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  paddingHorizontal: 2,
                 }}
               >
-                <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: '#FFFFFF' }} numberOfLines={1}>
-                  {toIndianWeight(totalProvisional)}
-                </Text>
+                {provisionalPct >= 0.12 ? (
+                  <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: '#FFFFFF' }} numberOfLines={1}>
+                    {toIndianWeight(totalProvisional)}
+                  </Text>
+                ) : null}
               </View>
-            )}
-            {availablePct > 0 && (
+            ) : null}
+            {availablePct > 0 ? (
               <View
                 style={{
-                  flex: 1,
+                  flex: availablePct,
                   backgroundColor: '#c7dde9',
                   alignItems: 'center',
                   justifyContent: 'center',
+                  paddingHorizontal: 2,
                 }}
               >
-                <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: '#41493e' }} numberOfLines={1}>
-                  {toIndianWeight(availableKg)}
-                </Text>
+                {availablePct >= 0.12 ? (
+                  <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: '#41493e' }} numberOfLines={1}>
+                    {toIndianWeight(availableKg)}
+                  </Text>
+                ) : null}
               </View>
-            )}
+            ) : null}
           </View>
 
           {/* Legend */}
