@@ -91,23 +91,21 @@ export default function PendingInquiryCard({ inquiry }: Props) {
         upiRef: upiRef.trim(),
       });
 
-      // 2. Update truck gradeInventory (best-effort)
-      try {
-        const truck = await api.get<Truck>(`/api/trucks/${inquiry.truckId}?shopId=${shop.shopId}`);
-        const newInventory = truck.gradeInventory.map((g) =>
-          g.code === inquiry.grade
-            ? {
-                ...g,
-                provisionalKg: Math.max(0, g.provisionalKg - result.totalWeight),
-                confirmedKg: g.confirmedKg + result.totalWeight,
-              }
-            : g
-        );
-        await api.put(`/api/trucks/${inquiry.truckId}`, {
-          shopId: shop.shopId,
-          gradeInventory: newInventory,
-        });
-      } catch { /* best-effort */ }
+      // 2. Update truck gradeInventory — move from provisional to confirmed
+      const weight = inquiry.totalWeight;
+      const truck = await api.get<Truck>(`/api/trucks/${inquiry.truckId}?shopId=${shop.shopId}`);
+      const newInventory = truck.gradeInventory.map((g) =>
+        g.code === inquiry.grade
+          ? {
+              ...g,
+              provisionalKg: Math.max(0, g.provisionalKg - weight),
+              confirmedKg: g.confirmedKg + weight,
+            }
+          : g
+      );
+      await api.put(`/api/trucks/${inquiry.truckId}`, {
+        gradeInventory: newInventory,
+      });
 
       // 3. Auto-create/update buyer and add SALE transaction (best-effort)
       try {
@@ -166,13 +164,28 @@ export default function PendingInquiryCard({ inquiry }: Props) {
   });
 
   const cancelMutation = useMutation({
-    mutationFn: () =>
-      api.put(`/api/inquiries/${inquiry.id}`, {
-        shopId: shop!.shopId,
+    mutationFn: async () => {
+      if (!shop?.shopId) throw new Error('Missing shop');
+      await api.put(`/api/inquiries/${inquiry.id}`, {
+        shopId: shop.shopId,
         status: 'CANCELLED',
-      }),
+      });
+      // Return provisional weight back to available
+      try {
+        const truck = await api.get<Truck>(`/api/trucks/${inquiry.truckId}?shopId=${shop.shopId}`);
+        const newInventory = truck.gradeInventory.map((g) =>
+          g.code === inquiry.grade
+            ? { ...g, provisionalKg: Math.max(0, g.provisionalKg - inquiry.totalWeight) }
+            : g
+        );
+        await api.put(`/api/trucks/${inquiry.truckId}`, {
+          gradeInventory: newInventory,
+        });
+      } catch { /* best-effort for cancel */ }
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inquiries', shop?.shopId] });
+      queryClient.invalidateQueries({ queryKey: ['trucks', shop?.shopId] });
     },
   });
 
