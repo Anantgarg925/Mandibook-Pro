@@ -113,7 +113,7 @@ export function AdminPinView({ visible, onHide, onSuccess, onCancel, correctPin 
           onPress={onCancel}
           style={styles.cancelBtn}
         >
-          <Text style={styles.cancelText}>Cancel</Text>
+          <MaterialIcons name="close" size={20} color="#41493e" />
         </Pressable>
       </View>
 
@@ -265,13 +265,12 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
   },
   cancelBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 4,
-  },
-  cancelText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#00450d',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#e8eceb',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   body: {
     flex: 1,
@@ -291,8 +290,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,69,13,0.10)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(254,179,0,0.35)',
     marginBottom: 24,
   },
   heading: {
