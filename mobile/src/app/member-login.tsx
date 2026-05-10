@@ -1,8 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, TextInput, Pressable, Image, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, Keyboard,
-  ActivityIndicator, Alert,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -12,64 +12,35 @@ import { Menu, User } from 'lucide-react-native';
 import { useShop } from '@/context/ShopContext';
 import { useLaunch } from '@/context/LaunchContext';
 
-const OTP_LENGTH = 4;
-
 export default function MemberLoginScreen() {
   const router = useRouter();
   const { shop } = useShop();
   const { setLaunchComplete } = useLaunch();
   const [phone, setPhone] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [otp, setOtp] = useState<string[]>(Array(OTP_LENGTH).fill(''));
-  const [sending, setSending] = useState(false);
-  const [verifying, setVerifying] = useState(false);
+  const [pin, setPin] = useState('');
+  const [pinError, setPinError] = useState(false);
   const [imageError, setImageError] = useState(false);
-  const otpRefs = useRef<(TextInput | null)[]>([]);
 
-  const teamPhones = (shop?.teamNames ?? []) as string[];
-
-  const handleSendOtp = () => {
+  const handleLogin = () => {
     const cleaned = phone.replace(/\D/g, '');
     if (cleaned.length !== 10) {
-      Alert.alert('Invalid Number', 'Please enter a valid 10-digit phone number.');
+      Alert.alert('Invalid Number', 'कृपया 10 अंकों का सही फोन नंबर डालें।');
       return;
     }
+    if (!pin || pin.length < 4) {
+      Alert.alert('Invalid PIN', 'कृपया 4 अंकों का PIN डालें।');
+      return;
+    }
+
     Keyboard.dismiss();
-    setSending(true);
-    setTimeout(() => {
-      setSending(false);
-      setOtpSent(true);
-      setTimeout(() => otpRefs.current[0]?.focus(), 300);
-    }, 1200);
-  };
+    const correctPin = shop?.adminPin ?? '';
 
-  const handleOtpChange = (text: string, index: number) => {
-    const digit = text.replace(/\D/g, '').slice(-1);
-    const newOtp = [...otp];
-    newOtp[index] = digit;
-    setOtp(newOtp);
-
-    if (digit && index < OTP_LENGTH - 1) {
-      otpRefs.current[index + 1]?.focus();
-    }
-
-    if (newOtp.every(d => d !== '')) {
-      Keyboard.dismiss();
-      setVerifying(true);
-      setTimeout(() => {
-        setVerifying(false);
-        setLaunchComplete(true);
-        router.replace('/authorization');
-      }, 1000);
-    }
-  };
-
-  const handleOtpKeyPress = (key: string, index: number) => {
-    if (key === 'Backspace' && !otp[index] && index > 0) {
-      otpRefs.current[index - 1]?.focus();
-      const newOtp = [...otp];
-      newOtp[index - 1] = '';
-      setOtp(newOtp);
+    if (pin === correctPin) {
+      setPinError(false);
+      setLaunchComplete(true);
+      router.replace('/authorization');
+    } else {
+      setPinError(true);
     }
   };
 
@@ -88,7 +59,7 @@ export default function MemberLoginScreen() {
         >
           {/* Header bar */}
           <View style={styles.header}>
-            <Pressable testID="member-menu-btn" onPress={() => router.back()} style={styles.headerIcon}>
+            <Pressable testID="member-back-btn" onPress={() => router.back()} style={styles.headerIcon}>
               <Menu size={22} color="#1a1a1a" />
             </Pressable>
             <Text style={styles.headerTitle}>MandiBook Pro</Text>
@@ -124,108 +95,80 @@ export default function MemberLoginScreen() {
 
           {/* Login card */}
           <View style={styles.card}>
-            {!otpSent ? (
-              <>
-                <View style={styles.labelRow}>
-                  <Text style={styles.label}>Phone Number</Text>
-                  <Text style={styles.labelHindi}>फोन नंबर</Text>
-                </View>
-                <View style={styles.phoneRow}>
-                  <View style={styles.countryCode}>
-                    <Text style={styles.countryCodeText}>+91</Text>
-                  </View>
-                  <View style={styles.divider} />
-                  <TextInput
-                    testID="member-phone-input"
-                    style={styles.phoneInput}
-                    placeholder="00000 00000"
-                    placeholderTextColor="#a0a0a0"
-                    keyboardType="phone-pad"
-                    maxLength={12}
-                    value={phone}
-                    onChangeText={(t) => {
-                      const digits = t.replace(/\D/g, '');
-                      if (digits.length <= 10) {
-                        const formatted = digits.length > 5
-                          ? `${digits.slice(0, 5)} ${digits.slice(5)}`
-                          : digits;
-                        setPhone(formatted);
-                      }
-                    }}
-                  />
-                </View>
+            {/* Phone Number */}
+            <View style={styles.labelRow}>
+              <Text style={styles.label}>Phone Number</Text>
+              <Text style={styles.labelHindi}>फोन नंबर</Text>
+            </View>
+            <View style={styles.phoneRow}>
+              <View style={styles.countryCode}>
+                <Text style={styles.countryCodeText}>+91</Text>
+              </View>
+              <View style={styles.divider} />
+              <TextInput
+                testID="member-phone-input"
+                style={styles.phoneInput}
+                placeholder="00000 00000"
+                placeholderTextColor="#a0a0a0"
+                keyboardType="phone-pad"
+                maxLength={12}
+                value={phone}
+                onChangeText={(t) => {
+                  const digits = t.replace(/\D/g, '');
+                  if (digits.length <= 10) {
+                    const formatted = digits.length > 5
+                      ? `${digits.slice(0, 5)} ${digits.slice(5)}`
+                      : digits;
+                    setPhone(formatted);
+                  }
+                  setPinError(false);
+                }}
+              />
+            </View>
 
-                <Pressable
-                  testID="send-otp-btn"
-                  onPress={handleSendOtp}
-                  disabled={sending}
-                  style={({ pressed }) => [
-                    styles.sendBtn,
-                    pressed && !sending && styles.sendBtnPressed,
-                    sending && styles.sendBtnDisabled,
-                  ]}
-                >
-                  {sending ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <>
-                      <Text style={styles.sendBtnText}>SEND OTP</Text>
-                      <Text style={styles.sendBtnSub}>ओटीपी भेजें</Text>
-                    </>
-                  )}
-                </Pressable>
+            {/* PIN */}
+            <View style={styles.labelRow}>
+              <Text style={styles.label}>Shop PIN</Text>
+              <Text style={styles.labelHindi}>शॉप पिन</Text>
+            </View>
+            <TextInput
+              testID="member-pin-input"
+              style={[styles.pinInput, pinError && styles.pinInputError]}
+              placeholder="Enter 4-digit PIN"
+              placeholderTextColor="#a0a0a0"
+              keyboardType="number-pad"
+              secureTextEntry
+              maxLength={6}
+              value={pin}
+              onChangeText={(t) => {
+                setPin(t.replace(/\D/g, ''));
+                setPinError(false);
+              }}
+            />
+            {pinError ? (
+              <Text style={styles.errorText}>गलत PIN। कृपया सही PIN डालें।</Text>
+            ) : null}
 
-                <View style={styles.secureRow}>
-                  <MaterialIcons name="lock" size={18} color="#546E57" />
-                  <View>
-                    <Text style={styles.secureText}>SECURE LOG-IN</Text>
-                    <Text style={styles.secureSub}>सुरक्षित लॉगिन</Text>
-                  </View>
-                </View>
-              </>
-            ) : (
-              <>
-                <Text style={styles.otpTitle}>Enter OTP</Text>
-                <Text style={styles.otpSub}>
-                  Sent to +91 {phone}
-                </Text>
+            {/* Login button */}
+            <Pressable
+              testID="member-login-btn"
+              onPress={handleLogin}
+              style={({ pressed }) => [
+                styles.loginBtn,
+                pressed && styles.loginBtnPressed,
+              ]}
+            >
+              <Text style={styles.loginBtnText}>LOG IN</Text>
+              <Text style={styles.loginBtnSub}>लॉगिन करें</Text>
+            </Pressable>
 
-                <View style={styles.otpRow}>
-                  {otp.map((digit, i) => (
-                    <TextInput
-                      key={i}
-                      ref={(ref) => { otpRefs.current[i] = ref; }}
-                      testID={`otp-input-${i}`}
-                      style={[styles.otpBox, digit ? styles.otpBoxFilled : null]}
-                      keyboardType="number-pad"
-                      maxLength={1}
-                      value={digit}
-                      onChangeText={(t) => handleOtpChange(t, i)}
-                      onKeyPress={({ nativeEvent }) => handleOtpKeyPress(nativeEvent.key, i)}
-                      selectTextOnFocus
-                    />
-                  ))}
-                </View>
-
-                {verifying ? (
-                  <View style={styles.verifyingRow}>
-                    <ActivityIndicator color="#1B5E20" size="small" />
-                    <Text style={styles.verifyingText}>Verifying...</Text>
-                  </View>
-                ) : (
-                  <Pressable
-                    testID="resend-otp-btn"
-                    onPress={() => {
-                      setOtp(Array(OTP_LENGTH).fill(''));
-                      setOtpSent(false);
-                    }}
-                    style={styles.resendBtn}
-                  >
-                    <Text style={styles.resendText}>Change Number / Resend OTP</Text>
-                  </Pressable>
-                )}
-              </>
-            )}
+            <View style={styles.secureRow}>
+              <MaterialIcons name="lock" size={18} color="#546E57" />
+              <View>
+                <Text style={styles.secureText}>SECURE LOG-IN</Text>
+                <Text style={styles.secureSub}>सुरक्षित लॉगिन</Text>
+              </View>
+            </View>
           </View>
 
           {/* Terms */}
@@ -381,7 +324,33 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     letterSpacing: 1,
   },
-  sendBtn: {
+  pinInput: {
+    borderWidth: 1.5,
+    borderColor: '#d0d5d1',
+    borderRadius: 12,
+    backgroundColor: '#fafbfa',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1a1a1a',
+    letterSpacing: 6,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  pinInputError: {
+    borderColor: '#B71C1C',
+    backgroundColor: '#FFF5F5',
+  },
+  errorText: {
+    fontSize: 13,
+    color: '#B71C1C',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginTop: -12,
+    marginBottom: 16,
+  },
+  loginBtn: {
     backgroundColor: '#1B5E20',
     borderRadius: 12,
     paddingVertical: 16,
@@ -394,19 +363,16 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 4,
   },
-  sendBtnPressed: {
+  loginBtnPressed: {
     backgroundColor: '#145214',
   },
-  sendBtnDisabled: {
-    backgroundColor: '#8fac90',
-  },
-  sendBtnText: {
+  loginBtnText: {
     fontSize: 16,
     fontWeight: '800',
     color: '#fff',
     letterSpacing: 1,
   },
-  sendBtnSub: {
+  loginBtnSub: {
     fontSize: 11,
     color: 'rgba(255,255,255,0.7)',
     marginTop: 2,
@@ -426,61 +392,6 @@ const styles = StyleSheet.create({
   secureSub: {
     fontSize: 10,
     color: '#546E57',
-  },
-  otpTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#1a1a1a',
-    textAlign: 'center',
-    marginBottom: 4,
-  },
-  otpSub: {
-    fontSize: 13,
-    color: '#546E57',
-    textAlign: 'center',
-    marginBottom: 24,
-  },
-  otpRow: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 14,
-    marginBottom: 24,
-  },
-  otpBox: {
-    width: 56,
-    height: 60,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#d0d5d1',
-    backgroundColor: '#fafbfa',
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#1a1a1a',
-    textAlign: 'center',
-  },
-  otpBoxFilled: {
-    borderColor: '#1B5E20',
-    backgroundColor: '#E8F5E9',
-  },
-  verifyingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  verifyingText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1B5E20',
-  },
-  resendBtn: {
-    alignItems: 'center',
-  },
-  resendText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1B5E20',
-    textDecorationLine: 'underline',
   },
   termsWrap: {
     marginTop: 24,
