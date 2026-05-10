@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { BottomNavBar } from '@/components/common/BottomNavBar';
 import {
   View,
@@ -10,12 +10,15 @@ import {
   Modal,
   Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   ChevronLeft,
   ChevronRight,
   FileText,
+  Lock,
+  LockOpen,
   Plus,
   Share2,
 } from 'lucide-react-native';
@@ -78,6 +81,40 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
     refetchInterval: 15000,
   });
   const pendingCount = allInquiries.filter(i => i.status === 'PENDING').length;
+
+  const CLOSED_DATES_KEY = 'closed_dates';
+  const dateKey = useMemo(() => {
+    const d = new Date(date);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }, [date]);
+
+  const [isDayClosed, setIsDayClosed] = useState(false);
+  const [closingDay, setClosingDay] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem(CLOSED_DATES_KEY).then(raw => {
+      const dates: string[] = raw ? JSON.parse(raw) : [];
+      setIsDayClosed(dates.includes(dateKey));
+    });
+  }, [dateKey]);
+
+  const toggleDayClosed = useCallback(async () => {
+    setClosingDay(true);
+    try {
+      const raw = await AsyncStorage.getItem(CLOSED_DATES_KEY);
+      const dates: string[] = raw ? JSON.parse(raw) : [];
+      let updated: string[];
+      if (dates.includes(dateKey)) {
+        updated = dates.filter(d => d !== dateKey);
+      } else {
+        updated = [...dates, dateKey];
+      }
+      await AsyncStorage.setItem(CLOSED_DATES_KEY, JSON.stringify(updated));
+      setIsDayClosed(updated.includes(dateKey));
+    } finally {
+      setClosingDay(false);
+    }
+  }, [dateKey]);
 
   const loading = inqLoading || trucksLoading;
 
@@ -199,7 +236,7 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f3faff' }} edges={['top']}>
       <ScrollView
         style={{ flex: 1 }}
-        stickyHeaderIndices={[1]}
+        stickyHeaderIndices={[isDayClosed ? 2 : 1]}
         showsVerticalScrollIndicator={false}
       >
         {/* Header section -- inside ScrollView, NOT fixed */}
@@ -266,6 +303,24 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
             </Pressable>
           </View>
         </View>
+
+        {isDayClosed ? (
+          <View testID="day-closed-badge" style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            backgroundColor: '#E8F5E9',
+            borderBottomWidth: 1,
+            borderBottomColor: '#C8E6C9',
+            paddingVertical: 8,
+          }}>
+            <Lock size={14} color="#2E7D32" />
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#2E7D32' }}>
+              Day Closed / दिन बंद
+            </Text>
+          </View>
+        ) : null}
 
         {/* Tab bar -- sticky (stickyHeaderIndices=[1]) */}
         <View style={{
@@ -655,6 +710,35 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
                     </Text>
                   </View>
                 </View>
+
+                {/* Close Day / Reopen Day button */}
+                <Pressable
+                  testID="close-day-btn"
+                  onPress={toggleDayClosed}
+                  disabled={closingDay}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
+                    height: 52,
+                    borderRadius: 14,
+                    marginTop: 16,
+                    backgroundColor: isDayClosed
+                      ? (pressed ? '#E65100' : '#F57C00')
+                      : (pressed ? '#1B5E20' : '#2E7D32'),
+                    opacity: closingDay ? 0.6 : 1,
+                  })}
+                >
+                  {isDayClosed ? (
+                    <LockOpen size={18} color="#FFF" />
+                  ) : (
+                    <Lock size={18} color="#FFF" />
+                  )}
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFF' }}>
+                    {isDayClosed ? 'Reopen Day / दिन खोलें' : 'Close Day / दिन बंद करें'}
+                  </Text>
+                </Pressable>
               </View>
             ) : null}
 
@@ -734,6 +818,7 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
                   <Pressable
                     testID="add-cash-entry"
                     onPress={() => setShowEntryModal(true)}
+                    disabled={isDayClosed}
                     style={({ pressed }) => ({
                       flexDirection: 'row',
                       alignItems: 'center',
@@ -742,11 +827,17 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
                       height: 44,
                       borderRadius: 12,
                       marginBottom: 14,
-                      backgroundColor: pressed ? '#005a10' : '#00450d',
+                      backgroundColor: isDayClosed ? '#9E9E9E' : (pressed ? '#005a10' : '#00450d'),
                     })}
                   >
-                    <Plus size={16} color="#FFF" />
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#FFF' }}>+ एंट्री जोड़ें</Text>
+                    {isDayClosed ? (
+                      <Lock size={14} color="#FFF" />
+                    ) : (
+                      <Plus size={16} color="#FFF" />
+                    )}
+                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#FFF' }}>
+                      {isDayClosed ? 'Day Closed — Cannot Add' : '+ एंट्री जोड़ें'}
+                    </Text>
                   </Pressable>
 
                   {/* Receipts */}
