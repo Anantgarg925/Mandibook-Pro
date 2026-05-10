@@ -106,14 +106,6 @@ export function AdminPinView({ visible, onHide, onSuccess, onCancel, correctPin 
           <MaterialIcons name="shield" size={22} color="#00450d" />
           <Text style={styles.headerTitle}>MandiBook Pro</Text>
         </View>
-        <Pressable
-          testID="pin-close-btn"
-          onPress={onCancel}
-          style={styles.closeBtn}
-          hitSlop={12}
-        >
-          <MaterialIcons name="close" size={22} color="#071e27" />
-        </Pressable>
       </View>
 
       {/* Body */}
@@ -165,13 +157,18 @@ export function AdminPinView({ visible, onHide, onSuccess, onCancel, correctPin 
                   key={idx}
                   testID="pin-backspace"
                   onPress={() => handleKey('back')}
-                  style={({ pressed }) => [
-                    styles.keyBtn,
-                    { width: KEY_SIZE, height: KEY_SIZE, borderRadius: KEY_SIZE / 2 },
-                    pressed && styles.backBtnPressed,
-                  ]}
+                  style={{ width: KEY_SIZE, height: KEY_SIZE, margin: 12 }}
+                  android_ripple={{ color: '#ffdad6', borderless: true, radius: KEY_SIZE / 2 }}
                 >
-                  <MaterialIcons name="backspace" size={26} color="#ba1a1a" />
+                  {({ pressed }) => (
+                    <View style={[
+                      styles.keyBtn,
+                      { width: KEY_SIZE, height: KEY_SIZE, borderRadius: KEY_SIZE / 2 },
+                      pressed && styles.backBtnPressed,
+                    ]}>
+                      <MaterialIcons name="backspace" size={26} color="#ba1a1a" />
+                    </View>
+                  )}
                 </Pressable>
               );
             }
@@ -180,14 +177,19 @@ export function AdminPinView({ visible, onHide, onSuccess, onCancel, correctPin 
                 key={idx}
                 testID={`pin-key-${key}`}
                 onPress={() => handleKey(key)}
-                style={({ pressed }) => [
-                  styles.keyBtn,
-                  styles.numBtn,
-                  { width: KEY_SIZE, height: KEY_SIZE, borderRadius: KEY_SIZE / 2 },
-                  pressed && styles.numBtnPressed,
-                ]}
+                style={{ width: KEY_SIZE, height: KEY_SIZE, margin: 12 }}
+                android_ripple={{ color: '#acf4a4', borderless: true, radius: KEY_SIZE / 2 }}
               >
-                <Text style={styles.keyText}>{key}</Text>
+                {({ pressed }) => (
+                  <View style={[
+                    styles.keyBtn,
+                    styles.numBtn,
+                    { width: KEY_SIZE, height: KEY_SIZE, borderRadius: KEY_SIZE / 2 },
+                    pressed && styles.numBtnPressed,
+                  ]}>
+                    <Text style={styles.keyText}>{key}</Text>
+                  </View>
+                )}
               </Pressable>
             );
           })}
@@ -215,7 +217,6 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingBottom: 12,
     backgroundColor: '#ffffff',
@@ -232,14 +233,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#00450d',
     letterSpacing: -0.3,
-  },
-  closeBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#dbf1fe',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   body: {
     flex: 1,
@@ -319,7 +312,6 @@ const styles = StyleSheet.create({
   keyBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    margin: 12,
   },
   numBtn: {
     backgroundColor: '#ffffff',
