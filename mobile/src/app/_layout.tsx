@@ -44,6 +44,7 @@ function RootLayoutNav({ colorScheme }: { colorScheme: 'light' | 'dark' | null |
         <Stack.Screen name="settings/team" options={{ headerShown: false }} />
         <Stack.Screen name="settings/change-pin" options={{ headerShown: false }} />
         <Stack.Screen name="trucks/edit-grades" options={{ headerShown: false }} />
+        <Stack.Screen name="notifications" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>

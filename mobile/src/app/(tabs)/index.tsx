@@ -12,7 +12,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useLaunch } from '@/context/LaunchContext';
-import { Plus, Search, Settings, Truck, ChevronRight } from 'lucide-react-native';
+import { Plus, Search, Bell, Truck, ChevronRight } from 'lucide-react-native';
 import { useShop } from '@/context/ShopContext';
 import { useInquiries } from '@/hooks/useInquiries';
 import { useTodayTrucks } from '@/hooks/useTodayTrucks';
@@ -477,10 +477,10 @@ export default function HomeScreen() {
                   </View>
                 </View>
 
-                {/* Right: settings only */}
+                {/* Right: notifications */}
                 <Pressable
-                  testID="settings-nav-btn"
-                  onPress={() => router.push('/settings' as any)}
+                  testID="notifications-nav-btn"
+                  onPress={() => router.push('/notifications' as any)}
                   style={{
                     width: 36,
                     height: 36,
@@ -490,7 +490,7 @@ export default function HomeScreen() {
                     justifyContent: 'center',
                   }}
                 >
-                  <Settings size={18} color={Colors.textSecond} />
+                  <Bell size={18} color={Colors.textSecond} />
                 </Pressable>
               </View>
             </View>
