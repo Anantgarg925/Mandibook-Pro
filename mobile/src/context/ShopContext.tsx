@@ -80,12 +80,15 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     async function load() {
+      console.log('[SHOP] Loading shop data...');
       try {
         const cached = await AsyncStorage.getItem(STORAGE_KEY);
+        console.log('[SHOP] Cache result:', cached ? 'found' : 'empty');
         if (cached) {
           const parsed: ShopData = JSON.parse(cached);
           setShop(parsed);
           setLoading(false);
+          console.log('[SHOP] Loaded from cache, firmName:', parsed.firmName);
           // Background sync from API
           try {
             const remote = await api.get<ShopData>(`/api/shops/${parsed.shopId}`);
@@ -102,9 +105,11 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
             // Other errors (network, etc.) — keep using local cache silently.
           }
         } else {
+          console.log('[SHOP] No cached shop, first run');
           setLoading(false);
         }
-      } catch {
+      } catch (e) {
+        console.log('[SHOP] Load error:', e);
         setLoading(false);
       }
     }
