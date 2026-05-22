@@ -257,18 +257,7 @@ export function AdminPinView({ visible, onHide, onSuccess, onCancel, correctPin,
       </View>
 
       {/* Footer */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + (isSmallHeight ? 12 : 24) }]}>
-        <View style={styles.footerPill}>
-          <MaterialIcons name="fingerprint" size={isVerySmallHeight ? 14 : 16} color="#00450D" />
-          <Text
-            style={[styles.footerPillText, isVerySmallHeight && { fontSize: 11 }]}
-            adjustsFontSizeToFit
-            numberOfLines={1}
-          >
-            Biometric entry available
-          </Text>
-        </View>
-      </View>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + (isSmallHeight ? 12 : 24) }]} />
 
       {/* Bottom accent */}
       <LinearGradient
