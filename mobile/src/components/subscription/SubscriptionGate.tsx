@@ -4,6 +4,7 @@ import {
   Alert,
   Dimensions,
   Image,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -287,7 +288,7 @@ export function SubscriptionGate({ children }: { children: ReactNode }) {
           />
         </View>
       ) : null}
-      {showBanner ? (
+      {showBanner && Platform.OS !== 'web' ? (
         <SafeAreaProvider
           initialMetrics={{
             frame: { x: 0, y: 0, width, height },

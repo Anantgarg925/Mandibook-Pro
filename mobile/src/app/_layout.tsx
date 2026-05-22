@@ -31,7 +31,7 @@ export const unstable_settings = {
   initialRouteName: '(tabs)',
 };
 
-SplashScreen.preventAutoHideAsync().catch(() => {});
+SplashScreen.preventAutoHideAsync().catch(() => { });
 
 const queryClient = new QueryClient();
 
@@ -110,7 +110,7 @@ export default function RootLayout() {
 
   useEffect(() => {
     if (!fontsLoaded) return;
-    SplashScreen.hideAsync().catch(() => {});
+    SplashScreen.hideAsync().catch(() => { });
   }, [fontsLoaded]);
 
   let FirstRunTutorialSafe: ComponentType | null = null;
@@ -127,7 +127,7 @@ export default function RootLayout() {
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
         <GestureHandlerRootView style={{ flex: 1, backgroundColor: '#F0F4F0' }}>
-          <SafeAreaProvider initialMetrics={initialWindowMetrics}>
+          <SafeAreaProvider initialMetrics={Platform.OS === 'web' ? undefined : initialWindowMetrics}>
             <KeyboardProvider>
               <LaunchProvider>
                 <ShopProvider>
