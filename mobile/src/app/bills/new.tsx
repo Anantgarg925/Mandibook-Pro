@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import * as Contacts from 'expo-contacts';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, ChevronDown, Minus, Plus, Phone } from 'lucide-react-native';
 import Animated, {
@@ -73,6 +73,7 @@ export default function NewBillScreen() {
   const { trucks } = useTodayTrucks();
   const { buyers } = useBuyers();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
 
   const [slipNumber, setSlipNumber] = useState<number | null>(null);
   const [selectedTruck, setSelectedTruck] = useState<Truck | null>(null);
@@ -1000,6 +1001,7 @@ export default function NewBillScreen() {
               borderTopRightRadius: 20,
               maxHeight: '70%',
               paddingTop: Spacing.md,
+              paddingBottom: Math.max(Spacing.md, insets.bottom),
               elevation: 20,
             }}
             onStartShouldSetResponder={() => true}
@@ -1126,6 +1128,7 @@ export default function NewBillScreen() {
               borderTopRightRadius: 20,
               maxHeight: '80%',
               paddingTop: Spacing.md,
+              paddingBottom: Math.max(Spacing.md, insets.bottom),
               elevation: 20,
             }}
           >

@@ -1,7 +1,17 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Notifications from 'expo-notifications';
 import { Platform, Vibration } from 'react-native';
+
+// expo-notifications is native-only; lazy-load to prevent web crashes
+let Notifications: typeof import('expo-notifications') | null = null;
+if (Platform.OS !== 'web') {
+  try {
+    Notifications = require('expo-notifications');
+  } catch {
+    Notifications = null;
+  }
+}
+
 import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useShop } from '@/context/ShopContext';
@@ -18,16 +28,19 @@ const BillNotificationContext = createContext<BillNotificationContextValue>({
 
 const storageKey = (shopId?: string) => `mandibook_bill_notification_unread_${shopId ?? 'none'}`;
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+if (Notifications) {
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
+    }),
+  });
+}
 
 async function prepareNotificationSound() {
+  if (!Notifications) return;
   const permission = await Notifications.getPermissionsAsync();
   if (!permission.granted) {
     await Notifications.requestPermissionsAsync();
@@ -105,9 +118,9 @@ export function BillNotificationProvider({ children }: { children: React.ReactNo
             return next;
           });
 
-          Vibration.vibrate([0, 180, 90, 180]);
+          if (Platform.OS !== 'web') Vibration.vibrate([0, 180, 90, 180]);
 
-          if (readyRef.current) {
+          if (readyRef.current && Notifications) {
             await Notifications.scheduleNotificationAsync({
               content: {
                 title: `New Bill #${bill.slip_number ?? ''}`,
