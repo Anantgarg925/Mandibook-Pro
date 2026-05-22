@@ -4,9 +4,15 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from '@/lib/useColorScheme';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { View } from 'react-native';
+import { Platform, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { KeyboardProvider } from 'react-native-keyboard-controller';
+import { KeyboardProvider as RNKeyboardProvider } from 'react-native-keyboard-controller';
+
+// KeyboardProvider crashes silently on web — use a passthrough wrapper
+function KeyboardProvider({ children }: { children: React.ReactNode }) {
+  if (Platform.OS === 'web') return <>{children}</>;
+  return <RNKeyboardProvider>{children}</RNKeyboardProvider>;
+}
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { usePathname } from 'expo-router';
 import { ShopProvider } from '@/context/ShopContext';
@@ -16,10 +22,9 @@ import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import OfflineBanner from '@/components/common/OfflineBanner';
 import { BottomNavBar } from '@/components/common/BottomNavBar';
 import { SubscriptionGate } from '@/components/subscription/SubscriptionGate';
-import type { ComponentType } from 'react';
+import React, { type ComponentType, useEffect } from 'react';
 import { Colors } from '@/lib/theme';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
-import { useEffect } from 'react';
 
 export const unstable_settings = {
   // Ensure that reloading on `/modal` keeps a back button present.
