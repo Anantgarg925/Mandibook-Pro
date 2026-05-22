@@ -24,7 +24,7 @@ import {
   Plus,
   Share2,
 } from 'lucide-react-native';
-import PagerView from 'react-native-pager-view';
+import PagerView from '@/components/common/PagerView';
 import { useQuery } from '@tanstack/react-query';
 import { useDateInquiries } from '@/hooks/useDateInquiries';
 import { useDateTrucks } from '@/hooks/useDateTrucks';

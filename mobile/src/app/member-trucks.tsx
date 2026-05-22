@@ -8,6 +8,7 @@ import { useTodayTrucks } from '@/hooks/useTodayTrucks';
 import { Colors, FontSize, Radius, Spacing } from '@/lib/theme';
 import { toIndianWeight } from '@/lib/formatters';
 import TruckCard from '@/components/truck/TruckCard';
+import { DraggableFAB } from '@/components/common/DraggableFAB';
 
 export default function MemberTrucksScreen() {
   const router = useRouter();
@@ -56,43 +57,30 @@ export default function MemberTrucksScreen() {
         />
       )}
 
-      {/* Floating Action Button */}
-      <Pressable
+      <DraggableFAB
         testID="new-truck-fab"
-        hitSlop={12}
         onPress={() => router.push('/trucks/register')}
-        style={{
-          position: 'absolute',
-          right: 16,
-          bottom: Math.max(24, 24 + insets.bottom),
-          elevation: 16,
-          zIndex: 30,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.25,
-          shadowRadius: 8,
-        }}
+        initialBottom={8}
+        initialRight={16}
       >
-        {({ pressed }) => (
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: pressed ? Colors.primaryPressed : Colors.primary,
-            paddingVertical: 12,
-            paddingHorizontal: 18,
-            borderRadius: 30,
-            gap: Spacing.sm,
-          }}>
-            <View style={{ width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}>
-              <Plus size={14} color="#FFFFFF" strokeWidth={3} />
-            </View>
-            <View>
-              <Text style={{ color: '#FFFFFF', fontSize: FontSize.sm, fontWeight: '800' }}>Register New</Text>
-              <Text style={{ color: '#DFF4FF', fontSize: 10, fontWeight: '600' }}>नई गाड़ी जोड़ें</Text>
-            </View>
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: Colors.primary,
+          paddingVertical: 12,
+          paddingHorizontal: 18,
+          borderRadius: 30,
+          gap: Spacing.sm,
+        }}>
+          <View style={{ width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}>
+            <Plus size={14} color="#FFFFFF" strokeWidth={3} />
           </View>
-        )}
-      </Pressable>
+          <View>
+            <Text style={{ color: '#FFFFFF', fontSize: FontSize.sm, fontWeight: '800' }}>Register New</Text>
+            <Text style={{ color: '#DFF4FF', fontSize: 10, fontWeight: '600' }}>नई गाड़ी जोड़ें</Text>
+          </View>
+        </View>
+      </DraggableFAB>
     </SafeAreaView>
   );
 }

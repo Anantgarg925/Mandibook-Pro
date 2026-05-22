@@ -8,6 +8,7 @@ import { trucksRouter } from "./routes/trucks";
 import { inquiriesRouter } from "./routes/inquiries";
 import { buyersRouter } from "./routes/buyers";
 import { transactionsRouter } from "./routes/transactions";
+import { membersRouter } from "./routes/members";
 import { logger } from "hono/logger";
 
 const app = new Hono();
@@ -28,6 +29,7 @@ app.route("/api/trucks", trucksRouter);
 app.route("/api/inquiries", inquiriesRouter);
 app.route("/api/buyers", buyersRouter);
 app.route("/api/transactions", transactionsRouter);
+app.route("/api/members", membersRouter);
 
 const port = Number(process.env.PORT) || 3000;
 

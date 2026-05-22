@@ -23,6 +23,7 @@ import type { Inquiry } from '@/types/inquiry';
 import { SplashScreenView } from '@/components/SplashScreenView';
 import { LaunchView } from '@/components/LaunchView';
 import { AdminPinView } from '@/components/AdminPinView';
+import { DraggableFAB } from '@/components/common/DraggableFAB';
 import { useBillNotifications } from '@/context/BillNotificationContext';
 import { useResponsive } from '@/hooks/useResponsive';
 import { APP_SESSION_KEY, MEMBER_SESSION_KEY } from '@/lib/session';
@@ -837,52 +838,40 @@ export default function HomeScreen() {
       />
 
       {launchComplete && shop ? (
-        <Pressable
+        <DraggableFAB
           testID="new-bill-fab"
-          hitSlop={12}
           onPress={() => router.push('/bills/new' as any)}
-          style={{
-            position: 'absolute',
-            right: 16,
-            bottom: 40 + insets.bottom,
-            elevation: 16,
-            zIndex: 30,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.25,
-            shadowRadius: 8,
-          }}
+          initialBottom={8}
+          initialRight={16}
         >
-          {({ pressed }) => (
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              backgroundColor: pressed ? '#003807' : UI.primary,
-              paddingVertical: 12,
-              paddingHorizontal: 18,
-              borderRadius: 30,
-              gap: Spacing.sm,
-            }}>
-              <View
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 12,
-                  borderWidth: 2,
-                  borderColor: '#FFFFFF',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}
-              >
-                <Plus size={14} color="#FFFFFF" strokeWidth={3} />
-              </View>
-              <View>
-                <Text style={{ color: '#FFFFFF', fontSize: FontSize.sm, fontWeight: '800' }}>New Bill</Text>
-                <Text style={{ color: '#DFF4FF', fontSize: 10, fontWeight: '600' }}>नया बिल</Text>
-              </View>
+          <View style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            backgroundColor: UI.primary,
+            paddingVertical: 12,
+            paddingHorizontal: 18,
+            borderRadius: 30,
+            gap: Spacing.sm,
+          }}>
+            <View
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: 12,
+                borderWidth: 2,
+                borderColor: '#FFFFFF',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Plus size={14} color="#FFFFFF" strokeWidth={3} />
             </View>
-          )}
-        </Pressable>
+            <View>
+              <Text style={{ color: '#FFFFFF', fontSize: FontSize.sm, fontWeight: '800' }}>New Bill</Text>
+              <Text style={{ color: '#DFF4FF', fontSize: 10, fontWeight: '600' }}>नया बिल</Text>
+            </View>
+          </View>
+        </DraggableFAB>
       ) : null}
 
       {!splashGone && (

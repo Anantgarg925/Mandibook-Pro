@@ -33,7 +33,7 @@ const ShopCreateSchema = z.object({
     telePost: 0,
   }),
   adminPin: z.string(),
-  teamNames: z.array(z.string()).default([]),
+  teamNames: z.array(z.any()).default([]),
   createdAt: z.number(),
 });
 
@@ -50,7 +50,7 @@ const ShopUpdateSchema = z.object({
   grades: z.array(z.object({ code: z.string(), name: z.string() })).optional(),
   charges: ChargesSchema.optional(),
   adminPin: z.string().optional(),
-  teamNames: z.array(z.string()).optional(),
+  teamNames: z.array(z.any()).optional(),
   createdAt: z.number().optional(),
 });
 
@@ -84,7 +84,7 @@ function parseShop(shop: {
       cartagePerKg: number;
       telePost: number;
     },
-    teamNames: JSON.parse(shop.teamNames) as string[],
+    teamNames: JSON.parse(shop.teamNames) as any[],
   };
 }
 

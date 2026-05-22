@@ -23,6 +23,7 @@ import {
   Users,
 } from 'lucide-react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { DraggableFAB } from '@/components/common/DraggableFAB';
 import { useBuyers } from '@/hooks/useBuyers';
 import { useShop } from '@/context/ShopContext';
 import { supabase } from '@/lib/supabase';
@@ -389,29 +390,23 @@ export default function BuyerListScreen() {
           />
         )}
 
-        {/* FAB */}
-        <Pressable
+        <DraggableFAB
           onPress={() => setAddVisible(true)}
           testID="add-buyer-fab"
-          style={{
-            position: 'absolute',
-            bottom: 40 + insets.bottom,
-            right: 20,
+          initialBottom={8}
+          initialRight={20}
+        >
+          <View style={{
             width: 60,
             height: 60,
             borderRadius: 30,
             backgroundColor: '#1b5e20',
             alignItems: 'center',
             justifyContent: 'center',
-            elevation: 8,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.2,
-            shadowRadius: 8,
-          }}
-        >
-          <UserPlus size={26} color="#ffffff" />
-        </Pressable>
+          }}>
+            <UserPlus size={26} color="#ffffff" />
+          </View>
+        </DraggableFAB>
       </View>
 
       <Modal visible={addVisible} transparent animationType="slide" onRequestClose={() => setAddVisible(false)}>

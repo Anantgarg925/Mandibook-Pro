@@ -13,7 +13,7 @@ import { useInquiries } from '@/hooks/useInquiries';
 import PendingInquiryCard from '@/components/bills/PendingInquiryCard';
 import { Colors, FontSize, Spacing } from '@/lib/theme';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import PagerView from 'react-native-pager-view';
+import PagerView from '@/components/common/PagerView';
 
 // TODO: add admin PIN gate once role selection (Phase N) is built
 

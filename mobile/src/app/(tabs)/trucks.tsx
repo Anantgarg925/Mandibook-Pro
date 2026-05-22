@@ -3,13 +3,14 @@ import { View, Text, FlatList, Pressable, TextInput, ScrollView } from 'react-na
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Menu, Truck as TruckIcon, TrendingUp, ClipboardList, Plus, Search } from 'lucide-react-native';
-import PagerView from 'react-native-pager-view';
+import PagerView from '@/components/common/PagerView';
 import { useTodayTrucks } from '@/hooks/useTodayTrucks';
 import TruckCard from '@/components/truck/TruckCard';
 import { SkeletonTable } from '@/components/common/SkeletonLoader';
 import { FontSize, Spacing, Radius } from '@/lib/theme';
 import type { Truck } from '@/types/truck';
 import { useResponsive } from '@/hooks/useResponsive';
+import { DraggableFAB } from '@/components/common/DraggableFAB';
 
 const BG = '#F3FAFF';
 const GREEN = '#00450D';
@@ -66,9 +67,9 @@ export default function TrucksScreen() {
       {/* Search Bar */}
       <View style={{ paddingTop: Spacing.md, paddingBottom: Spacing.sm }}>
         <View style={{
-          flexDirection: 'row', 
-          alignItems: 'center', 
-          backgroundColor: '#FFFFFF', 
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: '#FFFFFF',
           borderRadius: 14,
           borderWidth: 1,
           borderColor: '#E5E7EB',
@@ -76,7 +77,7 @@ export default function TrucksScreen() {
           minHeight: 48
         }}>
           <TruckIcon size={20} color="#717A6D" />
-          <TextInput 
+          <TextInput
             style={{ flex: 1, marginLeft: 12, fontSize: isSmall ? 14 : 16, color: '#111827' }}
             placeholder="Search truck number... / गाड़ी नंबर खोजें"
             placeholderTextColor="#6B7280"
@@ -133,9 +134,9 @@ export default function TrucksScreen() {
       {/* Summary Cards - Horizontal Scroll */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: Spacing.lg }}>
         <View style={{ flexDirection: 'row', gap: Spacing.md, paddingRight: Spacing.md }}>
-          <View style={{ 
-            backgroundColor: '#FFFFFF', 
-            borderRadius: 14, 
+          <View style={{
+            backgroundColor: '#FFFFFF',
+            borderRadius: 14,
             padding: Spacing.sm,
             borderWidth: 1,
             borderColor: BORDER,
@@ -149,10 +150,10 @@ export default function TrucksScreen() {
               <TrendingUp size={18} color={GREEN} />
             </View>
           </View>
-          
+
           <View style={{
-            backgroundColor: '#FFFFFF', 
-            borderRadius: 14, 
+            backgroundColor: '#FFFFFF',
+            borderRadius: 14,
             padding: Spacing.sm,
             borderWidth: 1,
             borderColor: BORDER,
@@ -181,9 +182,9 @@ export default function TrucksScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={['top', 'left', 'right']}>
       {/* Top App Bar */}
-      <View style={{ 
-        flexDirection: 'row', 
-        alignItems: 'center', 
+      <View style={{
+        flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: contentHPad,
         minHeight: 56,
@@ -283,42 +284,30 @@ export default function TrucksScreen() {
       )}
 
       {/* Floating Action Button */}
-      <Pressable
+      <DraggableFAB
         testID="new-truck-fab"
-        hitSlop={12}
         onPress={handleAdd}
-        style={{
-          position: 'absolute',
-          right: 16,
-          bottom: 40 + insets.bottom,
-          elevation: 16,
-          zIndex: 30,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.25,
-          shadowRadius: 8,
-        }}
+        initialBottom={8}
+        initialRight={16}
       >
-        {({ pressed }) => (
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: pressed ? '#003807' : GREEN,
-            paddingVertical: 12,
-            paddingHorizontal: 18,
-            borderRadius: 30,
-            gap: Spacing.sm,
-          }}>
-            <View style={{ width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}>
-              <Plus size={14} color="#FFFFFF" strokeWidth={3} />
-            </View>
-            <View>
-              <Text style={{ color: '#FFFFFF', fontSize: FontSize.sm, fontWeight: '800' }}>Register New</Text>
-              <Text style={{ color: '#DFF4FF', fontSize: 10, fontWeight: '600' }}>नई गाड़ी जोड़ें</Text>
-            </View>
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: GREEN,
+          paddingVertical: 12,
+          paddingHorizontal: 18,
+          borderRadius: 30,
+          gap: Spacing.sm,
+        }}>
+          <View style={{ width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}>
+            <Plus size={14} color="#FFFFFF" strokeWidth={3} />
           </View>
-        )}
-      </Pressable>
+          <View>
+            <Text style={{ color: '#FFFFFF', fontSize: FontSize.sm, fontWeight: '800' }}>Register New</Text>
+            <Text style={{ color: '#DFF4FF', fontSize: 10, fontWeight: '600' }}>नई गाड़ी जोड़ें</Text>
+          </View>
+        </View>
+      </DraggableFAB>
     </SafeAreaView>
   );
 }

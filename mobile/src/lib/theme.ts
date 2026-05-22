@@ -1,13 +1,12 @@
-import { Dimensions } from 'react-native';
+import { Dimensions, PixelRatio } from 'react-native';
 
 const { width } = Dimensions.get('window');
-// Base width standard (e.g., iPhone 12/13/14 Pro is 390, Android is ~360-380)
-const guidelineBaseWidth = 380;
 
-// Dynamic scaling function
-const scale = (size: number) => (width / guidelineBaseWidth) * size;
-// Moderate scale to ensure components don't shrink or grow excessively
-export const ms = (size: number, factor = 0.4) => Math.round(size + (scale(size) - size) * factor);
+// Modern, extremely subtle moderate scaling factor (15%) for screen-size adaptability
+export const ms = (size: number, factor = 0.15) => {
+  const scale = (width / 375) * size;
+  return Math.round(size + (scale - size) * factor);
+};
 
 export const Colors = {
   primary: '#1B5E20',
@@ -25,27 +24,30 @@ export const Colors = {
   headerBg: '#1B5E20',
 } as const;
 
+// Professional compact 4px grid for elite spacing
 export const Spacing = {
   xs: ms(4),
   sm: ms(8),
-  md: ms(14),
-  lg: ms(20),
-  xl: ms(28),
+  md: ms(12),  // 12px instead of 16px makes layout significantly tighter and premium
+  lg: ms(18),  // 18px instead of 24px
+  xl: ms(24),  // 24px instead of 32px
 } as const;
 
+// Premium compact Material/Apple typography scale
 export const FontSize = {
-  xs: ms(11),
-  sm: ms(12),
-  md: ms(14),
-  lg: ms(16),
-  xl: ms(20),
-  xxl: ms(24),
+  xs: ms(10),  // Extremely crisp small footnotes
+  sm: ms(12),  // Premium small text / labels
+  md: ms(14),  // Standard body text used in premier apps (WhatsApp, Twitter/X)
+  lg: ms(16),  // Sub-headers / primary actions
+  xl: ms(20),  // Screen / Card titles
+  xxl: ms(24), // Heavy hero display titles
 } as const;
 
+// Crisp, refined roundness
 export const Radius = {
-  sm: ms(8),
-  md: ms(12),
-  lg: ms(14),
+  sm: ms(6),   // Small chips / inputs
+  md: ms(10),  // Standard cards
+  lg: ms(14),  // Modal bottom sheets
   round: 999,
 } as const;
 

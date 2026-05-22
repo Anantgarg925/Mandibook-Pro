@@ -3,12 +3,13 @@ import { View, Text, FlatList, Pressable, ActivityIndicator, ScrollView, TextInp
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ChevronDown, ChevronRight, Plus, Menu, Search, TrendingUp, ClipboardList, Clock, FileText } from 'lucide-react-native';
-import PagerView from 'react-native-pager-view';
+import PagerView from '@/components/common/PagerView';
 import { useInquiries } from '@/hooks/useInquiries';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { toIndianCurrency } from '@/lib/formatters';
 import type { Inquiry } from '@/types/inquiry';
 import { useResponsive } from '@/hooks/useResponsive';
+import { DraggableFAB } from '@/components/common/DraggableFAB';
 
 type FilterTab = 'ALL' | 'PENDING' | 'CONFIRMED' | 'UDHAARI' | 'GRADE';
 
@@ -22,7 +23,7 @@ function BillCard({ item, onPress, isSmall }: { item: Inquiry; onPress: () => vo
   const isConfirmed = item.status === 'CONFIRMED';
   const isCancelled = item.status === 'CANCELLED';
   const statusDisplay = isConfirmed ? 'AUTHORIZED / अधिकृत' : isCancelled ? 'CANCELLED / रद्द' : 'PENDING / शेष';
-  
+
   const statusBg = isConfirmed ? '#E8F5E9' : isCancelled ? '#FFEBEE' : '#FFF8E1';
   const statusColor = isConfirmed ? '#166534' : isCancelled ? '#991B1B' : '#854D0E';
 
@@ -85,7 +86,7 @@ export default function BillsScreen() {
   const { contentHPad, isSmall } = useResponsive();
   const { filter } = useLocalSearchParams<{ filter?: string }>();
   const { inquiries, pending, confirmed, udhaari, loading } = useInquiries();
-  
+
   const [activeFilter, setActiveFilter] = useState<FilterTab>('ALL');
   const [query, setQuery] = useState('');
   const [expandedGrades, setExpandedGrades] = useState<Record<string, boolean>>({});
@@ -112,10 +113,10 @@ export default function BillsScreen() {
 
   const filteredBills =
     activeFilter === 'ALL' ? searchedBills
-    : activeFilter === 'PENDING' ? searchedBills.filter(b => b.status === 'PENDING')
-    : activeFilter === 'CONFIRMED' ? searchedBills.filter(b => b.status === 'CONFIRMED')
-    : activeFilter === 'GRADE' ? searchedBills
-    : searchedBills.filter(b => b.paymentMode === 'UDHAARI');
+      : activeFilter === 'PENDING' ? searchedBills.filter(b => b.status === 'PENDING')
+        : activeFilter === 'CONFIRMED' ? searchedBills.filter(b => b.status === 'CONFIRMED')
+          : activeFilter === 'GRADE' ? searchedBills
+            : searchedBills.filter(b => b.paymentMode === 'UDHAARI');
 
   const gradeGroups = Object.values(
     filteredBills.reduce<Record<string, { grade: string; totalQty: number; totalAmount: number; rows: Inquiry[] }>>((acc, bill) => {
@@ -147,9 +148,9 @@ export default function BillsScreen() {
       {/* Search Bar */}
       <View style={{ paddingTop: Spacing.md, paddingBottom: Spacing.sm }}>
         <View style={{
-          flexDirection: 'row', 
-          alignItems: 'center', 
-          backgroundColor: '#FFFFFF', 
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: '#FFFFFF',
           borderRadius: 14,
           borderWidth: 1,
           borderColor: query ? '#2563EB' : BORDER,
@@ -157,7 +158,7 @@ export default function BillsScreen() {
           minHeight: 48
         }}>
           <Search size={20} color="#717A6D" />
-          <TextInput 
+          <TextInput
             style={{ flex: 1, marginLeft: 12, fontSize: isSmall ? 14 : 16, color: '#111827' }}
             placeholder="Search bills... / बिल खोजें"
             placeholderTextColor="#6B7280"
@@ -227,10 +228,10 @@ export default function BillsScreen() {
 
       {/* Summary Cards */}
       <View style={{ flexDirection: 'row', gap: isSmall ? 8 : Spacing.md, marginBottom: Spacing.lg }}>
-        <View style={{ 
-          flex: 1, 
-          backgroundColor: '#FFFFFF', 
-          borderRadius: 14, 
+        <View style={{
+          flex: 1,
+          backgroundColor: '#FFFFFF',
+          borderRadius: 14,
           padding: isSmall ? Spacing.sm : Spacing.md,
           borderWidth: 1,
           borderColor: BORDER,
@@ -243,11 +244,11 @@ export default function BillsScreen() {
             <TrendingUp size={isSmall ? 20 : 22} color={GREEN} />
           </View>
         </View>
-        
+
         <View style={{
-          flex: 1, 
-          backgroundColor: '#FFFFFF', 
-          borderRadius: 14, 
+          flex: 1,
+          backgroundColor: '#FFFFFF',
+          borderRadius: 14,
           padding: isSmall ? Spacing.sm : Spacing.md,
           borderWidth: 1,
           borderColor: BORDER,
@@ -267,9 +268,9 @@ export default function BillsScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={['top', 'left', 'right']}>
       {/* Top App Bar */}
-      <View style={{ 
-        flexDirection: 'row', 
-        alignItems: 'center', 
+      <View style={{
+        flexDirection: 'row',
+        alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: contentHPad,
         minHeight: 56,
@@ -285,7 +286,7 @@ export default function BillsScreen() {
         </Text>
         <Pressable hitSlop={10} style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
           {/* Placeholder for balance/layout alignment with left icon */}
-          <Search size={24} color="#111827" opacity={0} /> 
+          <Search size={24} color="#111827" opacity={0} />
         </Pressable>
       </View>
 
@@ -374,9 +375,9 @@ export default function BillsScreen() {
 
               const pageBills =
                 tabStatus === 'ALL' ? searchedBills
-                : tabStatus === 'PENDING' ? searchedBills.filter(b => b.status === 'PENDING')
-                : tabStatus === 'CONFIRMED' ? searchedBills.filter(b => b.status === 'CONFIRMED')
-                : searchedBills.filter(b => b.paymentMode === 'UDHAARI');
+                  : tabStatus === 'PENDING' ? searchedBills.filter(b => b.status === 'PENDING')
+                    : tabStatus === 'CONFIRMED' ? searchedBills.filter(b => b.status === 'CONFIRMED')
+                      : searchedBills.filter(b => b.paymentMode === 'UDHAARI');
 
               return (
                 <View key={index} style={{ flex: 1 }}>
@@ -403,42 +404,30 @@ export default function BillsScreen() {
       )}
 
       {/* Floating Action Button */}
-      <Pressable
+      <DraggableFAB
         testID="new-bill-fab"
-        hitSlop={12}
         onPress={handleAdd}
-        style={{
-          position: 'absolute',
-          right: 16,
-          bottom: 40 + insets.bottom,
-          elevation: 16,
-          zIndex: 30,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.25,
-          shadowRadius: 8,
-        }}
+        initialBottom={8}
+        initialRight={16}
       >
-        {({ pressed }) => (
-          <View style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            backgroundColor: pressed ? '#003807' : GREEN,
-            paddingVertical: 12,
-            paddingHorizontal: 18,
-            borderRadius: 30,
-            gap: Spacing.sm,
-          }}>
-            <View style={{ width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}>
-              <Plus size={14} color="#FFFFFF" strokeWidth={3} />
-            </View>
-            <View>
-              <Text style={{ color: '#FFFFFF', fontSize: FontSize.sm, fontWeight: '800' }}>New Bill</Text>
-              <Text style={{ color: '#DFF4FF', fontSize: 10, fontWeight: '600' }}>नया बिल</Text>
-            </View>
+        <View style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: GREEN,
+          paddingVertical: 12,
+          paddingHorizontal: 18,
+          borderRadius: 30,
+          gap: Spacing.sm,
+        }}>
+          <View style={{ width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: '#FFFFFF', alignItems: 'center', justifyContent: 'center' }}>
+            <Plus size={14} color="#FFFFFF" strokeWidth={3} />
           </View>
-        )}
-      </Pressable>
+          <View>
+            <Text style={{ color: '#FFFFFF', fontSize: FontSize.sm, fontWeight: '800' }}>New Bill</Text>
+            <Text style={{ color: '#DFF4FF', fontSize: 10, fontWeight: '600' }}>नया बिल</Text>
+          </View>
+        </View>
+      </DraggableFAB>
     </SafeAreaView>
   );
 }

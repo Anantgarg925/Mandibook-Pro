@@ -28,6 +28,7 @@ model Shop {
   inquiries    Inquiry[]
   buyers       Buyer[]
   transactions Transaction[]
+  members      Member[]
 }
 
 model Truck {
@@ -40,12 +41,25 @@ model Truck {
   totalKg        Float
   freightAmount  Float
   gradeInventory String  // JSON array
+  isGodown       Boolean @default(false)
+  godownDate     Float?
   status         String  @default("ACTIVE")
   date           Float
   createdAt      Float
 
   shop       Shop      @relation(fields: [shopId], references: [id], onDelete: Cascade)
   inquiries  Inquiry[]
+  gradeEntries TruckGradeEntry[]
+}
+
+model TruckGradeEntry {
+  id         String @id @default(cuid())
+  truckId    String
+  gradeLabel String
+  weightKg   Float
+  createdAt  Float
+
+  truck Truck @relation(fields: [truckId], references: [id], onDelete: Cascade)
 }
 
 model Inquiry {
@@ -84,6 +98,11 @@ model Buyer {
   name                 String
   phone                String
   outstandingBalance   Float   @default(0)
+  openingBalance       Float   @default(0)
+  openingBalanceType   String  @default("DR")
+  openingBalanceDate   Float?
+  openingBalanceSet    Boolean @default(false)
+  notes                String  @default("")
   lastTransactionDate  Float
   lastPaymentAmount    Float?
   lastPaymentDate      Float?
@@ -95,11 +114,25 @@ model Buyer {
   @@unique([shopId, code])
 }
 
+model Member {
+  id        String  @id @default(cuid())
+  shopId    String
+  name      String
+  phone     String
+  pin       String
+  role      String  @default("MEMBER") // 'ADMIN' or 'MEMBER'
+  createdAt Float
+
+  shop      Shop    @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, phone])
+}
+
 model Transaction {
   id            String  @id @default(cuid())
   shopId        String
   buyerCode     String
-  type          String  // 'SALE' | 'PAYMENT'
+  type          String  // 'SALE' | 'PAYMENT' | 'OPENING'
   amount        Float
   date          Float
   paymentMethod String?
