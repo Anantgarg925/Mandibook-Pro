@@ -11,7 +11,7 @@ import {
   Alert,
   KeyboardAvoidingView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   ChevronLeft,
@@ -58,6 +58,7 @@ type DaySummaryContentProps = {
 export default function DaySummaryContent({ showBottomNav = false }: DaySummaryContentProps) {
   const router = useRouter();
   const { shop } = useShop();
+  const insets = useSafeAreaInsets();
   const [date, setDate] = useState<Date>(getCurrentBusinessDate());
   const [activeTab, setActiveTab] = useState<TabKey>('sale');
   const [exporting, setExporting] = useState(false);
@@ -1346,7 +1347,7 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
                 borderTopLeftRadius: 20,
                 borderTopRightRadius: 20,
                 padding: Spacing.md,
-                paddingBottom: Spacing.xl + 40,
+                paddingBottom: Math.max(Spacing.xl + 40, insets.bottom + Spacing.md),
               }}>
                 <Text style={{ fontSize: FontSize.md, fontWeight: '700', marginBottom: Spacing.md }}>Add Cash Entry</Text>
 

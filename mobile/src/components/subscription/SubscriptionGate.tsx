@@ -2,6 +2,7 @@ import React, { type ReactNode, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Image,
   Pressable,
   RefreshControl,
@@ -10,7 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
 import { CheckCircle2, Clock3, Copy, RefreshCw } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import { usePathname } from 'expo-router';
@@ -239,6 +240,7 @@ export function SubscriptionGate({ children }: { children: ReactNode }) {
   const { shop, loading: shopLoading } = useShop();
   const pathname = usePathname();
   const { data, isLoading, isFetching, refetch, submitPayment, submittingPayment } = useSubscriptionStatus();
+  const insets = useSafeAreaInsets();
 
   const bypass =
     !shop?.shopId ||
@@ -271,18 +273,32 @@ export function SubscriptionGate({ children }: { children: ReactNode }) {
     );
   }
 
+  const showBanner = data?.status === 'trial' || data?.status === 'active';
+  const { width, height } = Dimensions.get('window');
+
   return (
     <View style={{ flex: 1 }}>
-      {data.status === 'trial' || data.status === 'active' ? (
-        <SafeAreaView edges={['top']} style={{ backgroundColor: data.status === 'trial' ? '#FFF8E1' : '#E8F5E9' }}>
+      {showBanner ? (
+        <View style={{ paddingTop: insets.top, backgroundColor: data.status === 'trial' ? '#FFF8E1' : '#E8F5E9' }}>
           <TrialBanner
             status={data.status}
             daysRemaining={data.days_remaining}
             until={data.current_period_ends_at ?? data.trial_ends_at}
           />
-        </SafeAreaView>
+        </View>
       ) : null}
-      {children}
+      {showBanner ? (
+        <SafeAreaProvider
+          initialMetrics={{
+            frame: { x: 0, y: 0, width, height },
+            insets: { ...insets, top: 0 },
+          }}
+        >
+          {children}
+        </SafeAreaProvider>
+      ) : (
+        children
+      )}
     </View>
   );
 }

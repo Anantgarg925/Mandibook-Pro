@@ -1,10 +1,13 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform, Vibration } from 'react-native';
+import Constants from 'expo-constants';
 
-// expo-notifications is native-only; lazy-load to prevent web crashes
+const isExpoGo = Constants.appOwnership === 'expo';
+
+// expo-notifications is native-only and not supported in Expo Go SDK 53+; lazy-load to prevent crashes
 let Notifications: typeof import('expo-notifications') | null = null;
-if (Platform.OS !== 'web') {
+if (Platform.OS !== 'web' && !isExpoGo) {
   try {
     Notifications = require('expo-notifications');
   } catch {

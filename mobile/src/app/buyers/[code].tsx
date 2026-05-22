@@ -911,6 +911,7 @@ export default function BuyerLedgerScreen() {
                 borderTopLeftRadius: 20,
                 borderTopRightRadius: 20,
                 padding: Spacing.md,
+                paddingBottom: Math.max(Spacing.md, insets.bottom),
               }}
             >
               <Text style={{ fontSize: FontSize.md, fontWeight: '900', color: Colors.text, marginBottom: Spacing.md }}>
