@@ -48,6 +48,13 @@ export type BuyerSummaryRow = {
   net: number;
 };
 
+function formatPlainAmount(value: number): string {
+  return value.toLocaleString('en-IN', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
+
 function buildGradeSummary(inquiries: Inquiry[]): GradeSummaryRow[] {
   const map = new Map<string, GradeSummaryRow>();
   for (const inq of inquiries) {
@@ -98,6 +105,64 @@ function buildBuyerSummary(inquiries: Inquiry[]): BuyerSummaryRow[] {
   return Array.from(map.values()).sort((a, b) => b.gross - a.gross);
 }
 
+function buildBuyerSummaryByName(inquiries: Inquiry[]): BuyerSummaryRow[] {
+  const map = new Map<string, BuyerSummaryRow>();
+  for (const inq of inquiries) {
+    const key = inq.customerName;
+    const existing = map.get(key);
+    if (existing) {
+      existing.sacks += inq.sacks;
+      existing.weight += inq.totalWeight;
+      existing.gross += inq.grossAmount;
+      existing.apmc += inq.apmcAmount;
+      existing.bardana += inq.bardanaAmount;
+      existing.net += inq.netAmount;
+    } else {
+      map.set(key, {
+        name: inq.customerName,
+        sacks: inq.sacks,
+        weight: inq.totalWeight,
+        gross: inq.grossAmount,
+        apmc: inq.apmcAmount,
+        bardana: inq.bardanaAmount,
+        net: inq.netAmount,
+      });
+    }
+  }
+  return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function buildTruckReports(inquiries: Inquiry[], trucks: Truck[], shop: ShopData) {
+  const commissionPct = shop.charges?.agentCommission ?? 0;
+  const telePost = shop.charges?.telePost ?? 0;
+  const telePostShare = trucks.length > 0 ? telePost / trucks.length : 0;
+
+  return trucks.map((truck) => {
+    const rows = inquiries.filter((inq) => inq.truckId === truck.id);
+    const gross = rows.reduce((sum, inq) => sum + inq.grossAmount, 0);
+    const apmc = rows.reduce((sum, inq) => sum + inq.apmcAmount, 0);
+    const cartage = rows.reduce((sum, inq) => sum + inq.cartageAmount, 0);
+    const bardana = rows.reduce((sum, inq) => sum + inq.bardanaAmount, 0);
+    const commission = gross * commissionPct / 100;
+    const grades = buildGradeSummary(rows);
+
+    return {
+      truck,
+      bills: rows.length,
+      sacks: rows.reduce((sum, inq) => sum + inq.sacks, 0),
+      weight: rows.reduce((sum, inq) => sum + inq.totalWeight, 0),
+      gross,
+      apmc,
+      cartage,
+      bardana,
+      commission,
+      telePost: telePostShare,
+      net: gross - truck.freightAmount - commission - apmc - cartage - bardana - telePostShare,
+      grades,
+    };
+  });
+}
+
 export function generateDayReportHTML(params: {
   date: number;
   shop: ShopData;
@@ -109,6 +174,8 @@ export function generateDayReportHTML(params: {
 
   const gradeSummary = buildGradeSummary(confirmedInquiries);
   const buyerSummary = buildBuyerSummary(confirmedInquiries);
+  const dayBookBuyerSummary = buildBuyerSummaryByName(confirmedInquiries);
+  const truckReports = buildTruckReports(confirmedInquiries, trucks, shop);
 
   const totalSacks = gradeSummary.reduce((s, r) => s + r.sacks, 0);
   const totalWeight = gradeSummary.reduce((s, r) => s + r.weight, 0);
@@ -123,6 +190,7 @@ export function generateDayReportHTML(params: {
   const telePost = shop.charges?.telePost ?? 0;
   const commission = totalGross * commissionPct / 100;
   const netToSender = totalGross - totalFreight - commission - totalApmc - totalCartage - totalBardana - telePost;
+  const totalOther = totalApmc + totalCartage + totalBardana + telePost;
 
   // Cash book
   const cashReceipts = [
@@ -158,6 +226,93 @@ export function generateDayReportHTML(params: {
     </tr>
   `).join('');
 
+  const truckReportRows = truckReports.map((report) => {
+    const rows = report.grades.map((r) => `
+      <tr>
+        <td>${r.grade} (${r.gradeName})</td>
+        <td style="text-align:right;">${r.sacks}</td>
+        <td style="text-align:right;">${r.weight.toFixed(0)} kg</td>
+        <td style="text-align:right;">${toIndianCurrency(r.gross)}</td>
+      </tr>
+    `).join('');
+
+    return `
+      <div class="truck-card">
+        <div class="truck-title">${report.truck.truckNumber} - ${report.truck.senderName || 'Sender'}</div>
+        <div class="truck-meta">Load: ${report.truck.totalKg.toFixed(0)} kg | Bills: ${report.bills} | Freight: ${toIndianCurrency(report.truck.freightAmount)}</div>
+        <table>
+          <thead><tr><th>Grade</th><th style="text-align:right">Sacks</th><th style="text-align:right">Weight</th><th style="text-align:right">Gross</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="4" style="color:#616161;">No confirmed bills for this truck</td></tr>'}</tbody>
+          <tfoot class="foot"><tr><td>Total</td><td style="text-align:right">${report.sacks}</td><td style="text-align:right">${report.weight.toFixed(0)} kg</td><td style="text-align:right">${toIndianCurrency(report.gross)}</td></tr></tfoot>
+        </table>
+        <div class="account-row"><span>Commission</span><span class="deduct">-${toIndianCurrency(report.commission)}</span></div>
+        <div class="account-row"><span>APMC + Cartage + Bardana</span><span class="deduct">-${toIndianCurrency(report.apmc + report.cartage + report.bardana)}</span></div>
+        <div class="account-row net"><span>Truck Net</span><span>${toIndianCurrency(report.net)}</span></div>
+      </div>
+    `;
+  }).join('');
+
+  const arrivalRows = truckReports.map((report, index) => `
+    <tr>
+      <td style="text-align:right;">${index + 1}</td>
+      <td>${report.truck.truckNumber}</td>
+      <td>${report.truck.senderName || 'Sender'}</td>
+      <td style="text-align:right;">${formatPlainAmount(report.gross)}</td>
+      <td style="text-align:right;">${formatPlainAmount(report.truck.freightAmount)}</td>
+      <td style="text-align:right;">${formatPlainAmount(report.cartage)}</td>
+      <td style="text-align:right;">${formatPlainAmount(report.commission)}</td>
+      <td style="text-align:right;">${formatPlainAmount(report.bardana)}</td>
+      <td style="text-align:right;">${formatPlainAmount(report.apmc + report.telePost)}</td>
+      <td style="text-align:right;">${formatPlainAmount(report.net)}</td>
+    </tr>
+  `).join('');
+
+  const dayBookBuyerRows = dayBookBuyerSummary.map((r, i) => `
+    <tr>
+      <td style="text-align:right;">${i + 1}</td>
+      <td>${r.name}</td>
+      <td style="text-align:right;">${r.sacks}</td>
+      <td style="text-align:right;">${formatPlainAmount(r.weight)}</td>
+      <td style="text-align:right;">${formatPlainAmount(r.gross)}</td>
+      <td style="text-align:right;">${formatPlainAmount(r.apmc)}</td>
+      <td style="text-align:right;">${formatPlainAmount(r.bardana)}</td>
+      <td style="text-align:right;">${formatPlainAmount(r.net)}</td>
+    </tr>
+  `).join('');
+
+  const mandiBookRows = truckReports.map((report) => {
+    const rows = confirmedInquiries
+      .filter((inq) => inq.truckId === report.truck.id)
+      .sort((a, b) => a.grade.localeCompare(b.grade) || a.createdAt - b.createdAt)
+      .map((inq) => `
+        <tr>
+          <td>${inq.gradeName || inq.grade}</td>
+          <td style="text-align:right;"></td>
+          <td style="text-align:right;"></td>
+          <td style="text-align:right;"></td>
+          <td style="text-align:right;"></td>
+          <td>${inq.paymentMode === 'CASH' ? 'CS' : inq.paymentMode === 'UPI' ? 'UPI' : inq.customerName.slice(0, 5).toUpperCase()}</td>
+          <td>${inq.customerName}</td>
+          <td style="text-align:right;">${inq.sacks}</td>
+          <td style="text-align:right;">${formatPlainAmount(inq.totalWeight)}</td>
+          <td style="text-align:right;">${inq.ratePerKg.toFixed(2)}</td>
+          <td style="text-align:right;">${formatPlainAmount(inq.grossAmount)}</td>
+        </tr>
+      `).join('');
+
+    return `
+      <div class="mandi-truck">
+        <div class="mandi-title">C# : ${report.truck.senderCode || report.truck.id.slice(-5)} [FRESH] ${report.truck.senderName || 'Sender'}</div>
+        <div class="mandi-meta">GR/TR #: ${report.truck.truckNumber} &nbsp; CHL #: ${report.truck.chlNumber || '-'}</div>
+        <table class="compact">
+          <thead><tr><th>Item</th><th style="text-align:right">Case</th><th style="text-align:right">WT (Kg)</th><th style="text-align:right">Rate</th><th style="text-align:right">Gross</th><th>Buyer</th><th>Name</th><th style="text-align:right">Case</th><th style="text-align:right">WT (Kg)</th><th style="text-align:right">Rate</th><th style="text-align:right">B-T Gross</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="11" style="color:#616161;">No confirmed buyer lines for this truck</td></tr>'}</tbody>
+          <tfoot class="foot"><tr><td>GR-TOTAL</td><td style="text-align:right">${report.sacks}</td><td style="text-align:right">${formatPlainAmount(report.weight)}</td><td></td><td style="text-align:right">${formatPlainAmount(report.gross)}</td><td colspan="2"></td><td style="text-align:right">${report.sacks}</td><td style="text-align:right">${formatPlainAmount(report.weight)}</td><td></td><td style="text-align:right">${formatPlainAmount(report.gross)}</td></tr></tfoot>
+        </table>
+      </div>
+    `;
+  }).join('');
+
   const buyerRows = buyerSummary.map((r, i) => `
     <tr style="background:${i % 2 === 0 ? '#FFF' : '#F5F5F5'}">
       <td>${i + 1}</td>
@@ -192,8 +347,40 @@ export function generateDayReportHTML(params: {
       .account-row.net { border-top: 2px solid #1A1A1A; border-bottom: 2px solid #1A1A1A; font-weight: 900; font-size: 14px; color: #2E7D32; margin-top: 4px; }
       .deduct { color: #C62828; }
       .page-break { page-break-before: always; }
+      .truck-card { border: 1px solid #C8E6C9; border-radius: 8px; padding: 10px; margin-bottom: 12px; page-break-inside: avoid; }
+      .truck-title { font-size: 13px; font-weight: 900; color: #1B5E20; }
+      .truck-meta { font-size: 10px; color: #616161; margin: 2px 0 8px; }
+      .compact th { font-size: 9px; padding: 4px; }
+      .compact td { font-size: 9px; padding: 3px 4px; }
+      .mandi-truck { page-break-inside: avoid; margin-bottom: 14px; }
+      .mandi-title { font-size: 12px; font-weight: 900; margin: 8px 0 2px; }
+      .mandi-meta { font-size: 10px; color: #424242; margin-bottom: 6px; }
     </style>
   </head><body>
+    ${header}
+    <h2>Arrival Day-Book (Fresh Sale-Proceed)</h2>
+    <table class="compact">
+      <thead><tr><th>C No.</th><th>GR-No</th><th>Name</th><th style="text-align:right">Gross Amt</th><th style="text-align:right">Freight</th><th style="text-align:right">Cartage</th><th style="text-align:right">Commission</th><th style="text-align:right">Bardana</th><th style="text-align:right">Other Exp.</th><th style="text-align:right">Net</th></tr></thead>
+      <tbody>${arrivalRows || '<tr><td colspan="10" style="color:#616161;">No trucks registered for this date</td></tr>'}</tbody>
+      <tfoot class="foot"><tr><td colspan="3">Grand Total</td><td style="text-align:right">${formatPlainAmount(totalGross)}</td><td style="text-align:right">${formatPlainAmount(totalFreight)}</td><td style="text-align:right">${formatPlainAmount(totalCartage)}</td><td style="text-align:right">${formatPlainAmount(commission)}</td><td style="text-align:right">${formatPlainAmount(totalBardana)}</td><td style="text-align:right">${formatPlainAmount(totalApmc + telePost)}</td><td style="text-align:right">${formatPlainAmount(netToSender)}</td></tr></tfoot>
+    </table>
+
+    <table class="compact">
+      <thead><tr><th>#</th><th>Name</th><th style="text-align:right">Case</th><th style="text-align:right">WT</th><th style="text-align:right">Gross</th><th style="text-align:right">APMC</th><th style="text-align:right">Bardana</th><th style="text-align:right">Net</th></tr></thead>
+      <tbody>${dayBookBuyerRows || '<tr><td colspan="8" style="color:#616161;">No buyer rows</td></tr>'}</tbody>
+      <tfoot class="foot"><tr><td colspan="2">Total</td><td style="text-align:right">${totalSacks}</td><td style="text-align:right">${formatPlainAmount(totalWeight)}</td><td style="text-align:right">${formatPlainAmount(totalGross)}</td><td style="text-align:right">${formatPlainAmount(totalApmc)}</td><td style="text-align:right">${formatPlainAmount(totalBardana)}</td><td style="text-align:right">${formatPlainAmount(dayBookBuyerSummary.reduce((s, r) => s + r.net, 0))}</td></tr></tfoot>
+    </table>
+
+    <div class="account-row"><span>${formatPlainAmount(netToSender)} By Fresh</span><span>${totalSacks} Case</span></div>
+    <div class="account-row"><span>${formatPlainAmount(dayBookBuyerSummary.reduce((s, r) => s + r.net, 0))} To Buyer / Cash / UPI</span><span>${totalSacks} Case</span></div>
+    <div class="account-row"><span>${formatPlainAmount(commission)} By Commission</span><span>${formatPlainAmount(totalOther)} By Market Charges</span></div>
+
+    <div class="page-break"></div>
+    ${header}
+    <h2>Mandi Book</h2>
+    ${mandiBookRows || '<div style="color:#616161;">No mandi-book rows for this date</div>'}
+
+    <div class="page-break"></div>
     ${header}
     <h2>Sale Summary</h2>
     <table>
@@ -201,6 +388,11 @@ export function generateDayReportHTML(params: {
       <tbody>${gradeRows}</tbody>
       <tfoot class="foot"><tr><td>Total</td><td style="text-align:right">${totalSacks}</td><td style="text-align:right">${totalWeight.toFixed(0)} kg</td><td style="text-align:right">&#8377;${totalAvgRate.toFixed(2)}</td><td style="text-align:right">${toIndianCurrency(totalGross)}</td></tr></tfoot>
     </table>
+
+    <div class="page-break"></div>
+    ${header}
+    <h2>Truck-wise Reports</h2>
+    ${truckReportRows || '<div style="color:#616161;">No trucks registered for this date</div>'}
 
     <div class="page-break"></div>
     ${header}

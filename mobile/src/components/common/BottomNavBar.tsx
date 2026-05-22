@@ -1,29 +1,42 @@
 import React from 'react';
 import { View, Text, Pressable } from 'react-native';
-import { useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Home, FileText, Truck, BarChart2, Settings } from 'lucide-react-native';
-import { Colors } from '@/lib/theme';
+import { Home, Truck, FilePlus, BarChart2, User, ClipboardList, Users } from 'lucide-react-native';
+import { Colors, Spacing, Radius } from '@/lib/theme';
+import { useRouter as useExpoRouter, usePathname as useExpoPathname } from 'expo-router';
+import { useMemberMode } from '@/hooks/useMemberMode';
 
-const TABS = [
-  { key: 'home', label: 'Home', icon: Home, path: '/' },
-  { key: 'bills', label: 'Bills', icon: FileText, path: '/bills' },
-  { key: 'trucks', label: 'Trucks', icon: Truck, path: '/trucks' },
-  { key: 'reports', label: 'Reports', icon: BarChart2, path: '/reports' },
-  { key: 'settings', label: 'Settings', icon: Settings, path: '/settings' },
+const ADMIN_TABS = [
+  { key: 'home',    labelEn: 'HOME',    labelHi: 'होम',     icon: Home,          path: '/(tabs)' },
+  { key: 'trucks',  labelEn: 'TRUCKS',  labelHi: 'ट्रक',     icon: Truck,         path: '/(tabs)/trucks' },
+  { key: 'bills',   labelEn: 'BILLS',   labelHi: 'बिल',      icon: ClipboardList, path: '/(tabs)/bills' },
+  { key: 'buyers',  labelEn: 'BUYERS',  labelHi: 'खरीदार',  icon: Users,         path: '/buyers' },
+  { key: 'reports', labelEn: 'REPORTS', labelHi: 'रिपोर्ट',  icon: BarChart2,     path: '/(tabs)/reports' },
+] as const;
+
+const MEMBER_TABS = [
+  { key: 'home', labelEn: 'HOME', labelHi: 'होम', icon: Home, path: '/member-dashboard' },
+  { key: 'trucks', labelEn: 'TRUCKS', labelHi: 'ट्रक', icon: Truck, path: '/member-trucks' },
+  { key: 'bills', labelEn: 'NEW BILL', labelHi: 'नया', icon: FilePlus, path: '/bills/new' },
+  { key: 'profile', labelEn: 'PROFILE', labelHi: 'प्रोफाइल', icon: User, path: '/member-profile' },
 ] as const;
 
 export function BottomNavBar() {
-  const router = useRouter();
-  const pathname = usePathname();
+  const router = useExpoRouter();
+  const pathname = useExpoPathname();
   const insets = useSafeAreaInsets();
+  const isMemberMode = useMemberMode();
+  const tabs = isMemberMode || pathname.startsWith('/member') ? MEMBER_TABS : ADMIN_TABS;
 
   const getActiveKey = (): string => {
     if (pathname === '/reports' || pathname.startsWith('/reports/')) return 'reports';
-    if (pathname === '/settings' || pathname.startsWith('/settings/')) return 'settings';
-    if (pathname.startsWith('/bills')) return 'bills';
-    if (pathname.startsWith('/trucks')) return 'trucks';
-    return 'home';
+    if (pathname.startsWith('/(tabs)/bills') || pathname === '/bills') return 'bills';
+    if (pathname.includes('/bills/new')) return isMemberMode ? 'bills' : '';
+    if (pathname.startsWith('/buyers')) return 'buyers';
+    if (pathname.startsWith('/member-profile')) return 'profile';
+    if (pathname.startsWith('/member-trucks') || pathname.startsWith('/trucks')) return 'trucks';
+    if (pathname === '/' || pathname === '/index' || pathname.startsWith('/member-dashboard')) return 'home';
+    return '';
   };
 
   const activeKey = getActiveKey();
@@ -33,15 +46,22 @@ export function BottomNavBar() {
       testID="bottom-nav-bar"
       style={{
         flexDirection: 'row',
-        backgroundColor: Colors.surface,
+        backgroundColor: Colors.primary, // Green theme background
         borderTopWidth: 1,
-        borderTopColor: Colors.border,
-        paddingBottom: insets.bottom,
-        height: 60 + insets.bottom,
+        borderTopColor: '#0F3D18', // darker green edge
+        paddingBottom: insets.bottom + 8,
+        paddingTop: 8,
+        justifyContent: 'space-evenly',
+        alignItems: 'center',
+        minHeight: 70 + insets.bottom,
         elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 8,
       }}
     >
-      {TABS.map(tab => {
+      {tabs.map(tab => {
         const Icon = tab.icon;
         const isActive = activeKey === tab.key;
         return (
@@ -53,23 +73,45 @@ export function BottomNavBar() {
                 router.navigate(tab.path as any);
               }
             }}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             style={({ pressed }) => ({
               flex: 1,
+              maxWidth: 85,
               alignItems: 'center',
               justifyContent: 'center',
-              gap: 3,
-              opacity: pressed ? 0.7 : 1,
+              paddingVertical: 8,
+              minHeight: 56,
+              borderRadius: Radius.lg,
+              backgroundColor: isActive ? 'rgba(255, 255, 255, 0.15)' : 'transparent',
+              opacity: pressed && !isActive ? 0.7 : 1,
             })}
           >
-            <Icon size={22} color={isActive ? Colors.primary : Colors.textSecond} />
+            <View style={{ marginBottom: 4 }}>
+              <Icon size={24} color={isActive ? '#FFFFFF' : 'rgba(255, 255, 255, 0.6)'} />
+            </View>
             <Text
               style={{
                 fontSize: 10,
-                fontWeight: isActive ? '700' : '400',
-                color: isActive ? Colors.primary : Colors.textSecond,
+                fontWeight: isActive ? '700' : '600',
+                color: isActive ? '#FFFFFF' : 'rgba(255, 255, 255, 0.6)',
+                textAlign: 'center',
+                letterSpacing: 0,
+              }}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.78}
+            >
+              {tab.labelEn} /
+            </Text>
+            <Text
+              style={{
+                fontSize: 10,
+                fontWeight: isActive ? '700' : '600',
+                color: isActive ? '#FFFFFF' : 'rgba(255, 255, 255, 0.6)',
+                textAlign: 'center',
               }}
             >
-              {tab.label}
+              {tab.labelHi}
             </Text>
           </Pressable>
         );

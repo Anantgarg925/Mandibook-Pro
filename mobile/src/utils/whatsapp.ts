@@ -64,15 +64,21 @@ export function generateBalanceMessage(buyer: Buyer, shop: ShopData): string {
 
 export async function openWhatsApp(phone: string, message: string): Promise<void> {
   const clean = phone.replace(/\D/g, '');
+  if (!clean) {
+    Alert.alert('Mobile number missing', 'इस बिल में मोबाइल नंबर सेव नहीं है');
+    return;
+  }
   const number = clean.startsWith('91') ? clean : `91${clean}`;
-  const url = `whatsapp://send?phone=${number}&text=${encodeURIComponent(message)}`;
+  const text = encodeURIComponent(message);
+  const appUrl = `whatsapp://send?phone=${number}&text=${text}`;
+  const webUrl = `https://wa.me/${number}?text=${text}`;
+
   try {
-    const supported = await Linking.canOpenURL(url);
-    if (!supported) {
-      Alert.alert('WhatsApp नहीं मिला', 'WhatsApp इंस्टॉल नहीं है');
-      return;
+    try {
+      await Linking.openURL(appUrl);
+    } catch {
+      await Linking.openURL(webUrl);
     }
-    await Linking.openURL(url);
   } catch {
     Alert.alert('Error', 'WhatsApp नहीं खुल सका');
   }

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { BottomNavBar } from '@/components/common/BottomNavBar';
 import {
   View,
@@ -9,46 +9,47 @@ import {
   TextInput,
   Modal,
   Alert,
+  KeyboardAvoidingView,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   ChevronLeft,
   ChevronRight,
+  Eye,
   FileText,
   Lock,
   LockOpen,
+  MessageCircle,
   Plus,
   Share2,
 } from 'lucide-react-native';
+import PagerView from 'react-native-pager-view';
 import { useQuery } from '@tanstack/react-query';
 import { useDateInquiries } from '@/hooks/useDateInquiries';
 import { useDateTrucks } from '@/hooks/useDateTrucks';
 import { useCashEntries } from '@/hooks/useCashEntries';
 import { useShop } from '@/context/ShopContext';
-import { api } from '@/lib/api';
+import { supabase, mapInquiry } from '@/lib/supabase';
 import { exportAndShareReport, type CashEntry } from '@/utils/pdfGenerator';
+import { generateCustomerMessage, openWhatsApp } from '@/utils/whatsapp';
 import { toIndianCurrency, toIndianDate } from '@/lib/formatters';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import type { Inquiry } from '@/types/inquiry';
+import { archiveQueryOptions } from '@/lib/queryOptions';
+import { getCurrentBusinessDate } from '@/lib/businessDay';
 
-type TabKey = 'sale' | 'accounts' | 'payments' | 'cashbook';
+type TabKey = 'sale' | 'bills' | 'accounts' | 'payments' | 'cashbook';
 
 const TAB_LABELS: Record<TabKey, string> = {
   sale: 'Sale',
+  bills: 'Bills',
   accounts: 'Accounts',
   payments: 'Payments',
   cashbook: 'Cash Book',
 };
 
-const TAB_ORDER: TabKey[] = ['sale', 'accounts', 'payments', 'cashbook'];
-
-function startOfDay(d: Date): Date {
-  const r = new Date(d);
-  r.setHours(0, 0, 0, 0);
-  return r;
-}
+const TAB_ORDER: TabKey[] = ['sale', 'bills', 'accounts', 'payments', 'cashbook'];
 
 type DaySummaryContentProps = {
   showBottomNav?: boolean;
@@ -57,10 +58,10 @@ type DaySummaryContentProps = {
 export default function DaySummaryContent({ showBottomNav = false }: DaySummaryContentProps) {
   const router = useRouter();
   const { shop } = useShop();
-  const [date, setDate] = useState<Date>(startOfDay(new Date()));
+  const [date, setDate] = useState<Date>(getCurrentBusinessDate());
   const [activeTab, setActiveTab] = useState<TabKey>('sale');
   const [exporting, setExporting] = useState(false);
-  const [showExportMenu, setShowExportMenu] = useState(false);
+  const pagerRef = React.useRef<PagerView>(null);
 
   // Cash entry modal state
   const [showEntryModal, setShowEntryModal] = useState(false);
@@ -71,50 +72,97 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
 
   const { inquiries, loading: inqLoading } = useDateInquiries(date);
   const { trucks, loading: trucksLoading } = useDateTrucks(date);
-  const { entries: cashEntries, loading: cashLoading, addEntry } = useCashEntries(date);
+  const { entries: cashEntries, addEntry } = useCashEntries(date);
 
-  const dateParam = useMemo(() => { const d = new Date(date); d.setHours(0,0,0,0); return d.getTime(); }, [date]);
+  const dateParam = useMemo(() => { const d = new Date(date); d.setHours(0, 0, 0, 0); return d.getTime(); }, [date]);
+  const dateEndParam = useMemo(() => { const d = new Date(date); d.setHours(23, 59, 59, 999); return d.getTime(); }, [date]);
   const { data: allInquiries = [] } = useQuery({
-    queryKey: ['inquiries', shop?.shopId, dateParam],
-    queryFn: () => api.get<Inquiry[]>(`/api/inquiries?shopId=${shop!.shopId}&date=${dateParam}`),
+    queryKey: ['inquiries', shop?.shopId, dateParam, dateEndParam],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('inquiries')
+        .select('*')
+        .eq('shop_id', shop!.shopId)
+        .gte('date', dateParam)
+        .lte('date', dateEndParam);
+      if (error) throw new Error(error.message);
+      return (data || []).map((r) => mapInquiry(r as Record<string, unknown>)) as Inquiry[];
+    },
     enabled: !!shop?.shopId,
-    refetchInterval: 15000,
+    ...archiveQueryOptions,
   });
   const pendingCount = allInquiries.filter(i => i.status === 'PENDING').length;
+  const generatedBills = useMemo(
+    () => [...allInquiries].sort((a, b) => b.createdAt - a.createdAt),
+    [allInquiries],
+  );
 
-  const CLOSED_DATES_KEY = 'closed_dates';
   const dateKey = useMemo(() => {
     const d = new Date(date);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   }, [date]);
 
-  const [isDayClosed, setIsDayClosed] = useState(false);
   const [closingDay, setClosingDay] = useState(false);
-
-  useEffect(() => {
-    AsyncStorage.getItem(CLOSED_DATES_KEY).then(raw => {
-      const dates: string[] = raw ? JSON.parse(raw) : [];
-      setIsDayClosed(dates.includes(dateKey));
-    });
-  }, [dateKey]);
+  const {
+    data: dayClosure,
+    refetch: refetchDayClosure,
+  } = useQuery({
+    queryKey: ['day-closure', shop?.shopId, dateParam],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('day_closures')
+        .select('*')
+        .eq('shop_id', shop!.shopId)
+        .eq('report_date', dateParam)
+        .maybeSingle();
+      if (error) throw new Error(error.message);
+      return data;
+    },
+    enabled: !!shop?.shopId,
+    ...archiveQueryOptions,
+  });
+  const isDayClosed = !!dayClosure;
 
   const toggleDayClosed = useCallback(async () => {
+    if (!shop?.shopId) return;
     setClosingDay(true);
     try {
-      const raw = await AsyncStorage.getItem(CLOSED_DATES_KEY);
-      const dates: string[] = raw ? JSON.parse(raw) : [];
-      let updated: string[];
-      if (dates.includes(dateKey)) {
-        updated = dates.filter(d => d !== dateKey);
+      if (isDayClosed) {
+        const { error } = await supabase
+          .from('day_closures')
+          .delete()
+          .eq('shop_id', shop.shopId)
+          .eq('report_date', dateParam);
+        if (error) throw new Error(error.message);
       } else {
-        updated = [...dates, dateKey];
+        const confirmedRows = allInquiries.filter((i) => i.status === 'CONFIRMED');
+        const totals = {
+          dateKey,
+          bills: confirmedRows.length,
+          pendingBills: allInquiries.filter((i) => i.status === 'PENDING').length,
+          sacks: confirmedRows.reduce((sum, i) => sum + i.sacks, 0),
+          weight: confirmedRows.reduce((sum, i) => sum + i.totalWeight, 0),
+          gross: confirmedRows.reduce((sum, i) => sum + i.grossAmount, 0),
+          net: confirmedRows.reduce((sum, i) => sum + i.netAmount, 0),
+          trucks: trucks.length,
+        };
+        const { error } = await supabase.from('day_closures').upsert({
+          shop_id: shop.shopId,
+          report_date: dateParam,
+          closed_by: 'admin',
+          totals,
+          closed_at: Date.now(),
+          created_at: Date.now(),
+        });
+        if (error) throw new Error(error.message);
       }
-      await AsyncStorage.setItem(CLOSED_DATES_KEY, JSON.stringify(updated));
-      setIsDayClosed(updated.includes(dateKey));
+      await refetchDayClosure();
+    } catch {
+      Alert.alert('Error', 'Could not update day close status.');
     } finally {
       setClosingDay(false);
     }
-  }, [dateKey]);
+  }, [allInquiries, dateKey, dateParam, isDayClosed, refetchDayClosure, shop?.shopId, trucks.length]);
 
   const loading = inqLoading || trucksLoading;
 
@@ -127,7 +175,7 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
   const nextDay = () => {
     const d = new Date(date);
     d.setDate(d.getDate() + 1);
-    if (d <= new Date()) setDate(d);
+    if (d <= getCurrentBusinessDate()) setDate(d);
   };
 
   // Grade summary
@@ -168,6 +216,57 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
   const telePost = shop?.charges?.telePost ?? 0;
   const commission = totalGross * commissionPct / 100;
   const netToSender = totalGross - totalFreight - commission - totalApmc - totalCartage - totalBardana - telePost;
+
+  const truckReports = useMemo(() => {
+    const telePostShare = trucks.length > 0 ? telePost / trucks.length : 0;
+
+    return trucks.map((truck) => {
+      const rows = inquiries.filter((inq) => inq.truckId === truck.id);
+      const sacks = rows.reduce((sum, inq) => sum + inq.sacks, 0);
+      const weight = rows.reduce((sum, inq) => sum + inq.totalWeight, 0);
+      const gross = rows.reduce((sum, inq) => sum + inq.grossAmount, 0);
+      const apmc = rows.reduce((sum, inq) => sum + inq.apmcAmount, 0);
+      const cartage = rows.reduce((sum, inq) => sum + inq.cartageAmount, 0);
+      const bardana = rows.reduce((sum, inq) => sum + inq.bardanaAmount, 0);
+      const commissionAmount = gross * commissionPct / 100;
+      const net = gross - truck.freightAmount - commissionAmount - apmc - cartage - bardana - telePostShare;
+      const gradeMap = new Map<string, { grade: string; gradeName: string; sacks: number; weight: number; gross: number; avgRate: number }>();
+
+      for (const inq of rows) {
+        const existing = gradeMap.get(inq.grade);
+        if (existing) {
+          existing.sacks += inq.sacks;
+          existing.weight += inq.totalWeight;
+          existing.gross += inq.grossAmount;
+          existing.avgRate = existing.weight > 0 ? existing.gross / existing.weight : 0;
+        } else {
+          gradeMap.set(inq.grade, {
+            grade: inq.grade,
+            gradeName: inq.gradeName,
+            sacks: inq.sacks,
+            weight: inq.totalWeight,
+            gross: inq.grossAmount,
+            avgRate: inq.ratePerKg,
+          });
+        }
+      }
+
+      return {
+        truck,
+        bills: rows.length,
+        sacks,
+        weight,
+        gross,
+        apmc,
+        cartage,
+        bardana,
+        commission: commissionAmount,
+        telePost: telePostShare,
+        net,
+        grades: Array.from(gradeMap.values()),
+      };
+    });
+  }, [commissionPct, inquiries, telePost, trucks]);
 
   // Payment breakdown
   const cashInquiries = inquiries.filter(i => i.paymentMode === 'CASH');
@@ -213,7 +312,6 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
 
   const handleExport = async () => {
     if (!shop) return;
-    setShowExportMenu(false);
     setExporting(true);
     try {
       await exportAndShareReport({
@@ -221,7 +319,7 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
         shop,
         confirmedInquiries: inquiries,
         trucks,
-        cashEntries: [...allReceipts, ...allPayments],
+        cashEntries,
       });
     } catch {
       Alert.alert('Error', 'Could not generate report.');
@@ -230,16 +328,21 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
     }
   };
 
-  const isToday = date.toDateString() === new Date().toDateString();
+  const handleSendBill = (bill: Inquiry) => {
+    if (!shop) return;
+    if (!bill.customerPhone) {
+      Alert.alert('No phone number', 'Open the slip and use Share PDF/Image, or add the buyer phone number first.');
+      return;
+    }
+    openWhatsApp(bill.customerPhone, generateCustomerMessage(bill, shop));
+  };
+
+  const isToday = date.toDateString() === getCurrentBusinessDate().toDateString();
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f3faff' }} edges={['top']}>
-      <ScrollView
-        style={{ flex: 1 }}
-        stickyHeaderIndices={[isDayClosed ? 2 : 1]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header section -- inside ScrollView, NOT fixed */}
+      <View style={{ flex: 1 }}>
+        {/* Header section -- static */}
         <View style={{
           backgroundColor: '#ffffff',
           borderBottomWidth: 1,
@@ -322,7 +425,7 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
           </View>
         ) : null}
 
-        {/* Tab bar -- sticky (stickyHeaderIndices=[1]) */}
+        {/* Tab bar -- static */}
         <View style={{
           backgroundColor: '#f3faff',
           paddingHorizontal: 16,
@@ -342,7 +445,10 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
                 <Pressable
                   key={key}
                   testID={`tab-${key === 'cashbook' ? 'cashbook' : key}`}
-                  onPress={() => setActiveTab(key)}
+                  onPress={() => {
+                    setActiveTab(key);
+                    pagerRef.current?.setPage(TAB_ORDER.indexOf(key));
+                  }}
                   style={{
                     flex: 1,
                     height: 44,
@@ -367,38 +473,186 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
 
         {/* Tab content */}
         {loading ? (
-          <View style={{ alignItems: 'center', justifyContent: 'center', paddingVertical: 64 }}>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 64 }}>
             <ActivityIndicator testID="reports-loading" color="#00450d" size="large" />
           </View>
         ) : (
-          <View>
+          <PagerView
+            ref={pagerRef}
+            style={{ flex: 1 }}
+            initialPage={TAB_ORDER.indexOf(activeTab) !== -1 ? TAB_ORDER.indexOf(activeTab) : 0}
+            onPageSelected={(e) => setActiveTab(TAB_ORDER[e.nativeEvent.position])}
+          >
             {/* TAB 1: Sale */}
-            {activeTab === 'sale' ? (
+            <View key="sale" style={{ flex: 1 }}>
               <ScrollView
-                scrollEnabled={false}
+                showsVerticalScrollIndicator={false}
                 contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 }}
               >
-                {/* Truck cards */}
-                {trucks.map(t => (
-                  <View key={t.id} style={{
-                    backgroundColor: '#ffffff',
-                    borderWidth: 1,
-                    borderColor: '#E5E7EB',
-                    borderRadius: 12,
-                    paddingHorizontal: 14,
-                    paddingVertical: 12,
-                    marginBottom: 8,
-                    borderLeftWidth: 3,
-                    borderLeftColor: '#00450d',
-                  }}>
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#071e27' }}>
-                      {t.truckNumber}
-                    </Text>
-                    <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
-                      {t.senderName} · {t.totalKg} kg
-                    </Text>
-                  </View>
-                ))}
+                {/* Truck-wise reports */}
+                <View style={{ marginBottom: 16 }}>
+                  <Text style={{ fontSize: 17, fontWeight: '800', color: '#00450d', marginBottom: 10 }}>
+                    Truck-wise Reports / गाड़ी अनुसार रिपोर्ट
+                  </Text>
+                  {truckReports.length === 0 ? (
+                    <View style={{
+                      backgroundColor: '#ffffff',
+                      borderWidth: 1,
+                      borderColor: '#E5E7EB',
+                      borderRadius: 12,
+                      padding: 16,
+                      alignItems: 'center',
+                    }}>
+                      <Text style={{ color: '#64748B' }}>No trucks registered for this date</Text>
+                    </View>
+                  ) : (
+                    truckReports.map((report) => (
+                      <View key={report.truck.id} style={{
+                        backgroundColor: '#ffffff',
+                        borderWidth: 1,
+                        borderColor: '#C0C9BB',
+                        borderRadius: 14,
+                        marginBottom: 12,
+                        overflow: 'hidden',
+                      }}>
+                        <View style={{
+                          backgroundColor: '#dbf1fe',
+                          paddingHorizontal: 14,
+                          paddingVertical: 12,
+                          borderLeftWidth: 4,
+                          borderLeftColor: '#00450d',
+                        }}>
+                          <Text style={{ fontSize: 15, fontWeight: '800', color: '#071e27' }}>
+                            {report.truck.truckNumber}
+                          </Text>
+                          <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }} numberOfLines={1}>
+                            {report.truck.senderName || 'Sender'} · Load {Math.round(report.truck.totalKg).toLocaleString('en-IN')} kg · {report.bills} bill{report.bills === 1 ? '' : 's'}
+                          </Text>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', padding: 12, gap: 8 }}>
+                          {[
+                            ['Sacks', String(report.sacks)],
+                            ['Weight', `${Math.round(report.weight).toLocaleString('en-IN')} kg`],
+                            ['Gross', toIndianCurrency(report.gross)],
+                            ['Net', toIndianCurrency(report.net)],
+                          ].map(([label, value]) => (
+                            <View key={label} style={{
+                              width: '48%',
+                              backgroundColor: '#f3faff',
+                              borderRadius: 10,
+                              padding: 10,
+                              borderWidth: 1,
+                              borderColor: '#E5E7EB',
+                            }}>
+                              <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '700' }}>{label}</Text>
+                              <Text numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 15, color: label === 'Net' ? '#00450d' : '#071e27', fontWeight: '800', marginTop: 3 }}>
+                                {value}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+
+                        {report.grades.length > 0 ? (
+                          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                            <View style={{ minWidth: 420 }}>
+                            <View style={{
+                              backgroundColor: '#f3faff',
+                              paddingHorizontal: 12,
+                              paddingVertical: 10,
+                              borderTopWidth: 1,
+                              borderTopColor: '#E5E7EB',
+                              borderBottomWidth: 1,
+                              borderBottomColor: '#E5E7EB',
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                            }}>
+                              <Text style={{ flex: 2, fontSize: 10, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                                Grade
+                              </Text>
+                              <Text style={{ width: 48, fontSize: 10, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'right' }}>
+                                Sacks
+                              </Text>
+                              <Text style={{ width: 70, fontSize: 10, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'right' }}>
+                                Weight
+                              </Text>
+                              <Text style={{ width: 62, fontSize: 10, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'right' }}>
+                                Avg Rate
+                              </Text>
+                              <Text style={{ width: 82, fontSize: 10, fontWeight: '700', color: '#64748B', textTransform: 'uppercase', letterSpacing: 0.4, textAlign: 'right' }}>
+                                Gross
+                              </Text>
+                            </View>
+
+                            {report.grades.map((grade, idx) => (
+                              <View key={grade.grade} style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                paddingHorizontal: 12,
+                                paddingVertical: 10,
+                                backgroundColor: idx % 2 === 0 ? '#ffffff' : '#f9fafb',
+                                borderBottomWidth: 1,
+                                borderBottomColor: '#E5E7EB',
+                              }}>
+                                <View style={{ flex: 2 }}>
+                                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#071e27' }}>
+                                    {grade.grade}
+                                  </Text>
+                                  <Text style={{ fontSize: 10, color: '#64748B' }} numberOfLines={1}>
+                                    {grade.gradeName}
+                                  </Text>
+                                </View>
+                                <Text style={{ width: 48, textAlign: 'right', fontSize: 12, fontWeight: '700', color: '#071e27' }}>
+                                  {grade.sacks}
+                                </Text>
+                                <Text style={{ width: 70, textAlign: 'right', fontSize: 12, fontWeight: '700', color: '#071e27' }}>
+                                  {grade.weight.toFixed(0)} kg
+                                </Text>
+                                <Text style={{ width: 62, textAlign: 'right', fontSize: 12, fontWeight: '700', color: '#071e27' }}>
+                                  {'\u20B9'}{grade.avgRate.toFixed(0)}
+                                </Text>
+                                <Text style={{ width: 82, textAlign: 'right', fontSize: 12, fontWeight: '800', color: '#00450d' }}>
+                                  {toIndianCurrency(grade.gross)}
+                                </Text>
+                              </View>
+                            ))}
+
+                            <View style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              backgroundColor: '#00450d',
+                              paddingHorizontal: 12,
+                              paddingVertical: 10,
+                            }}>
+                              <Text style={{ flex: 2, fontSize: 12, fontWeight: '800', color: '#ffffff' }}>
+                                Total
+                              </Text>
+                              <Text style={{ width: 48, textAlign: 'right', fontSize: 12, fontWeight: '800', color: '#ffffff' }}>
+                                {report.sacks}
+                              </Text>
+                              <Text style={{ width: 70, textAlign: 'right', fontSize: 12, fontWeight: '800', color: '#ffffff' }}>
+                                {report.weight.toFixed(0)} kg
+                              </Text>
+                              <Text style={{ width: 62, textAlign: 'right', fontSize: 12, fontWeight: '800', color: '#ffffff' }}>
+                                {'\u20B9'}{report.weight > 0 ? (report.gross / report.weight).toFixed(0) : '0'}
+                              </Text>
+                              <Text style={{ width: 82, textAlign: 'right', fontSize: 12, fontWeight: '800', color: '#ffffff' }}>
+                                {toIndianCurrency(report.gross)}
+                              </Text>
+                            </View>
+                            </View>
+                          </ScrollView>
+                        ) : (
+                          <View style={{ paddingHorizontal: 12, paddingBottom: 12 }}>
+                            <Text style={{ fontSize: 12, color: '#64748B' }}>
+                              No confirmed bills for this truck yet.
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    ))
+                  )}
+                </View>
 
                 {/* Grade Table Card */}
                 <View style={{
@@ -575,67 +829,163 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
                   </View>
                 </View>
 
-                {/* Export Action Buttons */}
-                <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
-                  {/* Export PDF */}
+                {/* Export PDF Card */}
+                <View style={{
+                  backgroundColor: '#e8f5e9',
+                  borderWidth: 1,
+                  borderColor: '#a5d6a7',
+                  borderRadius: 16,
+                  padding: 16,
+                  marginBottom: 16,
+                }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#1b5e20', marginBottom: 12 }}>
+                    📄 Day Report / दिन की रिपोर्ट
+                  </Text>
                   <Pressable
                     testID="export-fab"
-                    onPress={() => setShowExportMenu(true)}
+                    onPress={handleExport}
                     disabled={exporting}
-                    style={({ pressed }) => ({
-                      flex: 1,
-                      backgroundColor: exporting ? '#4a7a52' : pressed ? '#005a10' : '#00450d',
+                  >
+                    <View style={{
+                      backgroundColor: '#00450d',
                       borderRadius: 12,
                       height: 56,
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'center',
                       gap: 10,
-                    })}
-                  >
-                    <FileText size={20} color="#ffffff" />
-                    <View>
-                      <Text style={{ fontSize: 15, fontWeight: '700', color: '#ffffff' }}>
-                        Export PDF
-                      </Text>
-                      <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>
-                        पीडीएफ निर्यात करें
-                      </Text>
-                    </View>
-                  </Pressable>
-
-                  {/* Share WhatsApp */}
-                  <Pressable
-                    testID="share-whatsapp-btn"
-                    onPress={() => setShowExportMenu(true)}
-                    style={({ pressed }) => ({
-                      flex: 1,
-                      backgroundColor: pressed ? '#2e7d32' : '#1b5e20',
-                      borderRadius: 12,
-                      height: 56,
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 10,
-                    })}
-                  >
-                    <Share2 size={20} color="#ffffff" />
-                    <View>
-                      <Text style={{ fontSize: 15, fontWeight: '700', color: '#ffffff' }}>
-                        Share Report
-                      </Text>
-                      <Text style={{ fontSize: 10, color: 'rgba(255,255,255,0.8)' }}>
-                        व्हाट्सएप पर साझा करें
-                      </Text>
+                    }}>
+                      {exporting
+                        ? <ActivityIndicator size="small" color="#fff" />
+                        : <FileText size={22} color="#ffffff" />}
+                      <View>
+                        <Text style={{ fontSize: 16, fontWeight: '800', color: '#ffffff' }}>
+                          Export &amp; Share PDF
+                        </Text>
+                        <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)' }}>
+                          पीडीएफ निर्यात करें
+                        </Text>
+                      </View>
                     </View>
                   </Pressable>
                 </View>
               </ScrollView>
-            ) : null}
+            </View>
 
-            {/* TAB 2: Accounts */}
-            {activeTab === 'accounts' ? (
-              <View style={{ marginHorizontal: 16, marginTop: 12, marginBottom: 24 }}>
+            {/* TAB 2: Generated Bills */}
+            <View key="bills" style={{ flex: 1 }}>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 }}>
+                <View style={{
+                  backgroundColor: '#ffffff',
+                  borderWidth: 1,
+                  borderColor: '#E5E7EB',
+                  borderRadius: 14,
+                  padding: 14,
+                  marginBottom: 12,
+                }}>
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: '#00450d' }}>
+                    Daywise Generated Bills
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#64748B', marginTop: 3 }}>
+                    {generatedBills.length} bill{generatedBills.length === 1 ? '' : 's'} created on {toIndianDate(date.getTime())}
+                  </Text>
+                </View>
+
+                {generatedBills.length === 0 ? (
+                  <View style={{
+                    backgroundColor: '#ffffff',
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB',
+                    borderRadius: 14,
+                    padding: 24,
+                    alignItems: 'center',
+                  }}>
+                    <Text style={{ color: '#64748B', fontSize: 14 }}>No bills generated for this date</Text>
+                  </View>
+                ) : generatedBills.map((bill) => (
+                  <View key={bill.id} style={{
+                    backgroundColor: '#ffffff',
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB',
+                    borderRadius: 14,
+                    padding: 12,
+                    marginBottom: 10,
+                  }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={{ fontSize: 14, fontWeight: '800', color: '#071e27' }}>
+                          #{bill.slipNumber} · {bill.customerName}
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                          {bill.truckNumber} · {bill.grade} · {bill.sacks} case · {Math.round(bill.totalWeight).toLocaleString('en-IN')} kg
+                        </Text>
+                        <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                          {bill.status} · {bill.paymentMode} · {toIndianCurrency(bill.netAmount)}
+                        </Text>
+                      </View>
+                      <View style={{
+                        borderRadius: 999,
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                        backgroundColor: bill.status === 'CONFIRMED' ? '#E8F5E9' : '#FFF8E1',
+                      }}>
+                        <Text style={{
+                          fontSize: 10,
+                          fontWeight: '800',
+                          color: bill.status === 'CONFIRMED' ? '#2E7D32' : '#7e5700',
+                        }}>
+                          {bill.status}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
+                      <Pressable
+                        testID={`send-bill-${bill.id}`}
+                        onPress={() => handleSendBill(bill)}
+                        style={({ pressed }) => ({
+                          flex: 1,
+                          height: 42,
+                          borderRadius: 10,
+                          backgroundColor: pressed ? '#1B5E20' : '#25D366',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                          opacity: bill.customerPhone ? 1 : 0.55,
+                        })}
+                      >
+                        <MessageCircle size={16} color="#FFF" />
+                        <Text style={{ fontSize: 13, fontWeight: '800', color: '#FFF' }}>Send</Text>
+                      </Pressable>
+                      <Pressable
+                        testID={`view-bill-${bill.id}`}
+                        onPress={() => router.push(`/slip/${bill.id}` as any)}
+                        style={({ pressed }) => ({
+                          flex: 1,
+                          height: 42,
+                          borderRadius: 10,
+                          borderWidth: 1,
+                          borderColor: '#00450d',
+                          backgroundColor: pressed ? '#E8F5E9' : '#FFFFFF',
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: 6,
+                        })}
+                      >
+                        <Eye size={16} color="#00450d" />
+                        <Text style={{ fontSize: 13, fontWeight: '800', color: '#00450d' }}>View</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+              </ScrollView>
+            </View>
+
+            {/* TAB 3: Accounts */}
+            <View key="accounts" style={{ flex: 1 }}>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 }}>
                 {pendingCount > 0 ? (
                   <View
                     testID="pending-warning-banner"
@@ -711,40 +1061,51 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
                   </View>
                 </View>
 
+
+
                 {/* Close Day / Reopen Day button */}
                 <Pressable
                   testID="close-day-btn"
                   onPress={toggleDayClosed}
                   disabled={closingDay}
                   style={({ pressed }) => ({
+                    opacity: pressed ? 0.85 : 1,
+                  })}
+                >
+                  <View style={{
                     flexDirection: 'row',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 8,
-                    height: 52,
+                    gap: 10,
+                    height: 56,
                     borderRadius: 14,
-                    marginTop: 16,
                     backgroundColor: isDayClosed
-                      ? (pressed ? '#E65100' : '#F57C00')
-                      : (pressed ? '#1B5E20' : '#2E7D32'),
+                      ? '#F57C00'
+                      : '#2E7D32',
                     opacity: closingDay ? 0.6 : 1,
-                  })}
-                >
-                  {isDayClosed ? (
-                    <LockOpen size={18} color="#FFF" />
-                  ) : (
-                    <Lock size={18} color="#FFF" />
-                  )}
-                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFF' }}>
-                    {isDayClosed ? 'Reopen Day / दिन खोलें' : 'Close Day / दिन बंद करें'}
-                  </Text>
+                    marginTop: 24,
+                  }}>
+                    {isDayClosed ? (
+                      <LockOpen size={20} color="#FFF" />
+                    ) : (
+                      <Lock size={20} color="#FFF" />
+                    )}
+                    <View>
+                      <Text style={{ fontSize: 16, fontWeight: '800', color: '#FFF' }}>
+                        {isDayClosed ? 'Reopen Day' : 'Close Day'}
+                      </Text>
+                      <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)' }}>
+                        {isDayClosed ? 'दिन खोलें' : 'दिन बंद करें'}
+                      </Text>
+                    </View>
+                  </View>
                 </Pressable>
-              </View>
-            ) : null}
+              </ScrollView>
+            </View>
 
-            {/* TAB 3: Payments */}
-            {activeTab === 'payments' ? (
-              <View style={{ marginHorizontal: 16, marginTop: 12, marginBottom: 24 }}>
+            {/* TAB 4: Payments */}
+            <View key="payments" style={{ flex: 1 }}>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 }}>
                 {/* Summary cards */}
                 <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
                   {[
@@ -807,94 +1168,68 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
                     ))}
                   </View>
                 ) : null}
-              </View>
-            ) : null}
+              </ScrollView>
+            </View>
 
-            {/* TAB 4: Cash Book */}
-            {activeTab === 'cashbook' ? (
-              <View style={{ paddingBottom: 120 }}>
-                <View style={{ paddingHorizontal: 16, paddingTop: 12 }}>
-                  {/* Add entry button */}
-                  <Pressable
-                    testID="add-cash-entry"
-                    onPress={() => setShowEntryModal(true)}
-                    disabled={isDayClosed}
-                    style={({ pressed }) => ({
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: 6,
-                      height: 44,
-                      borderRadius: 12,
-                      marginBottom: 14,
-                      backgroundColor: isDayClosed ? '#9E9E9E' : (pressed ? '#005a10' : '#00450d'),
-                    })}
-                  >
-                    {isDayClosed ? (
-                      <Lock size={14} color="#FFF" />
-                    ) : (
-                      <Plus size={16} color="#FFF" />
-                    )}
-                    <Text style={{ fontSize: 14, fontWeight: '700', color: '#FFF' }}>
-                      {isDayClosed ? 'Day Closed — Cannot Add' : '+ एंट्री जोड़ें'}
+            {/* TAB 5: Cash Book */}
+            <View key="cashbook" style={{ flex: 1 }}>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 }}>
+               
+                {/* Receipts */}
+                <View style={{
+                  backgroundColor: '#ffffff',
+                  borderWidth: 1,
+                  borderColor: '#E5E7EB',
+                  borderRadius: 14,
+                  overflow: 'hidden',
+                  marginBottom: 14,
+                }}>
+                  <View style={{ paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', backgroundColor: '#f0fdf4' }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#00450d', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                      Receipts
                     </Text>
-                  </Pressable>
-
-                  {/* Receipts */}
-                  <View style={{
-                    backgroundColor: '#ffffff',
-                    borderWidth: 1,
-                    borderColor: '#E5E7EB',
-                    borderRadius: 14,
-                    overflow: 'hidden',
-                    marginBottom: 14,
-                  }}>
-                    <View style={{ paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', backgroundColor: '#f0fdf4' }}>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#00450d', textTransform: 'uppercase', letterSpacing: 0.4 }}>
-                        Receipts
-                      </Text>
-                    </View>
-                    {allReceipts.length === 0 ? (
-                      <View style={{ paddingHorizontal: 16, paddingVertical: 16 }}>
-                        <Text style={{ color: '#64748B', fontSize: 14 }}>No receipts</Text>
-                      </View>
-                    ) : allReceipts.map((e, idx) => (
-                      <View key={`${e.id}-${idx}`} style={{
-                        flexDirection: 'row',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        paddingVertical: 12,
-                        paddingHorizontal: 16,
-                        borderBottomWidth: 1,
-                        borderBottomColor: '#E5E7EB',
-                      }}>
-                        <Text style={{ flex: 1, fontSize: 14, color: '#071e27' }} numberOfLines={1}>{e.description}</Text>
-                        <Text style={{ fontSize: 14, fontWeight: '700', color: '#00450d' }}>
-                          +{toIndianCurrency(e.amount)}
-                        </Text>
-                      </View>
-                    ))}
                   </View>
-
-                  {/* Payments */}
-                  <View style={{
-                    backgroundColor: '#ffffff',
-                    borderWidth: 1,
-                    borderColor: '#E5E7EB',
-                    borderRadius: 14,
-                    overflow: 'hidden',
-                    marginBottom: 14,
-                  }}>
-                    <View style={{ paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', backgroundColor: '#fff5f5' }}>
-                      <Text style={{ fontSize: 11, fontWeight: '700', color: '#ba1a1a', textTransform: 'uppercase', letterSpacing: 0.4 }}>
-                        Payments
+                  {allReceipts.length === 0 ? (
+                    <View style={{ paddingHorizontal: 16, paddingVertical: 16 }}>
+                      <Text style={{ color: '#64748B', fontSize: 14 }}>No receipts</Text>
+                    </View>
+                  ) : allReceipts.map((e, idx) => (
+                    <View key={`${e.id}-${idx}`} style={{
+                      flexDirection: 'row',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      paddingVertical: 12,
+                      paddingHorizontal: 16,
+                      borderBottomWidth: 1,
+                      borderBottomColor: '#E5E7EB',
+                    }}>
+                      <Text style={{ flex: 1, fontSize: 14, color: '#071e27' }} numberOfLines={1}>{e.description}</Text>
+                      <Text style={{ fontSize: 14, fontWeight: '700', color: '#00450d' }}>
+                        +{toIndianCurrency(e.amount)}
                       </Text>
                     </View>
-                    {allPayments.length === 0 ? (
-                      <View style={{ paddingHorizontal: 16, paddingVertical: 16 }}>
-                        <Text style={{ color: '#64748B', fontSize: 14 }}>No payments</Text>
-                      </View>
-                    ) : allPayments.map(e => (
+                  ))}
+                </View>
+
+                {/* Payments */}
+                <View style={{
+                  backgroundColor: '#ffffff',
+                  borderWidth: 1,
+                  borderColor: '#E5E7EB',
+                  borderRadius: 14,
+                  overflow: 'hidden',
+                  marginBottom: 14,
+                }}>
+                  <View style={{ paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', backgroundColor: '#fff5f5' }}>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#ba1a1a', textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                      Payments
+                    </Text>
+                  </View>
+                  {allPayments.length === 0 ? (
+                    <View style={{ paddingHorizontal: 16, paddingVertical: 16 }}>
+                      <Text style={{ color: '#64748B', fontSize: 14 }}>No payments</Text>
+                    </View>
+                  ) : allPayments.map(e => (
                       <View key={e.id} style={{
                         flexDirection: 'row',
                         justifyContent: 'space-between',
@@ -911,7 +1246,44 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
                       </View>
                     ))}
                   </View>
-                </View>
+
+                   {/* Add entry button */}
+                <Pressable
+                  testID="add-cash-entry"
+                  onPress={() => setShowEntryModal(true)}
+                  disabled={isDayClosed}
+                  style={({ pressed }) => ({
+                    marginBottom: 16,
+                    opacity: pressed ? 0.85 : 1,
+                  })}
+                >
+                  <View style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 10,
+                    height: 56,
+                    borderRadius: 14,
+                    backgroundColor: isDayClosed ? '#9E9E9E' : '#00450d',
+                    opacity: isDayClosed ? 0.6 : 1,
+                  }}>
+                    {isDayClosed ? (
+                      <Lock size={18} color="#FFF" />
+                    ) : (
+                      <Plus size={18} color="#FFF" />
+                    )}
+                    <View>
+                      <Text style={{ fontSize: 16, fontWeight: '800', color: '#FFF' }}>
+                        {isDayClosed ? 'Day Closed' : 'एंट्री जोड़ें'}
+                      </Text>
+                      {isDayClosed ? (
+                        <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)' }}>
+                          Cannot Add
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                </Pressable>
 
                 {/* Closing balance sticky */}
                 <View style={{
@@ -941,56 +1313,13 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
                     {toIndianCurrency(closingBalance)}
                   </Text>
                 </View>
-              </View>
-            ) : null}
-          </View>
+              </ScrollView>
+            </View>
+          </PagerView>
         )}
-      </ScrollView>
+      </View>
 
-      {/* Export options modal */}
-      <Modal
-        visible={showExportMenu}
-        transparent
-        animationType="slide"
-        hardwareAccelerated={true}
-        statusBarTranslucent={true}
-        onRequestClose={() => setShowExportMenu(false)}
-      >
-        <Pressable
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }}
-          onPress={() => setShowExportMenu(false)}
-        >
-          <View style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            backgroundColor: Colors.surface,
-            borderTopLeftRadius: 20,
-            borderTopRightRadius: 20,
-            padding: Spacing.md,
-          }}>
-            <Text style={{ fontSize: FontSize.md, fontWeight: '700', marginBottom: Spacing.md }}>Export Report</Text>
-            <Pressable
-              testID="export-pdf-btn"
-              onPress={handleExport}
-              style={({ pressed }) => ({
-                height: 52,
-                borderRadius: Radius.sm,
-                marginBottom: Spacing.sm,
-                backgroundColor: pressed ? Colors.primaryPressed : Colors.primary,
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: 8,
-              })}
-            >
-              <FileText size={18} color="#FFF" />
-              <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: '#FFF' }}>Full PDF Report</Text>
-            </Pressable>
-          </View>
-        </Pressable>
-      </Modal>
+
 
       {/* Cash entry modal */}
       <Modal
@@ -1005,17 +1334,21 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
           style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }}
           onPress={() => setShowEntryModal(false)}
         >
-          <View style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            backgroundColor: Colors.surface,
-            borderTopLeftRadius: 20,
-            borderTopRightRadius: 20,
-            padding: Spacing.md,
-          }}>
-            <Text style={{ fontSize: FontSize.md, fontWeight: '700', marginBottom: Spacing.md }}>Add Cash Entry</Text>
+          <KeyboardAvoidingView behavior="padding" style={{ flex: 1, justifyContent: 'flex-end' }}>
+            <ScrollView
+              scrollEnabled={true}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ flexGrow: 1 }}
+              style={{ maxHeight: '90%' }}
+            >
+              <View style={{
+                backgroundColor: Colors.surface,
+                borderTopLeftRadius: 20,
+                borderTopRightRadius: 20,
+                padding: Spacing.md,
+                paddingBottom: Spacing.xl + 40,
+              }}>
+                <Text style={{ fontSize: FontSize.md, fontWeight: '700', marginBottom: Spacing.md }}>Add Cash Entry</Text>
 
             {/* Type toggle */}
             <View style={{ flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md }}>
@@ -1091,18 +1424,24 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
               onPress={handleSaveEntry}
               disabled={savingEntry}
               style={({ pressed }) => ({
-                height: 52,
-                borderRadius: Radius.sm,
-                backgroundColor: savingEntry ? Colors.border : pressed ? Colors.primaryPressed : Colors.primary,
-                alignItems: 'center',
-                justifyContent: 'center',
+                opacity: pressed ? 0.85 : 1,
               })}
             >
-              <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: '#FFF' }}>
-                {savingEntry ? 'Saving...' : 'Save Entry'}
-              </Text>
+              <View style={{
+                height: 52,
+                borderRadius: Radius.sm,
+                backgroundColor: savingEntry ? Colors.border : Colors.primary,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: '#FFF' }}>
+                  {savingEntry ? 'Saving...' : 'Save Entry'}
+                </Text>
+              </View>
             </Pressable>
           </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
         </Pressable>
       </Modal>
 

@@ -135,7 +135,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(255, 255, 255, 0.2)',
   },
   brandName: {
-    fontSize: 46,
+    fontSize: 32,
     fontWeight: '900',
     color: '#ffffff',
     letterSpacing: -1.5,
@@ -158,7 +158,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   hindiTagline: {
-    fontSize: 22,
+    fontSize: 16,
     fontWeight: '600',
     color: 'rgba(255,255,255,0.9)',
     textAlign: 'center',

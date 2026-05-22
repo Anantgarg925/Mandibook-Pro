@@ -1,28 +1,17 @@
 import React from 'react';
-import { Platform, View, Text } from 'react-native';
+import { View, Text } from 'react-native';
 import { Tabs } from 'expo-router';
-import { Home, Truck, PlusSquare, BarChart2 } from 'lucide-react-native';
+import { Home, Truck, ClipboardList, BarChart2 } from 'lucide-react-native';
 import { useClientOnlyValue } from '@/lib/useClientOnlyValue';
 import { Colors } from '@/lib/theme';
-import { useLaunch } from '@/context/LaunchContext';
 
 export default function TabLayout() {
-  const { launchComplete } = useLaunch();
-
   return (
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors.primary,
         tabBarInactiveTintColor: Colors.textSecond,
-        tabBarStyle: launchComplete
-          ? {
-              borderTopColor: Colors.border,
-              backgroundColor: Colors.surface,
-              paddingBottom: Platform.OS === 'android' ? 8 : 8,
-              paddingTop: 4,
-              height: Platform.OS === 'android' ? 68 : 60,
-            }
-          : { display: 'none' },
+        tabBarStyle: { display: 'none' },
         headerShown: useClientOnlyValue(false, true),
       }}
     >
@@ -59,13 +48,13 @@ export default function TabLayout() {
       <Tabs.Screen
         name="bills"
         options={{
-          title: 'New Bill',
-          tabBarButtonTestID: 'tab-new-bill',
-          tabBarIcon: ({ color }: { color: string }) => <PlusSquare size={22} color={color} />,
+          title: 'Bills',
+          tabBarButtonTestID: 'tab-bills',
+          tabBarIcon: ({ color }: { color: string }) => <ClipboardList size={22} color={color} />,
           tabBarLabel: ({ color }: { color: string }) => (
             <View style={{ alignItems: 'center' }}>
-              <Text style={{ fontSize: 10, fontWeight: '600', color }}>NEW BILL /</Text>
-              <Text style={{ fontSize: 8, color: color + '99' }}>नया बिल</Text>
+              <Text style={{ fontSize: 10, fontWeight: '600', color }}>BILLS /</Text>
+              <Text style={{ fontSize: 8, color: color + '99' }}>बिल</Text>
             </View>
           ),
           headerShown: false,

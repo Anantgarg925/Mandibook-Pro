@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,11 @@ import {
   Pressable,
   TextInput,
   ActivityIndicator,
+  Modal,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  useWindowDimensions,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -17,15 +22,33 @@ import {
   UserPlus,
   Users,
 } from 'lucide-react-native';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useBuyers } from '@/hooks/useBuyers';
+import { useShop } from '@/context/ShopContext';
+import { supabase } from '@/lib/supabase';
 import { toIndianCurrency, toIndianDate } from '@/lib/formatters';
+import { generateCode } from '@/utils/buyerCode';
+import { FontSize, Spacing, Radius } from '@/lib/theme';
 import type { Buyer } from '@/types/inquiry';
 
 export default function BuyerListScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const isSmall = width < 380;
+  const { shop } = useShop();
   const { buyers, loading } = useBuyers();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
+  const [addVisible, setAddVisible] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newPhone, setNewPhone] = useState('');
+  const [openingAmount, setOpeningAmount] = useState('');
+  const [openingType, setOpeningType] = useState<'DR' | 'CR'>('DR');
+  const [notes, setNotes] = useState('');
+  const addBuyerPhoneRef = useRef<TextInput>(null);
+  const addBuyerOpeningRef = useRef<TextInput>(null);
+  const addBuyerNotesRef = useRef<TextInput>(null);
 
   const sorted = useMemo(
     () =>
@@ -43,65 +66,92 @@ export default function BuyerListScreen() {
 
   const totalOutstanding = buyers.reduce((s, b) => s + b.outstandingBalance, 0);
 
+  const addBuyerMutation = useMutation({
+    mutationFn: async () => {
+      if (!shop?.shopId) throw new Error('Missing shop');
+      if (!newName.trim()) throw new Error('Name is required');
+      const now = Date.now();
+      const amount = parseFloat(openingAmount) || 0;
+      const signedBalance = openingType === 'CR' ? -amount : amount;
+      const code = generateCode(newName, buyers.map((b) => b.code));
+      const { error } = await supabase.from('buyers').insert({
+        shop_id: shop.shopId,
+        code,
+        name: newName.trim(),
+        phone: newPhone.trim(),
+        outstanding_balance: signedBalance,
+        opening_balance: amount,
+        opening_balance_type: openingType,
+        opening_balance_date: amount > 0 ? now : null,
+        opening_balance_set: amount > 0,
+        notes: notes.trim(),
+        last_transaction_date: now,
+        created_at: now,
+      });
+      if (error) throw new Error(error.message);
+      if (amount > 0) {
+        const { error: txError } = await supabase.from('transactions').insert({
+          shop_id: shop.shopId,
+          buyer_code: code,
+          type: 'OPENING',
+          amount,
+          date: now,
+          note: openingType,
+          description: 'Opening Balance',
+          created_at: now,
+        });
+        if (txError) throw new Error(txError.message);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['buyers', shop?.shopId] });
+      setAddVisible(false);
+      setNewName('');
+      setNewPhone('');
+      setOpeningAmount('');
+      setOpeningType('DR');
+      setNotes('');
+    },
+    onError: (err) => Alert.alert('Could not add buyer', (err as Error).message),
+  });
+
   const ListHeader = (
     <>
-      {/* Top nav bar */}
+      {/* Unified Header */}
       <View
         style={{
-          flexDirection: 'row',
-          alignItems: 'center',
-          gap: 12,
+          backgroundColor: '#00450d',
+          borderBottomWidth: 0,
           paddingHorizontal: 20,
           paddingVertical: 14,
-          backgroundColor: '#ffffff',
-          borderBottomWidth: 1,
-          borderBottomColor: '#E5E7EB',
         }}
       >
-        <Pressable
-          onPress={() => router.back()}
-          testID="buyers-back"
-          hitSlop={8}
-        >
-          <ArrowLeft size={22} color="#1a3c20" />
-        </Pressable>
-        <Text
-          style={{
-            fontSize: 20,
-            fontWeight: '700',
-            color: '#1a3c20',
-          }}
-        >
-          Buyers / ग्राहक
-        </Text>
-      </View>
-
-      {/* Page content starts here */}
-      <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
-        {/* Title stats row */}
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'flex-end',
-            marginBottom: 16,
-          }}
-        >
-          <View>
-            <Text
-              style={{
-                fontSize: 28,
-                fontWeight: '700',
-                color: '#071e27',
-                letterSpacing: -0.5,
-              }}
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+            <Pressable
+              onPress={() => router.navigate('/' as any)}
+              testID="buyers-back"
+              hitSlop={8}
             >
-              Buyers / ग्राहक
-            </Text>
-            <Text style={{ fontSize: 13, color: '#64748B' }}>
-              {buyers.length} active buyer accounts
-            </Text>
+              <ArrowLeft size={24} color="#ffffff" />
+            </Pressable>
+            <View>
+              <Text
+                style={{
+                  fontSize: 26,
+                  fontWeight: '700',
+                  color: '#ffffff',
+                  letterSpacing: -0.5,
+                }}
+              >
+                Buyers / ग्राहक
+              </Text>
+              <Text style={{ fontSize: 13, color: 'rgba(255, 255, 255, 0.8)', marginTop: 2 }}>
+                {buyers.length} active buyer accounts
+              </Text>
+            </View>
           </View>
+
           {totalOutstanding > 0 ? (
             <View style={{ alignItems: 'flex-end' }}>
               <Text
@@ -113,14 +163,15 @@ export default function BuyerListScreen() {
                   textAlign: 'right',
                 }}
               >
-                Total Receivable
+                TOTAL RECEIVABLE
               </Text>
               <Text
                 style={{
-                  fontSize: 20,
-                  fontWeight: '700',
+                  fontSize: 16,
+                  fontWeight: '800',
                   color: '#ba1a1a',
                   textAlign: 'right',
+                  marginTop: 2,
                 }}
               >
                 {toIndianCurrency(totalOutstanding)}
@@ -128,6 +179,10 @@ export default function BuyerListScreen() {
             </View>
           ) : null}
         </View>
+      </View>
+
+      {/* Page content starts here */}
+      <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
 
         {/* Search + Filter row */}
         <View
@@ -141,14 +196,14 @@ export default function BuyerListScreen() {
             <TextInput
               testID="buyers-search"
               placeholder="Search by name or code..."
-              placeholderTextColor="#c0c9bb"
+              placeholderTextColor="#9CA3AF"
               value={search}
               onChangeText={setSearch}
               style={{
                 height: 56,
                 backgroundColor: '#ffffff',
                 borderWidth: 1,
-                borderColor: '#c0c9bb',
+                borderColor: '#E5E7EB',
                 borderRadius: 14,
                 paddingLeft: 48,
                 paddingRight: 16,
@@ -176,7 +231,7 @@ export default function BuyerListScreen() {
               height: 56,
               backgroundColor: '#ffffff',
               borderWidth: 1,
-              borderColor: '#c0c9bb',
+              borderColor: '#E5E7EB',
               borderRadius: 14,
               alignItems: 'center',
               justifyContent: 'center',
@@ -212,166 +267,65 @@ export default function BuyerListScreen() {
       <Pressable
         testID={`buyer-row-${item.code}`}
         onPress={() => router.push(`/buyers/${item.code}` as any)}
-        style={({ pressed }) => ({
-          backgroundColor: pressed ? '#f0f8ff' : '#ffffff',
-          borderWidth: 1,
-          borderColor: '#E5E7EB',
-          borderRadius: 16,
-          padding: 20,
-          marginBottom: 12,
-          marginHorizontal: 20,
-          elevation: 1,
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.06,
-          shadowRadius: 4,
-          overflow: 'hidden',
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'flex-start',
-        })}
+        style={{
+          marginHorizontal: 16,
+          marginBottom: Spacing.md,
+        }}
       >
-        {/* Decorative corner circle for pending/overdue */}
-        {isPending ? (
-          <View
-            style={{
-              position: 'absolute',
-              top: 0,
-              right: 0,
-              width: 80,
-              height: 80,
-              backgroundColor: 'rgba(255,218,214,0.15)',
-              borderBottomLeftRadius: 80,
-            }}
-            pointerEvents="none"
-          />
-        ) : null}
-
-        {/* Left side */}
-        <View style={{ flex: 1, gap: 10 }}>
-          {/* Pills row */}
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
-            <View
-              style={{
-                backgroundColor: '#dbf1fe',
-                paddingHorizontal: 10,
-                paddingVertical: 4,
-                borderRadius: 20,
-                marginRight: 8,
-                marginBottom: 4,
-              }}
-            >
-              <Text
+        {({ pressed }) => (
+          <View style={{
+            backgroundColor: pressed ? '#F8FAFC' : '#FFFFFF',
+            borderRadius: 14,
+            padding: isSmall ? Spacing.sm : Spacing.md,
+            borderWidth: 1,
+            borderColor: '#E5E7EB',
+            overflow: 'hidden',
+          }}>
+            {/* Top Row: Name and Status */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: Spacing.md, gap: Spacing.sm }}>
+              <View style={{ flex: 1 }}>
+                <Text numberOfLines={1} style={{ fontSize: FontSize.md, fontWeight: '700', color: '#111827', marginBottom: 4 }}>
+                  {item.name}
+                </Text>
+                <Text numberOfLines={2} style={{ fontSize: isSmall ? FontSize.xs : FontSize.sm, lineHeight: isSmall ? 18 : 20, color: '#111827' }}>
+                  Code: {item.code} | {item.notes ? item.notes : (item.phone ? item.phone : 'No details')}
+                </Text>
+              </View>
+              <View
                 style={{
-                  fontSize: 10,
-                  fontWeight: '700',
-                  color: '#003d65',
-                  letterSpacing: 1,
-                  textTransform: 'uppercase',
+                  backgroundColor: statusBg,
+                  paddingHorizontal: isSmall ? 8 : 12,
+                  paddingVertical: 6,
+                  borderRadius: 22,
+                  alignItems: 'center',
+                  minWidth: isSmall ? 86 : 104,
                 }}
               >
-                {item.code}
-              </Text>
+                {statusLabel.split(' / ').map((part, index, arr) => (
+                  <Text key={index} numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 11, fontWeight: '800', color: statusText }}>
+                    {part} {index === 0 && arr.length > 1 ? '/' : ''}
+                  </Text>
+                ))}
+              </View>
             </View>
-            <View
-              style={{
-                backgroundColor: statusBg,
-                paddingHorizontal: 10,
-                paddingVertical: 4,
-                borderRadius: 20,
-                marginRight: 8,
-                marginBottom: 4,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 10,
-                  fontWeight: '700',
-                  color: statusText,
-                  letterSpacing: 1,
-                }}
-              >
-                {statusLabel}
+
+            {/* Divider */}
+            <View style={{ height: 1, backgroundColor: '#E5E7EB', marginBottom: Spacing.md }} />
+
+            {/* Bottom Row: Last Transaction and Amount */}
+            <View style={{ flexDirection: isSmall ? 'column' : 'row', justifyContent: 'space-between', alignItems: isSmall ? 'flex-start' : 'center', gap: isSmall ? 8 : 0 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                <Clock size={14} color="#333" />
+                <Text style={{ fontSize: 12, color: '#374151', marginLeft: 6, flexShrink: 1 }}>
+                  Last: {item.lastTransactionDate > 0 ? toIndianDate(item.lastTransactionDate) : 'N/A'}
+                </Text>
+              </View>
+              <Text style={{ fontSize: FontSize.sm, color: isPending ? '#B91C1C' : '#003D0A', fontWeight: '800', marginLeft: isSmall ? 20 : 8, textAlign: isSmall ? 'left' : 'right' }}>
+                {isPending ? `₹ ${toIndianCurrency(item.outstandingBalance).replace('₹', '')}` : '₹ 0.00'}
               </Text>
             </View>
           </View>
-
-          {/* Name */}
-          <Text
-            style={{
-              fontSize: 20,
-              fontWeight: '700',
-              color: '#071e27',
-              marginTop: 2,
-            }}
-          >
-            {item.name}
-          </Text>
-
-          {/* Phone or No contact */}
-          <Text style={{ fontSize: 13, color: '#41493e' }}>
-            {item.phone ? item.phone : 'No contact'}
-          </Text>
-        </View>
-
-        {/* Right side */}
-        <View style={{ alignItems: 'flex-end', gap: 4, paddingLeft: 12 }}>
-          {/* Balance label */}
-          {item.outstandingBalance > 0 ? (
-            <Text
-              style={{
-                fontSize: 10,
-                color: '#64748B',
-                opacity: 0.7,
-              }}
-            >
-              Balance Due
-            </Text>
-          ) : (
-            <Text style={{ fontSize: 10, color: '#64748B', opacity: 0.7 }}>
-              Balance
-            </Text>
-          )}
-
-          {/* Amount */}
-          {item.outstandingBalance > 0 ? (
-            <Text
-              style={{
-                fontSize: 24,
-                fontWeight: '700',
-                color: '#ba1a1a',
-              }}
-            >
-              {toIndianCurrency(item.outstandingBalance)}
-            </Text>
-          ) : (
-            <Text
-              style={{
-                fontSize: 22,
-                fontWeight: '700',
-                color: '#717a6d',
-              }}
-            >
-              ₹ 0.00
-            </Text>
-          )}
-
-          {/* Last transaction */}
-          {item.lastTransactionDate > 0 ? (
-            <View
-              style={{
-                flexDirection: 'row',
-                gap: 4,
-                alignItems: 'center',
-              }}
-            >
-              <Clock size={13} color="#717a6d" />
-              <Text style={{ fontSize: 11, color: '#717a6d' }}>
-                Last: {toIndianDate(item.lastTransactionDate)}
-              </Text>
-            </View>
-          ) : null}
-        </View>
+        )}
       </Pressable>
     );
   };
@@ -379,7 +333,7 @@ export default function BuyerListScreen() {
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: '#f3faff' }}
-      edges={['top']}
+      edges={['top', 'left', 'right']}
     >
       <View style={{ flex: 1 }}>
         {loading ? (
@@ -409,10 +363,10 @@ export default function BuyerListScreen() {
                   paddingHorizontal: 32,
                 }}
               >
-                <Users size={56} color="#c0c9bb" />
+                <Users size={56} color="#9CA3AF" />
                 <Text
                   style={{
-                    fontSize: 20,
+                    fontSize: 16,
                     fontWeight: '700',
                     color: '#071e27',
                     marginTop: 16,
@@ -436,11 +390,12 @@ export default function BuyerListScreen() {
         )}
 
         {/* FAB */}
-        <View
+        <Pressable
+          onPress={() => setAddVisible(true)}
           testID="add-buyer-fab"
           style={{
             position: 'absolute',
-            bottom: 24 + insets.bottom,
+            bottom: 40 + insets.bottom,
             right: 20,
             width: 60,
             height: 60,
@@ -456,8 +411,126 @@ export default function BuyerListScreen() {
           }}
         >
           <UserPlus size={26} color="#ffffff" />
-        </View>
+        </Pressable>
       </View>
+
+      <Modal visible={addVisible} transparent animationType="slide" onRequestClose={() => setAddVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' }} onPress={() => setAddVisible(false)}>
+            <View
+              onStartShouldSetResponder={() => true}
+              style={{
+                position: 'absolute',
+                left: 0,
+                right: 0,
+                bottom: 0,
+                backgroundColor: '#FFFFFF',
+                borderTopLeftRadius: 20,
+                borderTopRightRadius: 20,
+                padding: 20,
+                paddingBottom: 20 + insets.bottom,
+              }}
+            >
+              <Text style={{ fontSize: 18, fontWeight: '800', color: '#071e27', marginBottom: 14 }}>
+                Add Buyer / ग्राहक जोड़ें
+              </Text>
+              <TextInput
+                testID="add-buyer-name"
+                value={newName}
+                onChangeText={setNewName}
+                placeholder="Name / नाम"
+                placeholderTextColor="#94A3B8"
+                returnKeyType="next"
+                onSubmitEditing={() => addBuyerPhoneRef.current?.focus()}
+                style={modalInputStyle}
+              />
+              <TextInput
+                testID="add-buyer-phone"
+                value={newPhone}
+                onChangeText={setNewPhone}
+                placeholder="Phone / मोबाइल"
+                placeholderTextColor="#94A3B8"
+                keyboardType="phone-pad"
+                returnKeyType="next"
+                ref={addBuyerPhoneRef}
+                onSubmitEditing={() => addBuyerOpeningRef.current?.focus()}
+                style={modalInputStyle}
+              />
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <TextInput
+                  testID="add-buyer-opening"
+                  value={openingAmount}
+                  onChangeText={setOpeningAmount}
+                  placeholder="Opening Balance"
+                  placeholderTextColor="#94A3B8"
+                  keyboardType="decimal-pad"
+                  returnKeyType="next"
+                  ref={addBuyerOpeningRef}
+                  onSubmitEditing={() => addBuyerNotesRef.current?.focus()}
+                  style={{ ...modalInputStyle, flex: 1 }}
+                />
+                {(['DR', 'CR'] as const).map((type) => (
+                  <Pressable
+                    key={type}
+                    onPress={() => setOpeningType(type)}
+                    style={{
+                      width: 56,
+                      minHeight: 44,
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: openingType === type ? '#1b5e20' : '#C8E6C9',
+                      backgroundColor: openingType === type ? '#E8F5E9' : '#FFF',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: '800', color: '#1b5e20' }}>{type}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <TextInput
+                testID="add-buyer-notes"
+                value={notes}
+                onChangeText={setNotes}
+                placeholder="Notes / टिप्पणी"
+                placeholderTextColor="#94A3B8"
+                returnKeyType="done"
+                ref={addBuyerNotesRef}
+                style={modalInputStyle}
+              />
+              <Pressable
+                testID="save-add-buyer"
+                onPress={() => addBuyerMutation.mutate()}
+                disabled={addBuyerMutation.isPending}
+                style={{
+                  height: 52,
+                  borderRadius: 8,
+                  backgroundColor: addBuyerMutation.isPending ? '#C8E6C9' : '#1b5e20',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginTop: 4,
+                }}
+              >
+                <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '800' }}>
+                  {addBuyerMutation.isPending ? 'Saving...' : 'Save Buyer'}
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
+
+const modalInputStyle = {
+  minHeight: 44,
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  borderRadius: 8,
+  paddingHorizontal: 12,
+  fontSize: 14,
+  color: '#071e27',
+  marginBottom: 10,
+  backgroundColor: '#FFFFFF',
+};

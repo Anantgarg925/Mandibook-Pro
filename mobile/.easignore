@@ -1,0 +1,12 @@
+node_modules/
+.expo/
+dist/
+web-build/
+android/
+ios/
+bun.lock
+mandi.zip
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.tsbuildinfo

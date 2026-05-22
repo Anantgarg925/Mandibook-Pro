@@ -1,14 +1,15 @@
-import React from 'react';
-import { View, Text, Pressable, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useEffect } from 'react';
+import { View, Text, Pressable, ScrollView, BackHandler } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, FileText } from 'lucide-react-native';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { ArrowLeft, FileText, Pencil } from 'lucide-react-native';
+import { useQuery } from '@tanstack/react-query';
+import { supabase, mapInquiry } from '@/lib/supabase';
 import { useShop } from '@/context/ShopContext';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { toIndianCurrency, toIndianDate, toIndianWeight } from '@/lib/formatters';
-import type { Inquiry } from '@/types/inquiry';
+import { useMemberMode } from '@/hooks/useMemberMode';
+import { archiveQueryOptions } from '@/lib/queryOptions';
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: Colors.warning,
@@ -20,41 +21,63 @@ export default function BillDetailScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { shop } = useShop();
-  const queryClient = useQueryClient();
+  const isMemberMode = useMemberMode();
+  const insets = useSafeAreaInsets();
+  const goBack = () => {
+    if (isMemberMode) {
+      router.replace('/member-dashboard' as any);
+      return;
+    }
+    router.replace('/(tabs)/bills' as any);
+  };
+
+  useEffect(() => {
+    if (isMemberMode === undefined) return undefined;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      router.replace((isMemberMode ? '/member-dashboard' : '/(tabs)/bills') as any);
+      return true;
+    });
+    return () => subscription.remove();
+  }, [isMemberMode, router]);
 
   const { data: inquiry } = useQuery({
     queryKey: ['inquiry', shop?.shopId, id],
-    queryFn: () => api.get<Inquiry>(`/api/inquiries/${id}?shopId=${shop!.shopId}`),
-    enabled: !!shop?.shopId && !!id,
-    refetchInterval: 10000,
-  });
-
-  const statusMutation = useMutation({
-    mutationFn: (status: 'CONFIRMED' | 'CANCELLED') =>
-      api.put(`/api/inquiries/${id}`, { shopId: shop!.shopId, status }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['inquiry', shop?.shopId, id] });
-      queryClient.invalidateQueries({ queryKey: ['inquiries', shop?.shopId] });
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('inquiries')
+        .select('*')
+        .eq('id', id)
+        .eq('shop_id', shop!.shopId)
+        .single();
+      if (error) throw new Error(error.message);
+      return mapInquiry(data as Record<string, unknown>);
     },
+    enabled: !!shop?.shopId && !!id,
+    ...archiveQueryOptions,
   });
 
-  const updateStatus = (status: 'CONFIRMED' | 'CANCELLED') => {
-    if (!shop?.shopId || !id) return;
-    statusMutation.mutate(status);
-  };
+  useEffect(() => {
+    if (!inquiry || isMemberMode === undefined || isMemberMode) return;
+    if (inquiry.status === 'CONFIRMED') {
+      router.replace(`/slip/${inquiry.id}` as any);
+    } else if (inquiry.status === 'PENDING') {
+      router.replace({ pathname: '/authorization', params: { id: inquiry.id } } as any);
+    }
+  }, [inquiry, isMemberMode, router]);
 
   if (!inquiry) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background, alignItems: 'center', justifyContent: 'center' }} edges={['top']}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#f3faff', alignItems: 'center', justifyContent: 'center' }} edges={['top', 'left', 'right']}>
         <Text style={{ color: Colors.textSecond }}>Loading…</Text>
       </SafeAreaView>
     );
   }
 
   const statusColor = STATUS_COLOR[inquiry.status] ?? Colors.textSecond;
+  const isReferenceSlip = inquiry.status !== 'CONFIRMED';
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#f3faff' }} edges={['top', 'left', 'right']}>
       <View
         style={{
           flexDirection: 'row',
@@ -62,15 +85,14 @@ export default function BillDetailScreen() {
           gap: Spacing.sm,
           paddingHorizontal: Spacing.md,
           paddingVertical: Spacing.sm,
-          backgroundColor: Colors.surface,
-          borderBottomWidth: 1,
-          borderBottomColor: Colors.border,
+          backgroundColor: Colors.primary,
+          borderBottomWidth: 0,
         }}
       >
-        <Pressable testID="back-from-bill-detail" onPress={() => router.back()} style={{ padding: 4 }}>
-          <ArrowLeft size={24} color={Colors.text} />
+        <Pressable testID="back-from-bill-detail" onPress={goBack} style={{ padding: 4 }}>
+          <ArrowLeft size={24} color="#FFFFFF" />
         </Pressable>
-        <Text style={{ flex: 1, fontSize: FontSize.lg, fontWeight: '700', color: Colors.text }}>
+        <Text style={{ flex: 1, fontSize: FontSize.lg, fontWeight: '700', color: '#FFFFFF' }}>
           Slip #{inquiry.slipNumber}
         </Text>
         <View
@@ -78,28 +100,25 @@ export default function BillDetailScreen() {
             paddingHorizontal: Spacing.sm,
             paddingVertical: 4,
             borderRadius: Radius.round,
-            backgroundColor: inquiry.status === 'CONFIRMED' ? '#E8F5E9' : inquiry.status === 'PENDING' ? '#FFF8E1' : '#FFEBEE',
+            backgroundColor: inquiry.status === 'CONFIRMED' ? 'rgba(255, 255, 255, 0.2)' : inquiry.status === 'PENDING' ? '#FFF8E1' : '#FFEBEE',
           }}
         >
-          <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: statusColor }}>
+          <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: inquiry.status === 'CONFIRMED' ? '#FFFFFF' : statusColor }}>
             {inquiry.status}
           </Text>
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: Spacing.md, paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: Spacing.md, paddingBottom: Spacing.md }} showsVerticalScrollIndicator={false}>
         {/* Main card */}
         <View
           style={{
-            backgroundColor: Colors.surface,
-            borderRadius: Radius.md,
+            backgroundColor: '#FFFFFF',
+            borderRadius: 14,
+            borderWidth: 1,
+            borderColor: '#E5E7EB',
             padding: Spacing.md,
             marginBottom: Spacing.md,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.06,
-            shadowRadius: 4,
-            elevation: 2,
           }}
         >
           <Row label="Customer" value={inquiry.customerName} />
@@ -113,15 +132,12 @@ export default function BillDetailScreen() {
         {/* Grade & Weight */}
         <View
           style={{
-            backgroundColor: Colors.surface,
-            borderRadius: Radius.md,
+            backgroundColor: '#FFFFFF',
+            borderRadius: 14,
+            borderWidth: 1,
+            borderColor: '#E5E7EB',
             padding: Spacing.md,
             marginBottom: Spacing.md,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.06,
-            shadowRadius: 4,
-            elevation: 2,
           }}
         >
           <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text, marginBottom: Spacing.sm }}>
@@ -136,17 +152,14 @@ export default function BillDetailScreen() {
         {inquiry.ratePerKg > 0 ? (
           <View
             style={{
-              backgroundColor: Colors.surface,
-              borderRadius: Radius.md,
-              padding: Spacing.md,
-              marginBottom: Spacing.md,
+              backgroundColor: '#FFFFFF',
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: '#E5E7EB',
               borderLeftWidth: 4,
               borderLeftColor: Colors.success,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.06,
-              shadowRadius: 4,
-              elevation: 2,
+              padding: Spacing.md,
+              marginBottom: Spacing.md,
             }}
           >
             <Row label="Rate" value={`₹${inquiry.ratePerKg}/kg`} />
@@ -160,74 +173,82 @@ export default function BillDetailScreen() {
             <Row label="Net Amount" value={toIndianCurrency(inquiry.netAmount)} bold />
           </View>
         ) : null}
+        {isReferenceSlip ? (
+          <View style={{ backgroundColor: '#FFF8E1', borderRadius: 14, padding: Spacing.md, borderWidth: 1, borderColor: '#FBBF24' }}>
+            <Text style={{ fontSize: FontSize.sm, fontWeight: '900', color: '#7E5700' }}>
+              Reference slip only
+            </Text>
+            <Text style={{ fontSize: FontSize.xs, color: '#7E5700', marginTop: 4 }}>
+              This is pending authorization and is not a final bill.
+            </Text>
+          </View>
+        ) : null}
       </ScrollView>
 
       {/* Action buttons */}
       <View
         style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
           gap: Spacing.xs,
           padding: Spacing.md,
-          backgroundColor: Colors.surface,
+          paddingBottom: Math.max(Spacing.md, insets.bottom + Spacing.sm),
+          backgroundColor: '#FFFFFF',
           borderTopWidth: 1,
-          borderTopColor: Colors.border,
+          borderTopColor: '#E5E7EB',
         }}
       >
-        {inquiry.status === 'PENDING' ? (
-          <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-            <Pressable
-              testID="cancel-bill-button"
-              onPress={() => updateStatus('CANCELLED')}
-              disabled={statusMutation.isPending}
-              style={{
-                flex: 1,
-                height: 48,
+        {isMemberMode === true && inquiry.status === 'PENDING' ? (
+          <Pressable
+            testID="edit-bill-button"
+            onPress={() => router.push(`/bills/edit/${id}` as any)}
+          >
+            {({ pressed }) => (
+              <View style={{
+                height: 52,
                 borderRadius: Radius.md,
+                flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'center',
-                borderWidth: 1,
-                borderColor: Colors.danger,
-              }}
-            >
-              <Text style={{ fontSize: FontSize.sm, color: Colors.danger, fontWeight: '700' }}>Cancel</Text>
-            </Pressable>
-            <Pressable
-              testID="confirm-bill-button"
-              onPress={() => updateStatus('CONFIRMED')}
-              disabled={statusMutation.isPending}
-              style={{
-                flex: 2,
-                height: 48,
-                borderRadius: Radius.md,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: Colors.success,
-              }}
-            >
-              <Text style={{ fontSize: FontSize.md, color: '#FFF', fontWeight: '700' }}>✅ Confirm</Text>
-            </Pressable>
-          </View>
+                gap: 8,
+                backgroundColor: pressed ? '#0A3B8A' : Colors.info,
+              }}>
+                <Pencil size={18} color="#FFF" />
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.78}
+                  style={{ fontSize: FontSize.md, fontWeight: '700', color: '#FFF' }}
+                >
+                  Edit Bill / बिल संपादित करें
+                </Text>
+              </View>
+            )}
+          </Pressable>
         ) : null}
         <Pressable
           testID="view-slip-button"
           onPress={() => router.push(`/slip/${id}` as any)}
-          style={({ pressed }) => ({
-            height: 52,
-            borderRadius: Radius.md,
-            flexDirection: 'row',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            backgroundColor: pressed ? '#005a10' : '#00450d',
-          })}
         >
-          <FileText size={18} color="#FFF" />
-          <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: '#FFF' }}>
-            View Delivery Slip / डिलीवरी स्लिप
-          </Text>
+          {({ pressed }) => (
+            <View style={{
+              height: 52,
+              borderRadius: Radius.md,
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 8,
+              backgroundColor: pressed ? Colors.primaryPressed : Colors.primary,
+            }}>
+              <FileText size={18} color="#FFF" />
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.78}
+                style={{ fontSize: FontSize.md, fontWeight: '700', color: '#FFF' }}
+              >
+                {isReferenceSlip ? 'View Reference Slip / संदर्भ पर्ची' : 'View Authorized Bill / अधिकृत बिल'}
+              </Text>
+            </View>
+          )}
         </Pressable>
       </View>
     </SafeAreaView>

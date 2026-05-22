@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { supabase, mapTransaction } from '@/lib/supabase';
 import { useShop } from '@/context/ShopContext';
 import type { CashEntry } from '@/utils/pdfGenerator';
+import { archiveQueryOptions } from '@/lib/queryOptions';
 
 function dateKey(date: Date): string {
   const y = date.getFullYear();
@@ -16,35 +17,62 @@ function startOfDay(date: Date): number {
   return d.getTime();
 }
 
+function endOfDay(date: Date): number {
+  const d = new Date(date);
+  d.setHours(23, 59, 59, 999);
+  return d.getTime();
+}
+
 export function useCashEntries(date: Date) {
   const { shop } = useShop();
   const queryClient = useQueryClient();
 
   const key = dateKey(date);
   const dateParam = startOfDay(date);
-  const queryKey = ['cash-entries', shop?.shopId, key, dateParam];
+  const dateEndParam = endOfDay(date);
+  const queryKey = ['cash-entries', shop?.shopId, key, dateParam, dateEndParam];
 
   const { data: entries = [], isLoading: loading } = useQuery({
     queryKey,
-    queryFn: () =>
-      api.get<CashEntry[]>(
-        `/api/transactions?shopId=${shop!.shopId}&buyerCode=__cashbook__&date=${dateParam}`
-      ),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('shop_id', shop!.shopId)
+        .eq('buyer_code', '__cashbook__')
+        .gte('date', dateParam)
+        .lte('date', dateEndParam)
+        .order('created_at', { ascending: true });
+      if (error) throw new Error(error.message);
+      return (data ?? []).map((r) => {
+        const t = mapTransaction(r as Record<string, unknown>);
+        return {
+          id: t.id,
+          type: t.type === 'PAYMENT' ? 'PAYMENT' : 'RECEIPT',
+          description: t.note ?? '',
+          amount: t.amount,
+          createdAt: t.createdAt,
+        } as CashEntry;
+      });
+    },
     enabled: !!shop?.shopId,
-    refetchInterval: 15000,
+    ...archiveQueryOptions,
   });
 
   const addMutation = useMutation({
-    mutationFn: (entry: Omit<CashEntry, 'id'>) =>
-      api.post<CashEntry>('/api/transactions', {
-        shopId: shop!.shopId,
-        buyerCode: '__cashbook__',
+    mutationFn: async (entry: Omit<CashEntry, 'id'>) => {
+      const { data, error } = await supabase.from('transactions').insert({
+        shop_id: shop!.shopId,
+        buyer_code: '__cashbook__',
         type: entry.type,
-        description: entry.description,
+        note: entry.description,
         amount: entry.amount,
-        createdAt: entry.createdAt,
+        created_at: entry.createdAt,
         date: dateParam,
-      }),
+      }).select().single();
+      if (error) throw new Error(error.message);
+      return data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey });
     },

@@ -1,28 +1,73 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View, Text, TextInput, Pressable, Image, StyleSheet,
   KeyboardAvoidingView, Platform, ScrollView, Keyboard,
-  Alert,
+  Alert, ActivityIndicator, BackHandler,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import { Menu, User } from 'lucide-react-native';
-import { useShop } from '@/context/ShopContext';
+import { ArrowLeft, User } from 'lucide-react-native';
+import { useShop, type TeamMember } from '@/context/ShopContext';
 import { useLaunch } from '@/context/LaunchContext';
+import { mapShop, supabase } from '@/lib/supabase';
+import { APP_SESSION_KEY, MEMBER_SESSION_KEY } from '@/lib/session';
+export { APP_SESSION_KEY, MEMBER_SESSION_KEY };
+
+const normalizePhone = (value: string) => value.replace(/\D/g, '');
 
 export default function MemberLoginScreen() {
   const router = useRouter();
-  const { shop } = useShop();
+  const { cacheShop } = useShop();
   const { setLaunchComplete } = useLaunch();
   const [phone, setPhone] = useState('');
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState(false);
   const [imageError, setImageError] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
-    const cleaned = phone.replace(/\D/g, '');
+  const goBack = () => {
+    setLaunchComplete(false);
+    router.replace({ pathname: '/(tabs)', params: { access: 'choose' } } as any);
+  };
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      setLaunchComplete(false);
+      router.replace({ pathname: '/(tabs)', params: { access: 'choose' } } as any);
+      return true;
+    });
+    return () => subscription.remove();
+  }, [router, setLaunchComplete]);
+
+  const findRemoteShop = async (phoneDigits: string, enteredPin: string) => {
+    const { data, error } = await supabase.rpc('verify_member_login', {
+      p_phone: phoneDigits,
+      p_pin: enteredPin,
+    });
+    if (error) throw error;
+    if (!data) return null;
+
+    const payload = data as {
+      shop?: Record<string, unknown>;
+      member?: TeamMember;
+      is_admin?: boolean;
+      session_token?: string;
+    };
+    if (!payload.shop || !payload.member || !payload.session_token) return null;
+
+    return {
+      shop: mapShop(payload.shop),
+      member: payload.member,
+      isAdmin: payload.is_admin === true,
+      sessionToken: payload.session_token,
+    };
+  };
+
+  const handleLogin = async () => {
+    const cleaned = normalizePhone(phone);
     if (cleaned.length !== 10) {
       Alert.alert('Invalid Number', 'कृपया 10 अंकों का सही फोन नंबर डालें।');
       return;
@@ -33,14 +78,47 @@ export default function MemberLoginScreen() {
     }
 
     Keyboard.dismiss();
-    const correctPin = shop?.adminPin ?? '';
+    setLoading(true);
 
-    if (pin === correctPin) {
-      setPinError(false);
-      setLaunchComplete(true);
-      router.replace('/member-dashboard');
-    } else {
+    try {
+      const remoteMatch = await findRemoteShop(cleaned, pin);
+      const activeShop = remoteMatch?.shop;
+      const isAdmin = remoteMatch?.isAdmin ?? false;
+      const member = remoteMatch?.member;
+
+      if (remoteMatch?.shop) {
+        await cacheShop(remoteMatch.shop);
+      }
+
+      if (activeShop && (isAdmin || member)) {
+        setPinError(false);
+        setLaunchComplete(true);
+        const session = {
+          id: member?.id ?? 'admin-member',
+          name: member?.name ?? activeShop.ownerName,
+          phone: member?.phone ?? activeShop.phone1,
+          role: member?.role ?? 'ADMIN',
+          sessionToken: remoteMatch.sessionToken,
+        };
+        AsyncStorage.setItem(APP_SESSION_KEY, JSON.stringify(session)).catch(() => {});
+        if (isAdmin) {
+          AsyncStorage.removeItem(MEMBER_SESSION_KEY).catch(() => {});
+          router.replace('/(tabs)');
+        } else {
+          AsyncStorage.setItem(MEMBER_SESSION_KEY, JSON.stringify(session)).catch(() => {});
+          router.replace('/member-dashboard');
+        }
+        return;
+      }
+
       setPinError(true);
+    } catch {
+      Alert.alert(
+        'Login Failed',
+        'Could not check your firm details right now. Please check internet and try again.\nफर्म जानकारी नहीं मिल पाई। इंटरनेट चेक करके दोबारा कोशिश करें।'
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -52,19 +130,19 @@ export default function MemberLoginScreen() {
       >
         <ScrollView
           style={{ flex: 1 }}
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           bounces={false}
         >
           {/* Header bar */}
           <View style={styles.header}>
-            <Pressable testID="member-back-btn" onPress={() => router.back()} style={styles.headerIcon}>
-              <Menu size={22} color="#1a1a1a" />
+            <Pressable testID="member-back-btn" onPress={goBack} style={styles.headerIcon}>
+              <ArrowLeft size={22} color="#FFFFFF" />
             </Pressable>
             <Text style={styles.headerTitle}>MandiBook Pro</Text>
             <View style={styles.headerIcon}>
-              <User size={22} color="#1a1a1a" />
+              <User size={22} color="#FFFFFF" />
             </View>
           </View>
 
@@ -149,19 +227,6 @@ export default function MemberLoginScreen() {
               <Text style={styles.errorText}>गलत PIN। कृपया सही PIN डालें।</Text>
             ) : null}
 
-            {/* Login button */}
-            <Pressable
-              testID="member-login-btn"
-              onPress={handleLogin}
-              style={({ pressed }) => [
-                styles.loginBtn,
-                pressed && styles.loginBtnPressed,
-              ]}
-            >
-              <Text style={styles.loginBtnText}>LOG IN</Text>
-              <Text style={styles.loginBtnSub}>लॉगिन करें</Text>
-            </Pressable>
-
             <View style={styles.secureRow}>
               <MaterialIcons name="lock" size={18} color="#546E57" />
               <View>
@@ -209,6 +274,31 @@ export default function MemberLoginScreen() {
             </Text>
           </View>
         </ScrollView>
+
+        <View style={styles.bottomCta}>
+          <Pressable
+            testID="member-login-btn"
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            {({ pressed }) => (
+              <View style={[
+                styles.loginBtn,
+                pressed && styles.loginBtnPressed,
+                loading && styles.loginBtnDisabled,
+              ]}>
+                {loading ? (
+                  <ActivityIndicator color="#FFF" />
+                ) : (
+                  <>
+                    <Text style={styles.loginBtnText}>LOG IN</Text>
+                    <Text style={styles.loginBtnSub}>लॉगिन करें</Text>
+                  </>
+                )}
+              </View>
+            )}
+          </Pressable>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -219,15 +309,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F3F7F4',
   },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 112,
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e8e8e8',
+    backgroundColor: '#00450d',
+    borderBottomWidth: 0,
   },
   headerIcon: {
     width: 36,
@@ -237,30 +330,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '800',
-    color: '#1B5E20',
+    color: '#FFFFFF',
     letterSpacing: -0.3,
   },
   heroWrap: {
-    height: 200,
+    height: 176,
     marginHorizontal: 16,
     marginTop: 16,
-    borderRadius: 16,
+    borderRadius: 14,
     overflow: 'hidden',
     position: 'relative',
     justifyContent: 'flex-end',
   },
   heroContent: {
-    padding: 20,
+    padding: 16,
   },
   heroTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: '800',
     color: '#fff',
   },
   heroSub: {
-    fontSize: 14,
+    fontSize: 12,
     color: 'rgba(255,255,255,0.8)',
     marginTop: 2,
   },
@@ -268,8 +361,8 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 20,
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 24,
+    borderRadius: 14,
+    padding: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
@@ -283,12 +376,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   label: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: '#1a1a1a',
   },
   labelHindi: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#546E57',
   },
   phoneRow: {
@@ -306,7 +399,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   countryCodeText: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '700',
     color: '#1a1a1a',
   },
@@ -317,7 +410,7 @@ const styles = StyleSheet.create({
   },
   phoneInput: {
     flex: 1,
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: '600',
     color: '#1a1a1a',
     paddingHorizontal: 14,
@@ -331,7 +424,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fafbfa',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: '700',
     color: '#1a1a1a',
     letterSpacing: 6,
@@ -351,30 +444,45 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   loginBtn: {
-    backgroundColor: '#1B5E20',
+    backgroundColor: '#FDE047',
     borderRadius: 12,
-    paddingVertical: 16,
+    minHeight: 60,
+    paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
-    shadowColor: '#1B5E20',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    elevation: 4,
+    marginBottom: 0,
+    borderWidth: 2,
+    borderColor: '#00450D',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  bottomCta: {
+    backgroundColor: '#FFFFFF',
+    borderTopWidth: 1,
+    borderTopColor: '#CBD5E1',
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 14,
   },
   loginBtnPressed: {
-    backgroundColor: '#145214',
+    backgroundColor: '#FBBF24',
+  },
+  loginBtnDisabled: {
+    backgroundColor: '#CBD5E1',
   },
   loginBtnText: {
     fontSize: 16,
-    fontWeight: '800',
-    color: '#fff',
+    fontWeight: '900',
+    color: '#003807',
     letterSpacing: 1,
   },
   loginBtnSub: {
     fontSize: 11,
-    color: 'rgba(255,255,255,0.7)',
+    color: '#365314',
+    fontWeight: '900',
     marginTop: 2,
   },
   secureRow: {

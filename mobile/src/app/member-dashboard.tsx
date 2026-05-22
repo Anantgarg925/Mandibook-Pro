@@ -1,19 +1,30 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
-  View, Text, FlatList, Pressable, StyleSheet, Platform,
+  View, Text, FlatList, Pressable, StyleSheet, BackHandler,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { MaterialIcons } from '@expo/vector-icons';
-import {
-  Home, Truck, PlusSquare, User,
-} from 'lucide-react-native';
+import { Bell, LogOut } from 'lucide-react-native';
 import { useShop } from '@/context/ShopContext';
 import { useInquiries } from '@/hooks/useInquiries';
 import { useTodayTrucks } from '@/hooks/useTodayTrucks';
+import { useResponsive } from '@/hooks/useResponsive';
 import { toIndianCurrency } from '@/lib/formatters';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import type { Inquiry } from '@/types/inquiry';
+import { APP_SESSION_KEY, MEMBER_SESSION_KEY } from '@/lib/session';
+import { useBillNotifications } from '@/context/BillNotificationContext';
+import { getCurrentBusinessDate } from '@/lib/businessDay';
+import { resetToRoute } from '@/utils/navigation';
+
+type MemberSession = {
+  id: string;
+  name: string;
+  phone: string;
+  role: string;
+};
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: Colors.warning,
@@ -42,7 +53,7 @@ function formatTime(ts: number): string {
 
 function isToday(ts: number): boolean {
   const d = new Date(ts);
-  const now = new Date();
+  const now = getCurrentBusinessDate();
   return d.getDate() === now.getDate() &&
     d.getMonth() === now.getMonth() &&
     d.getFullYear() === now.getFullYear();
@@ -51,24 +62,46 @@ function isToday(ts: number): boolean {
 export default function MemberDashboardScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { contentHPad, isSmall } = useResponsive();
   const { shop } = useShop();
   const { inquiries } = useInquiries();
   const { trucks } = useTodayTrucks();
+  const { unreadCount } = useBillNotifications();
+  const [member, setMember] = useState<MemberSession | null>(null);
+
+  useEffect(() => {
+    AsyncStorage.getItem(MEMBER_SESSION_KEY)
+      .then((raw) => {
+        if (raw) setMember(JSON.parse(raw) as MemberSession);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
+    return () => subscription.remove();
+  }, []);
+
+  const logout = async () => {
+    await AsyncStorage.removeItem(APP_SESSION_KEY);
+    await AsyncStorage.removeItem(MEMBER_SESSION_KEY);
+    resetToRoute(router, '/member-login' as any);
+  };
 
   const recentBills = inquiries.slice(0, 5);
   const liveTrucks = trucks.slice(0, 3);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <FlatList
         testID="member-dashboard"
         data={recentBills}
         keyExtractor={(item) => item.id}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
-          <View>
+          <View style={{ paddingHorizontal: Math.max(0, contentHPad - Spacing.md) }}>
             {/* Header */}
-            <View style={styles.header}>
+            <View style={[styles.header, { paddingHorizontal: Math.max(Spacing.md, contentHPad) }]}>
               <View style={styles.headerLeft}>
                 <Pressable testID="member-menu-btn" style={styles.menuBtn}>
                   <MaterialIcons name="menu" size={24} color={Colors.text} />
@@ -76,39 +109,64 @@ export default function MemberDashboardScreen() {
                 <View>
                   <Text style={styles.brandName}>MandiBook Pro</Text>
                   <View style={styles.memberBadge}>
-                    <Text style={styles.memberBadgeText}>MEMBER</Text>
+                    <Text style={styles.memberBadgeText}>{member?.role || 'MEMBER'}</Text>
                   </View>
                 </View>
               </View>
-              <View style={styles.avatar}>
-                <MaterialIcons name="person" size={24} color={Colors.primary} />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <Pressable
+                  testID="member-notifications-btn"
+                  onPress={() => router.push('/notifications' as any)}
+                  style={styles.avatar}
+                >
+                  <Bell size={22} color={Colors.primary} />
+                  {unreadCount > 0 ? (
+                    <View style={styles.badgeDot}>
+                      <Text style={styles.badgeDotText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                    </View>
+                  ) : null}
+                </Pressable>
+                <Pressable testID="member-avatar-btn" onPress={() => router.push('/member-profile')} style={styles.avatar}>
+                  <MaterialIcons name="person" size={24} color={Colors.primary} />
+                </Pressable>
+                <Pressable testID="member-dashboard-logout-btn" onPress={logout} style={[styles.avatar, styles.logoutAvatar]}>
+                  <LogOut size={21} color="#B91C1C" />
+                </Pressable>
               </View>
             </View>
 
             {/* Quick Action Cards */}
-            <View style={styles.actionRow}>
+            <View style={[styles.actionRow, { paddingHorizontal: Math.max(Spacing.md, contentHPad) }]}>
               <Pressable
                 testID="member-new-bill-btn"
                 onPress={() => router.push('/bills/new')}
-                style={({ pressed }) => [styles.actionCardPrimary, pressed && { opacity: 0.9 }]}
+                style={{ flex: 1.2 }}
               >
-                <View style={styles.actionIconWrapWhite}>
-                  <MaterialIcons name="add-circle-outline" size={24} color="#fff" />
-                </View>
-                <Text style={styles.actionPrimaryTitle}>Create New Bill</Text>
-                <Text style={styles.actionPrimarySub}>नया बिल बनाएं</Text>
+                {({ pressed }) => (
+                  <View style={[styles.actionCardPrimary, pressed && { opacity: 0.9 }]}>
+                    <View style={styles.actionIconWrapWhite}>
+                      <MaterialIcons name="add-circle-outline" size={24} color="#fff" />
+                    </View>
+                    <Text style={styles.actionPrimaryTitle}>Create New Bill</Text>
+                    <Text style={styles.actionPrimarySub}>नया बिल बनाएं</Text>
+                  </View>
+                )}
               </Pressable>
 
               <Pressable
                 testID="member-trucks-btn"
-                onPress={() => router.push('/(tabs)/trucks' as any)}
-                style={({ pressed }) => [styles.actionCardSecondary, pressed && { opacity: 0.9 }]}
+                onPress={() => router.push('/member-trucks')}
+                style={{ flex: 1 }}
               >
-                <View style={styles.actionIconWrapLight}>
-                  <MaterialIcons name="local-shipping" size={24} color={Colors.primary} />
-                </View>
-                <Text style={styles.actionSecondaryTitle}>Today's Trucks</Text>
-                <Text style={styles.actionSecondarySub}>आज की गाड़ियाँ</Text>
+                {({ pressed }) => (
+                  <View style={[styles.actionCardSecondary, pressed && { opacity: 0.9 }]}>
+                    <View style={styles.actionIconWrapLight}>
+                      <MaterialIcons name="local-shipping" size={24} color={Colors.primary} />
+                    </View>
+                    <Text style={styles.actionSecondaryTitle}>Today's Trucks</Text>
+                    <Text style={styles.actionSecondarySub}>आज की गाड़ियाँ</Text>
+                  </View>
+                )}
               </Pressable>
             </View>
 
@@ -125,11 +183,8 @@ export default function MemberDashboardScreen() {
 
                 <View style={styles.feedCard}>
                   {liveTrucks.map((truck, idx) => {
-                    const totalKg: number = truck.gradeInventory.reduce(
-                      (s: number, g: any) => s + g.totalKg, 0
-                    );
                     const mainGrade = truck.gradeInventory[0];
-                    const gradeName = mainGrade?.name ?? 'Goods';
+                    const gradeName = shop?.commodity || mainGrade?.name || 'Mosambi';
                     const arrivedTime = formatTime(truck.createdAt);
 
                     return (
@@ -137,25 +192,30 @@ export default function MemberDashboardScreen() {
                         key={truck.id}
                         testID={`feed-truck-${truck.id}`}
                         onPress={() => router.push(`/trucks/${truck.id}` as any)}
-                        style={[
-                          styles.feedRow,
-                          idx < liveTrucks.length - 1 && styles.feedRowBorder,
-                        ]}
+                        style={{ marginBottom: idx < liveTrucks.length - 1 ? 0 : 0 }}
                       >
-                        <View style={styles.feedIconWrap}>
-                          <MaterialIcons
-                            name={idx % 2 === 0 ? 'agriculture' : 'inventory-2'}
-                            size={22}
-                            color={Colors.primary}
-                          />
-                        </View>
-                        <View style={{ flex: 1 }}>
-                          <Text style={styles.feedTitle}>{gradeName}</Text>
-                          <Text style={styles.feedSub}>
-                            Truck {truck.truckNumber} Arrived
-                          </Text>
-                        </View>
-                        <Text style={styles.feedTime}>{arrivedTime}</Text>
+                        {({ pressed }) => (
+                          <View style={[
+                            styles.feedRow,
+                            idx < liveTrucks.length - 1 && styles.feedRowBorder,
+                            pressed && { backgroundColor: '#F9FAFB' }
+                          ]}>
+                            <View style={styles.feedIconWrap}>
+                              <MaterialIcons
+                                name={idx % 2 === 0 ? 'agriculture' : 'inventory-2'}
+                                size={22}
+                                color={Colors.primary}
+                              />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                              <Text style={styles.feedTitle}>{gradeName}</Text>
+                              <Text style={styles.feedSub}>
+                                Truck {truck.truckNumber} Arrived
+                              </Text>
+                            </View>
+                            <Text style={styles.feedTime}>{arrivedTime}</Text>
+                          </View>
+                        )}
                       </Pressable>
                     );
                   })}
@@ -172,10 +232,10 @@ export default function MemberDashboardScreen() {
                 </View>
                 <Pressable
                   testID="member-see-all-bills"
-                  onPress={() => router.push('/(tabs)' as any)}
+                  onPress={() => router.push('/bills/new')}
                   style={styles.seeAllBtn}
                 >
-                  <Text style={styles.seeAllText}>See All</Text>
+                  <Text style={styles.seeAllText}>New Bill</Text>
                   <MaterialIcons name="arrow-forward" size={16} color={Colors.primary} />
                 </Pressable>
               </View>
@@ -193,30 +253,40 @@ export default function MemberDashboardScreen() {
           return (
             <Pressable
               testID={`member-bill-${item.id}`}
-              onPress={() => router.push(`/bills/${item.id}`)}
-              style={({ pressed }) => [styles.billCard, pressed && { opacity: 0.95 }]}
+              onPress={() => {
+                if (item.status === 'PENDING') {
+                  router.push(`/bills/${item.id}` as any);
+                } else {
+                  router.push(`/slip/${item.id}` as any);
+                }
+              }}
+              style={{ marginHorizontal: Math.max(Spacing.md, contentHPad), marginBottom: 10 }}
             >
-              <View style={styles.billIconWrap}>
-                <MaterialIcons name="receipt-long" size={24} color={Colors.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.billName} numberOfLines={1}>
-                  {item.customerName}
-                </Text>
-                <Text style={styles.billMeta}>
-                  Slip #{item.slipNumber} {'\u2022'} {timeLabel}
-                </Text>
-              </View>
-              <View style={styles.billRight}>
-                <Text style={styles.billAmount}>
-                  {toIndianCurrency(item.netAmount)}
-                </Text>
-                <View style={[styles.statusBadge, { backgroundColor: statusBg }]}>
-                  <Text style={[styles.statusText, { color: statusColor }]}>
-                    {statusLabel}
-                  </Text>
+              {({ pressed }) => (
+                <View style={[styles.billCard, pressed && { opacity: 0.95 }]}>
+                  <View style={styles.billIconWrap}>
+                    <MaterialIcons name="receipt-long" size={24} color={Colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.billName} numberOfLines={1}>
+                      {item.customerName}
+                    </Text>
+                    <Text style={styles.billMeta}>
+                      Slip #{item.slipNumber} {'\u2022'} {timeLabel}
+                    </Text>
+                  </View>
+                  <View style={styles.billRight}>
+                    <Text style={styles.billAmount}>
+                      {toIndianCurrency(item.netAmount)}
+                    </Text>
+                    <View style={[styles.statusBadge, { backgroundColor: statusBg }]}>
+                      <Text style={[styles.statusText, { color: statusColor }]}>
+                        {statusLabel}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
-              </View>
+              )}
             </Pressable>
           );
         }}
@@ -230,37 +300,6 @@ export default function MemberDashboardScreen() {
         contentContainerStyle={{ paddingBottom: 80 + insets.bottom }}
       />
 
-      {/* Bottom Tab Bar */}
-      <View style={[styles.tabBar, { paddingBottom: insets.bottom || 8 }]}>
-        <Pressable testID="tab-home" style={styles.tabItem}>
-          <Home size={22} color={Colors.primary} />
-          <Text style={[styles.tabLabel, { color: Colors.primary }]}>HOME</Text>
-        </Pressable>
-        <Pressable
-          testID="tab-trucks"
-          onPress={() => router.push('/(tabs)/trucks' as any)}
-          style={styles.tabItem}
-        >
-          <Truck size={22} color={Colors.textSecond} />
-          <Text style={styles.tabLabel}>TRUCKS</Text>
-        </Pressable>
-        <Pressable
-          testID="tab-new-bill"
-          onPress={() => router.push('/bills/new')}
-          style={styles.tabItem}
-        >
-          <PlusSquare size={22} color={Colors.textSecond} />
-          <Text style={styles.tabLabel}>NEW BILL</Text>
-        </Pressable>
-        <Pressable
-          testID="tab-profile"
-          onPress={() => router.push('/settings' as any)}
-          style={styles.tabItem}
-        >
-          <User size={22} color={Colors.textSecond} />
-          <Text style={styles.tabLabel}>PROFILE</Text>
-        </Pressable>
-      </View>
     </SafeAreaView>
   );
 }
@@ -320,6 +359,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: Colors.border,
+  },
+  logoutAvatar: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  badgeDot: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    minWidth: 17,
+    height: 17,
+    borderRadius: 9,
+    backgroundColor: '#D92D20',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+    borderWidth: 1,
+    borderColor: '#FFF',
+  },
+  badgeDotText: {
+    color: '#FFF',
+    fontSize: 9,
+    fontWeight: '900',
   },
 
   actionRow: {
@@ -482,8 +544,6 @@ const styles = StyleSheet.create({
   billCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginHorizontal: Spacing.md,
-    marginBottom: 10,
     backgroundColor: Colors.surface,
     borderRadius: Radius.md,
     padding: Spacing.md,
@@ -548,31 +608,4 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  tabBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    backgroundColor: Colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    paddingTop: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 8,
-  },
-  tabItem: {
-    flex: 1,
-    alignItems: 'center',
-    gap: 3,
-  },
-  tabLabel: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: Colors.textSecond,
-    letterSpacing: Platform.OS === 'android' ? 0 : 0.3,
-  },
 });

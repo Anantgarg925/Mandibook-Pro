@@ -8,11 +8,11 @@ export function generateSlipHTML(inquiry: Inquiry, shop: ShopData): string {
   const upiInfo = shop.upiId ? `GPay/Paytm: ${shop.upiId}` : shop.upiApps.join('/');
   const cartageRow =
     inquiry.cartageAmount > 0
-      ? `<tr><td>Cartage</td><td></td><td></td><td class="right">${inquiry.cartageAmount.toFixed(0)}</td></tr>`
+      ? `<tr><td colspan="5">Cartage</td><td class="right">${inquiry.cartageAmount.toFixed(0)}</td></tr>`
       : '';
   const bardanaRow =
     inquiry.bardanaAmount > 0
-      ? `<tr><td>Bardana</td><td></td><td></td><td class="right">${inquiry.bardanaAmount.toFixed(0)}</td></tr>`
+      ? `<tr><td colspan="5">Bardana</td><td class="right">${inquiry.bardanaAmount.toFixed(0)}</td></tr>`
       : '';
   const dateStr = new Date(inquiry.date).toLocaleDateString('en-IN', {
     day: '2-digit',
@@ -28,38 +28,46 @@ export function generateSlipHTML(inquiry: Inquiry, shop: ShopData): string {
 <style>
   @page {
     size: 80mm auto;
-    margin: 4mm;
+    margin: 0;
   }
+  html, body { margin: 0; padding: 0; width: 80mm; min-width: 80mm; background: #fff; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: 'Courier New', Courier, monospace;
-    font-size: 11px;
+    font-size: 12px;
     background: #fff;
     color: #000;
-    width: 72mm;
-    max-width: 72mm;
+    width: 80mm;
+    max-width: 80mm;
+    min-height: 100vh;
+  }
+  .receipt {
+    width: 80mm;
+    min-width: 80mm;
+    padding: 3mm;
+    page-break-inside: avoid;
   }
   .center { text-align: center; }
   .right { text-align: right; }
   .bold { font-weight: bold; }
   .firm-name {
-    font-size: 15px;
+    font-size: 17px;
     font-weight: bold;
     text-align: center;
     margin: 4px 0 2px;
     text-transform: uppercase;
     letter-spacing: 1px;
   }
-  .small { font-size: 9px; color: #444; }
-  .divider-solid { border: none; border-top: 1px solid #000; margin: 4px 0; }
-  .divider-dash { border: none; border-top: 1px dashed #888; margin: 4px 0; }
+  .small { font-size: 10px; color: #444; }
+  .divider-solid { border: none; border-top: 1px solid #000; margin: 5px 0; }
+  .divider-dash { border: none; border-top: 1px dashed #888; margin: 5px 0; }
   table { width: 100%; border-collapse: collapse; }
-  td { padding: 1px 2px; vertical-align: top; font-size: 10px; }
-  .header-row td { font-weight: bold; font-size: 9px; border-bottom: 1px solid #000; padding-bottom: 3px; }
+  td { padding: 2px 2px; vertical-align: top; font-size: 11px; }
+  .header-row td { font-weight: bold; font-size: 10px; border-bottom: 1px solid #000; padding-bottom: 3px; }
   .net-row td {
     border-top: 2px solid #000;
     border-bottom: 2px solid #000;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: bold;
     padding: 3px 2px;
   }
@@ -69,7 +77,7 @@ export function generateSlipHTML(inquiry: Inquiry, shop: ShopData): string {
   }
   .phones-row span {
     display: table-cell;
-    font-size: 9px;
+    font-size: 10px;
     color: #444;
   }
   .phones-row span:last-child { text-align: right; }
@@ -87,19 +95,20 @@ export function generateSlipHTML(inquiry: Inquiry, shop: ShopData): string {
     width: 100%;
     margin-top: 2px;
   }
-  .footer-row span { display: table-cell; font-size: 9px; }
+  .footer-row span { display: table-cell; font-size: 10px; }
   .footer-row span:last-child { text-align: right; }
-  .thank-you { font-size: 13px; font-weight: bold; text-align: center; margin: 4px 0 2px; }
+  .thank-you { font-size: 15px; font-weight: bold; text-align: center; margin: 5px 0 2px; }
   .stamp-row {
     display: table;
     width: 100%;
     margin-top: 6px;
   }
-  .stamp-row span { display: table-cell; font-size: 10px; font-weight: bold; }
-  .stamp-row span:last-child { text-align: right; font-size: 9px; color: #666; }
+  .stamp-row span { display: table-cell; font-size: 11px; font-weight: bold; }
+  .stamp-row span:last-child { text-align: right; font-size: 10px; color: #666; }
 </style>
 </head>
 <body>
+<div class="receipt">
 
   <div class="phones-row">
     <span>M: ${shop.phone1}</span>
@@ -127,26 +136,26 @@ export function generateSlipHTML(inquiry: Inquiry, shop: ShopData): string {
 
   <table>
     <tr class="header-row">
-      <td>Description</td>
-      <td>Wt</td>
+      <td>#</td>
+      <td>Item/Fruit</td>
+      <td>Grade</td>
+      <td>Weight (kg)</td>
       <td>Rate</td>
       <td class="right">Amt</td>
     </tr>
     <tr>
-      <td>
-        <strong>${inquiry.grade}</strong><br>
-        <span class="small">${inquiry.gradeName}</span><br>
-        <span class="small">${inquiry.sacks}&times;${inquiry.weightPerSack}kg</span>
-      </td>
-      <td>${inquiry.totalWeight}kg</td>
+      <td>1</td>
+      <td><strong>${shop.commodity}</strong><br><span class="small">${inquiry.sacks}&times;${inquiry.weightPerSack}kg</span></td>
+      <td>${inquiry.gradeName || inquiry.grade}</td>
+      <td>${inquiry.totalWeight}</td>
       <td>&#8377;${inquiry.ratePerKg}</td>
       <td class="right">${inquiry.grossAmount.toFixed(0)}</td>
     </tr>
-    <tr><td>APMC</td><td></td><td></td><td class="right">${inquiry.apmcAmount.toFixed(0)}</td></tr>
+    <tr><td colspan="5">APMC</td><td class="right">${inquiry.apmcAmount.toFixed(0)}</td></tr>
     ${bardanaRow}
     ${cartageRow}
     <tr class="net-row">
-      <td colspan="3">NET AMOUNT / कुल राशि</td>
+      <td colspan="5">NET AMOUNT / कुल राशि</td>
       <td class="right">&#8377;${inquiry.netAmount.toFixed(0)}</td>
     </tr>
   </table>
@@ -170,9 +179,10 @@ export function generateSlipHTML(inquiry: Inquiry, shop: ShopData): string {
 
   <div class="footer-row" style="margin-top:4px;">
     <span>E.&amp;O.E.</span>
-    <span>वजन की जिम्मेदारी हमारी नहीं</span>
+    <span>वजन की जिम्मेदारी माल उठने तक है</span>
   </div>
 
+</div>
 </body>
 </html>`;
 }
@@ -213,7 +223,7 @@ export async function printSlip(inquiry: Inquiry, shop: ShopData): Promise<void>
     return;
   }
 
-  await Print.printAsync({ html });
+  await Print.printAsync({ html, width: 302 });
 }
 
 export async function shareSlipAsPDF(inquiry: Inquiry, shop: ShopData): Promise<void> {

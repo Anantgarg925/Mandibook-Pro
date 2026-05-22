@@ -1,28 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
   TextInput,
-  ScrollView,
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  BackHandler,
+  Alert,
 } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withTiming,
-  Easing,
-} from 'react-native-reanimated';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ArrowLeft } from 'lucide-react-native';
+import { ArrowLeft, ChevronDown, ChevronRight, Info, Plus, X } from 'lucide-react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import * as Sharing from 'expo-sharing';
+import { captureRef } from 'react-native-view-shot';
+import { supabase } from '@/lib/supabase';
 import { useShop } from '@/context/ShopContext';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
-import { toIndianNumber } from '@/lib/formatters';
+import { toIndianWeight } from '@/lib/formatters';
+import { useMemberMode } from '@/hooks/useMemberMode';
+import { getCurrentBusinessDate } from '@/lib/businessDay';
+import { makeReferenceSlipNumber, normalizeGradeRows, ReferenceSlipCard } from '@/utils/referenceSlip';
 import type { GradeInventory } from '@/types/truck';
 
 // ─── field input style ───────────────────────────────────────────────────────
@@ -68,55 +68,19 @@ function GridField({
   );
 }
 
-// ─── pulsing mismatch badge ──────────────────────────────────────────────────
-function MismatchBadge({ diff }: { diff: number }) {
-  const opacity = useSharedValue(1);
-
-  useEffect(() => {
-    opacity.value = withRepeat(
-      withTiming(0.6, { duration: 700, easing: Easing.inOut(Easing.ease) }),
-      -1,
-      true
-    );
-  }, [opacity]);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-  }));
-
-  return (
-    <Animated.View
-      style={[
-        {
-          backgroundColor: '#ffdad6',
-          borderRadius: 8,
-          padding: 8,
-        },
-        animatedStyle,
-      ]}
-    >
-      <Text style={{ fontSize: 11, fontWeight: '700', color: '#93000a' }}>
-        {'\u26A0'} {toIndianNumber(diff)} kg Mismatch
-      </Text>
-    </Animated.View>
-  );
-}
-
 // ─── bottom action bar ───────────────────────────────────────────────────────
 function BottomBar({
-  totalEntered,
   totalKgNum,
-  diff,
   formComplete,
   isPending,
   onSubmit,
+  onSubmitAndAddAnother,
 }: {
-  totalEntered: number;
   totalKgNum: number;
-  diff: number;
   formComplete: boolean;
   isPending: boolean;
   onSubmit: () => void;
+  onSubmitAndAddAnother: () => void;
 }) {
   const insets = useSafeAreaInsets();
 
@@ -157,38 +121,66 @@ function BottomBar({
             Live Breakdown Calculation
           </Text>
           <Text style={{ fontSize: 14, fontWeight: '700', color: '#071e27' }}>
-            Total Entered: {toIndianNumber(totalEntered)} kg / Truck: {toIndianNumber(totalKgNum)} kg
+            Truck Load: {totalKgNum > 0 ? toIndianWeight(totalKgNum) : 'Not entered'}
           </Text>
         </View>
 
-        {diff > 0 && totalKgNum > 0 ? (
-          <MismatchBadge diff={diff} />
-        ) : null}
+        <View style={{ backgroundColor: '#E8F5E9', borderRadius: 8, padding: 8 }}>
+          <Text style={{ fontSize: 11, fontWeight: '700', color: '#00450d' }}>
+            Grade split will come from bills
+          </Text>
+        </View>
       </View>
 
-      {/* Row 2: submit button */}
-      <Pressable
-        testID="submit-truck-button"
-        onPress={onSubmit}
-        disabled={!formComplete || isPending}
-        style={{
-          height: 56,
-          borderRadius: 12,
-          alignItems: 'center',
-          justifyContent: 'center',
-          backgroundColor:
-            formComplete && !isPending ? '#00450d' : 'transparent',
-          borderWidth: formComplete && !isPending ? 0 : 1,
-          borderColor: '#E5E7EB',
-        }}
-      >
-        <Text style={{ fontSize: 17, fontWeight: '800', color: formComplete && !isPending ? '#fff' : '#9CA3AF' }}>
-          {isPending ? 'Registering…' : 'Register Truck'}
-        </Text>
-        <Text style={{ fontSize: 10, color: formComplete && !isPending ? '#fff' : '#9CA3AF', opacity: 0.85 }}>
-          {isPending ? 'रजिस्टर हो रही है…' : 'गाड़ी रजिस्टर करें'}
-        </Text>
-      </Pressable>
+      {/* Row 2: submit buttons */}
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        <Pressable
+          testID="submit-add-another-truck-button"
+          onPress={onSubmitAndAddAnother}
+          disabled={!formComplete || isPending}
+          style={{
+            flex: 1,
+            height: 56,
+            borderRadius: 12,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor: '#FFFFFF',
+            borderWidth: 1,
+            borderColor: formComplete && !isPending ? '#00450d' : '#E5E7EB',
+          }}
+        >
+          <Text style={{ fontSize: 13, fontWeight: '800', color: formComplete && !isPending ? '#00450d' : '#9CA3AF' }}>
+            Save + Add More
+          </Text>
+          <Text style={{ fontSize: 10, color: formComplete && !isPending ? '#00450d' : '#9CA3AF', opacity: 0.85 }}>
+            और गाड़ी
+          </Text>
+        </Pressable>
+
+        <Pressable
+          testID="submit-truck-button"
+          onPress={onSubmit}
+          disabled={!formComplete || isPending}
+          style={{
+            flex: 1,
+            height: 56,
+            borderRadius: 12,
+            alignItems: 'center',
+            justifyContent: 'center',
+            backgroundColor:
+              formComplete && !isPending ? '#00450d' : 'transparent',
+            borderWidth: formComplete && !isPending ? 0 : 1,
+            borderColor: '#E5E7EB',
+          }}
+        >
+          <Text style={{ fontSize: 15, fontWeight: '800', color: formComplete && !isPending ? '#fff' : '#9CA3AF' }}>
+            {isPending ? 'Registering…' : 'Register Truck'}
+          </Text>
+          <Text style={{ fontSize: 10, color: formComplete && !isPending ? '#fff' : '#9CA3AF', opacity: 0.85 }}>
+            {isPending ? 'रजिस्टर हो रही है…' : 'सेव करें'}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -198,6 +190,7 @@ export default function RegisterTruckScreen() {
   const router = useRouter();
   const { shop } = useShop();
   const queryClient = useQueryClient();
+  const isMemberMode = useMemberMode();
 
   const [truckNumber, setTruckNumber] = useState('');
   const [senderName, setSenderName] = useState('');
@@ -205,55 +198,176 @@ export default function RegisterTruckScreen() {
   const [chlNumber, setChlNumber] = useState('');
   const [totalKg, setTotalKg] = useState('');
   const [freightAmount, setFreightAmount] = useState('');
-  const [gradeWeights, setGradeWeights] = useState<Record<string, string>>({});
+  const [gradeBreakdownOpen, setGradeBreakdownOpen] = useState(false);
+  const [gradeRows, setGradeRows] = useState([{ gradeLabel: '', weightKg: '' }]);
+  const [referenceSlipNumber, setReferenceSlipNumber] = useState(() => makeReferenceSlipNumber());
   const [success, setSuccess] = useState(false);
+  const submitModeRef = useRef<'done' | 'add-another'>('done');
+  const referenceSlipRef = useRef<View>(null);
+  const chlRef = useRef<TextInput>(null);
+  const senderNameRef = useRef<TextInput>(null);
+  const senderCodeRef = useRef<TextInput>(null);
+  const totalKgRef = useRef<TextInput>(null);
+  const freightRef = useRef<TextInput>(null);
+  const scrollRef = useRef<any>(null);
+  const sectionY = useRef<Record<string, number>>({});
+
+  const rememberSection = (key: string) => (event: any) => {
+    sectionY.current[key] = event.nativeEvent.layout.y;
+  };
+
+  const scrollToSection = (key: string) => {
+    const y = sectionY.current[key] ?? 0;
+    scrollRef.current?.scrollToPosition?.(0, Math.max(0, y - 12), true);
+    scrollRef.current?.scrollTo?.({ y: Math.max(0, y - 12), animated: true });
+  };
 
   const grades = shop?.grades ?? [];
-  const totalEntered = grades.reduce(
-    (s, g) => s + (parseFloat(gradeWeights[g.code] ?? '0') || 0),
-    0
+  const firmGradeRows = useMemo(
+    () => grades.map((grade) => ({
+      gradeLabel: grade.code,
+      weightKg: '',
+    })),
+    [grades],
   );
   const totalKgNum = parseFloat(totalKg) || 0;
-  const diff = Math.abs(totalKgNum - totalEntered);
+  const totalGradedWeight = gradeBreakdownOpen
+    ? gradeRows.reduce((sum, row) => sum + (parseFloat(row.weightKg) || 0), 0)
+    : 0;
+  const remainingUngraded = totalKgNum - totalGradedWeight;
   const formComplete = truckNumber.trim() !== '' && senderName.trim() !== '' && totalKgNum > 0;
+  const referenceSlipReady = truckNumber.trim() !== '' && totalKgNum > 0;
+  const referenceSlipRows = gradeBreakdownOpen ? normalizeGradeRows(gradeRows) : [];
+
+  const goBack = () => {
+    if (isMemberMode) {
+      router.replace('/member-trucks' as any);
+      return;
+    }
+    router.replace('/(tabs)/trucks' as any);
+  };
+
+  const goToTrucks = () => {
+    router.replace((isMemberMode ? '/member-trucks' : '/(tabs)/trucks') as any);
+  };
+
+  useEffect(() => {
+    if (isMemberMode === undefined) return undefined;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      router.replace((isMemberMode ? '/member-trucks' : '/(tabs)/trucks') as any);
+      return true;
+    });
+    return () => subscription.remove();
+  }, [isMemberMode, router]);
+
+  useEffect(() => {
+    if (!gradeBreakdownOpen || grades.length === 0) return;
+    setGradeRows((rows) => {
+      const hasOnlyBlankRow = rows.length === 1 && !rows[0].gradeLabel.trim() && !rows[0].weightKg.trim();
+      if (!hasOnlyBlankRow) return rows;
+      return firmGradeRows;
+    });
+  }, [firmGradeRows, gradeBreakdownOpen, grades.length]);
 
   const mutation = useMutation({
-    mutationFn: (payload: object) => api.post('/api/trucks', payload),
+    mutationFn: async (payload: Record<string, unknown>) => {
+      const { data, error } = await supabase
+        .from('trucks')
+        .insert(payload)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return data;
+    },
     onSuccess: () => {
-      const startOfToday = new Date();
-      startOfToday.setHours(0, 0, 0, 0);
       queryClient.invalidateQueries({ queryKey: ['trucks', shop?.shopId] });
+      if (submitModeRef.current === 'add-another') {
+        setTruckNumber('');
+        setSenderName('');
+        setSenderCode('');
+        setChlNumber('');
+        setTotalKg('');
+        setFreightAmount('');
+        mutation.reset();
+        return;
+      }
       setSuccess(true);
     },
   });
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (addAnother = false) => {
     if (!shop?.shopId || !formComplete || mutation.isPending) return;
+    if (gradeBreakdownOpen) {
+      if (totalGradedWeight > totalKgNum) return;
+      const invalidRow = gradeRows.some((row) => (parseFloat(row.weightKg) || 0) > 0 && !row.gradeLabel.trim());
+      if (invalidRow) return;
+    }
+    submitModeRef.current = addAnother ? 'add-another' : 'done';
 
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
+    const businessDate = getCurrentBusinessDate();
 
-    const gradeInventory: GradeInventory[] = grades.map((g) => ({
-      code: g.code,
-      name: g.name,
-      totalKg: parseFloat(gradeWeights[g.code] ?? '0') || 0,
-      confirmedKg: 0,
-      provisionalKg: 0,
-    }));
+    const validGradeRows = gradeBreakdownOpen
+      ? gradeRows
+          .map((row) => ({ gradeLabel: row.gradeLabel.trim(), weightKg: parseFloat(row.weightKg) || 0 }))
+          .filter((row) => row.gradeLabel && row.weightKg > 0)
+      : [];
 
-    mutation.mutate({
-      shopId: shop.shopId,
-      truckNumber: truckNumber.toUpperCase(),
-      senderName,
-      senderCode,
-      chlNumber,
-      totalKg: totalKgNum,
-      freightAmount: parseFloat(freightAmount) || 0,
-      gradeInventory,
-      status: 'ACTIVE',
-      date: startOfToday.getTime(),
-      createdAt: Date.now(),
+    const gradeInventory: GradeInventory[] = grades.map((g) => {
+      const match = validGradeRows.find((r) => r.gradeLabel === g.code);
+      return {
+        code: g.code,
+        name: g.name,
+        totalKg: match ? match.weightKg : 0,
+        confirmedKg: 0,
+        provisionalKg: 0,
+      };
     });
+
+    const { data: truckData, error } = await supabase
+      .from('trucks')
+      .insert({
+      shop_id: shop.shopId,
+      truck_number: truckNumber.toUpperCase(),
+      sender_name: senderName,
+      sender_code: senderCode,
+      chl_number: chlNumber,
+      total_kg: totalKgNum,
+      freight_amount: parseFloat(freightAmount) || 0,
+      grade_inventory: gradeInventory,
+      reference_slip_number: referenceSlipNumber,
+      status: 'ACTIVE',
+      date: businessDate.getTime(),
+      created_at: Date.now(),
+      })
+      .select()
+      .single();
+    if (error) {
+      Alert.alert('Could not register truck', error.message);
+      return;
+    }
+    if (validGradeRows.length > 0) {
+      await supabase.from('truck_grade_entries').insert(validGradeRows.map((row) => ({
+        id: `${truckData.id}-${row.gradeLabel}-${Date.now()}`.replace(/\s+/g, '-'),
+        truck_id: truckData.id,
+        grade_label: row.gradeLabel,
+        weight_kg: row.weightKg,
+        created_at: Date.now(),
+      })));
+    }
+    queryClient.invalidateQueries({ queryKey: ['trucks', shop?.shopId] });
+    if (submitModeRef.current === 'add-another') {
+      setTruckNumber('');
+      setSenderName('');
+      setSenderCode('');
+      setChlNumber('');
+      setTotalKg('');
+      setFreightAmount('');
+      setGradeRows(firmGradeRows.length > 0 ? firmGradeRows : [{ gradeLabel: '', weightKg: '' }]);
+      setGradeBreakdownOpen(false);
+      setReferenceSlipNumber(makeReferenceSlipNumber());
+      return;
+    }
+    setSuccess(true);
   };
 
   const resetForm = () => {
@@ -263,9 +377,30 @@ export default function RegisterTruckScreen() {
     setChlNumber('');
     setTotalKg('');
     setFreightAmount('');
-    setGradeWeights({});
+    setGradeRows(firmGradeRows.length > 0 ? firmGradeRows : [{ gradeLabel: '', weightKg: '' }]);
+    setGradeBreakdownOpen(false);
+    setReferenceSlipNumber(makeReferenceSlipNumber());
     setSuccess(false);
     mutation.reset();
+  };
+
+  const shareReferenceSlip = async () => {
+    if (!referenceSlipReady || !referenceSlipRef.current) return;
+    try {
+      const available = await Sharing.isAvailableAsync();
+      if (!available) {
+        Alert.alert('Sharing unavailable', 'Reference slip sharing is not available on this device.');
+        return;
+      }
+      const uri = await captureRef(referenceSlipRef, { format: 'jpg', quality: 1, result: 'tmpfile' });
+      await Sharing.shareAsync(uri, {
+        mimeType: 'image/jpeg',
+        UTI: 'public.jpeg',
+        dialogTitle: 'Share reference slip',
+      });
+    } catch {
+      Alert.alert('Reference Slip', 'Could not create the reference slip image.');
+    }
   };
 
   // ── success screen (unchanged) ──────────────────────────────────────────────
@@ -322,7 +457,7 @@ export default function RegisterTruckScreen() {
           </Pressable>
           <Pressable
             testID="go-home-after-register"
-            onPress={() => router.replace('/(tabs)/trucks')}
+            onPress={goToTrucks}
             style={{
               flex: 1,
               height: 56,
@@ -352,15 +487,14 @@ export default function RegisterTruckScreen() {
           gap: 10,
           paddingHorizontal: 16,
           paddingVertical: 12,
-          backgroundColor: '#fff',
-          borderBottomWidth: 1,
-          borderBottomColor: '#E5E7EB',
+          backgroundColor: Colors.primary,
+          borderBottomWidth: 0,
         }}
       >
-        <Pressable testID="back-from-register" onPress={() => router.back()} style={{ padding: 4 }}>
-          <ArrowLeft size={24} color="#1a3c20" />
+        <Pressable testID="back-from-register" onPress={goBack} style={{ padding: 4 }}>
+          <ArrowLeft size={24} color="#FFFFFF" />
         </Pressable>
-        <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: '#1a3c20' }}>
+        <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: '#FFFFFF' }}>
           Register New Truck / नई गाड़ी
         </Text>
       </View>
@@ -369,13 +503,16 @@ export default function RegisterTruckScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
       >
-        <ScrollView
+        <KeyboardAwareScrollView
+          ref={scrollRef}
           contentContainerStyle={{ paddingBottom: 200 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          bottomOffset={200}
         >
           {/* ── Section label ──────────────────────────────────────────────── */}
           <Text
+            onLayout={rememberSection('details')}
             style={{
               fontSize: 13,
               fontWeight: '600',
@@ -416,6 +553,8 @@ export default function RegisterTruckScreen() {
                   value={truckNumber}
                   onChangeText={(v) => setTruckNumber(v.toUpperCase())}
                   autoCapitalize="characters"
+                  returnKeyType="next"
+                  onSubmitEditing={() => chlRef.current?.focus()}
                 />
               </GridField>
 
@@ -428,6 +567,9 @@ export default function RegisterTruckScreen() {
                   placeholderTextColor="#c0c9bb"
                   value={chlNumber}
                   onChangeText={setChlNumber}
+                  ref={chlRef}
+                  returnKeyType="next"
+                  onSubmitEditing={() => senderNameRef.current?.focus()}
                 />
               </GridField>
 
@@ -440,6 +582,9 @@ export default function RegisterTruckScreen() {
                   placeholderTextColor="#c0c9bb"
                   value={senderName}
                   onChangeText={setSenderName}
+                  ref={senderNameRef}
+                  returnKeyType="next"
+                  onSubmitEditing={() => senderCodeRef.current?.focus()}
                 />
               </GridField>
 
@@ -453,6 +598,9 @@ export default function RegisterTruckScreen() {
                   value={senderCode}
                   onChangeText={(v) => setSenderCode(v.toUpperCase())}
                   autoCapitalize="characters"
+                  ref={senderCodeRef}
+                  returnKeyType="next"
+                  onSubmitEditing={() => totalKgRef.current?.focus()}
                 />
               </GridField>
 
@@ -466,6 +614,9 @@ export default function RegisterTruckScreen() {
                   value={totalKg}
                   onChangeText={setTotalKg}
                   keyboardType="numeric"
+                  ref={totalKgRef}
+                  returnKeyType="next"
+                  onSubmitEditing={() => freightRef.current?.focus()}
                 />
               </GridField>
 
@@ -508,114 +659,162 @@ export default function RegisterTruckScreen() {
                     value={freightAmount}
                     onChangeText={setFreightAmount}
                     keyboardType="numeric"
-                  />
-                </View>
-              </GridField>
+                  ref={freightRef}
+                  returnKeyType="done"
+                  onSubmitEditing={() => scrollToSection('grades')}
+                />
+              </View>
+            </GridField>
             </View>
           </View>
 
-          {/* ── Inventory section header ───────────────────────────────────── */}
+
+
           <View
+            onLayout={rememberSection('grades')}
             style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              paddingHorizontal: 16,
+              backgroundColor: '#fff',
+              borderWidth: 1,
+              borderColor: '#E5E7EB',
+              borderRadius: 8,
+              padding: 10,
+              marginHorizontal: 16,
               marginBottom: 12,
             }}
           >
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#00450d' }}>
-              Inventory Breakdown / माल का विवरण
-            </Text>
-            <View
-              style={{
-                backgroundColor: '#dbf1fe',
-                borderRadius: 20,
-                paddingHorizontal: 12,
-                paddingVertical: 4,
+            <Pressable
+              testID="toggle-grade-breakdown"
+              onPress={() => {
+                if (!gradeBreakdownOpen && grades.length > 0) {
+                  setGradeRows((rows) => {
+                    const hasOnlyBlankRow = rows.length === 1 && !rows[0].gradeLabel.trim() && !rows[0].weightKg.trim();
+                    return hasOnlyBlankRow ? firmGradeRows : rows;
+                  });
+                }
+                setGradeBreakdownOpen((open) => !open);
+                setTimeout(() => scrollToSection('grades'), 80);
               }}
+              style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8 }}
             >
-              <Text style={{ fontSize: 12, fontWeight: '600', color: '#003d65' }}>
-                {grades.length} Grades
+              {gradeBreakdownOpen ? <ChevronDown size={18} color="#00450d" /> : <ChevronRight size={18} color="#00450d" />}
+              <Text style={{ flex: 1, fontSize: 13, fontWeight: '800', color: '#00450d' }}>
+                Add grade-wise weight breakdown (optional)
+              </Text>
+            </Pressable>
+
+            {gradeBreakdownOpen ? (
+              <View style={{ gap: 10, marginTop: 8 }}>
+                {grades.length > 0 ? (
+                  <Text style={{ fontSize: 12, color: '#64748B', lineHeight: 18 }}>
+                    Firm grades are prefilled from settings. Enter weights only for grades present in this truck.
+                  </Text>
+                ) : null}
+                {gradeRows.map((row, index) => (
+                  <View key={index} style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+                    <TextInput
+                      testID={`grade-label-${index}`}
+                      style={{ ...inputStyle, flex: 1, minHeight: 44, height: 44 }}
+                      placeholder="Grade"
+                      placeholderTextColor="#c0c9bb"
+                      value={row.gradeLabel}
+                      onChangeText={(value) => setGradeRows((rows) => rows.map((r, i) => i === index ? { ...r, gradeLabel: value } : r))}
+                      returnKeyType="next"
+                    />
+                    <TextInput
+                      testID={`grade-weight-${index}`}
+                      style={{ ...inputStyle, flex: 1, minHeight: 44, height: 44 }}
+                      placeholder="Weight kg"
+                      placeholderTextColor="#c0c9bb"
+                      value={row.weightKg}
+                      onChangeText={(value) => setGradeRows((rows) => rows.map((r, i) => i === index ? { ...r, weightKg: value } : r))}
+                      keyboardType="decimal-pad"
+                      returnKeyType="next"
+                    />
+                    <Pressable
+                      testID={`remove-grade-row-${index}`}
+                      onPress={() => setGradeRows((rows) => rows.length === 1 ? rows : rows.filter((_, i) => i !== index))}
+                      style={{ width: 44, height: 44, borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <X size={18} color="#B71C1C" />
+                    </Pressable>
+                  </View>
+                ))}
+                <Pressable
+                  testID="add-grade-row"
+                  onPress={() => {
+                    setGradeRows((rows) => [...rows, { gradeLabel: '', weightKg: '' }]);
+                    setTimeout(() => scrollToSection('grades'), 80);
+                  }}
+                  style={{ minHeight: 44, borderRadius: 8, borderWidth: 1, borderColor: '#00450d', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 6 }}
+                >
+                  <Plus size={16} color="#00450d" />
+                  <Text style={{ fontSize: 12, fontWeight: '800', color: '#00450d' }}>Add Grade</Text>
+                </Pressable>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                  <View style={{ width: '48%', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 10 }}>
+                    <Text style={{ fontSize: 11, color: '#64748B' }}>Total Graded Weight</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '900', color: '#071e27' }}>{toIndianWeight(totalGradedWeight)}</Text>
+                  </View>
+                  <View style={{ width: '48%', borderWidth: 1, borderColor: remainingUngraded < 0 ? '#B71C1C' : '#E5E7EB', borderRadius: 8, padding: 10 }}>
+                    <Text style={{ fontSize: 11, color: '#64748B' }}>Ungraded / Remaining</Text>
+                    <Text style={{ fontSize: 14, fontWeight: '900', color: remainingUngraded < 0 ? '#B71C1C' : '#071e27' }}>{toIndianWeight(remainingUngraded)}</Text>
+                  </View>
+                </View>
+              </View>
+            ) : null}
+          </View>
+
+          {/* ── Inventory explanation ─────────────────────────────────────── */}
+          <View
+            onLayout={rememberSection('saveHint')}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'flex-start',
+              gap: 10,
+              backgroundColor: '#E8F5E9',
+              borderWidth: 1,
+              borderColor: '#B7DDBA',
+              borderRadius: 12,
+              marginHorizontal: 16,
+              padding: 14,
+            }}
+          >
+            <Info size={20} color="#00450d" />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: '#00450d' }}>
+                No grade estimate needed
+              </Text>
+              <Text style={{ fontSize: 12, color: '#41493e', marginTop: 4, lineHeight: 18 }}>
+                Mosambi grade is selected while making each bill. Truck detail will total grade-wise sacks and weight automatically.
               </Text>
             </View>
           </View>
-
-          {/* ── Grade Grid ────────────────────────────────────────────────── */}
-          <View
-            style={{
-              flexDirection: 'row',
-              flexWrap: 'wrap',
-              paddingHorizontal: 16,
-            }}
-          >
-            {grades.map((grade) => (
-              <View
-                key={grade.code}
-                style={{
-                  width: '47%',
-                  backgroundColor: '#fff',
-                  borderWidth: 1,
-                  borderColor: '#E5E7EB',
-                  borderRadius: 12,
-                  padding: 14,
-                  elevation: 1,
-                  marginRight: 12,
-                  marginBottom: 12,
-                }}
-              >
-                <Text style={{ fontSize: 15, fontWeight: '700', color: '#071e27' }}>
-                  {grade.name}
-                </Text>
-                <Text style={{ fontSize: 11, color: '#41493e', marginTop: 2 }}>
-                  {grade.code}
-                </Text>
-                <View
-                  style={{
-                    flexDirection: 'row',
-                    alignItems: 'center',
-                    gap: 8,
-                    marginTop: 10,
-                  }}
-                >
-                  <TextInput
-                    testID={`grade-weight-${grade.code}`}
-                    style={{
-                      flex: 1,
-                      height: 48,
-                      borderBottomWidth: 1,
-                      borderBottomColor: '#c0c9bb',
-                      textAlign: 'right',
-                      fontSize: 18,
-                      fontWeight: '700',
-                      color: '#00450d',
-                      backgroundColor: 'transparent',
-                    }}
-                    placeholder="0"
-                    placeholderTextColor="#c0c9bb"
-                    keyboardType="numeric"
-                    value={gradeWeights[grade.code] ?? ''}
-                    onChangeText={(v) =>
-                      setGradeWeights((prev) => ({ ...prev, [grade.code]: v }))
-                    }
-                  />
-                  <Text style={{ fontSize: 13, color: '#64748B', fontWeight: '600' }}>kg</Text>
-                </View>
-              </View>
-            ))}
-          </View>
-        </ScrollView>
+        </KeyboardAwareScrollView>
 
         {/* ── Fixed bottom action bar ────────────────────────────────────── */}
         <BottomBar
-          totalEntered={totalEntered}
           totalKgNum={totalKgNum}
-          diff={diff}
           formComplete={formComplete}
           isPending={mutation.isPending}
-          onSubmit={handleSubmit}
+          onSubmit={() => handleSubmit(false)}
+          onSubmitAndAddAnother={() => handleSubmit(true)}
         />
       </KeyboardAvoidingView>
+
+      <View style={{ position: 'absolute', left: -1200, top: 0 }}>
+        <View ref={referenceSlipRef} collapsable={false}>
+          <ReferenceSlipCard
+            shop={shop}
+            slipNumber={referenceSlipNumber}
+            generatedAt={Date.now()}
+            itemName={shop?.commodity ?? 'Item'}
+            truckNumber={truckNumber.trim().toUpperCase() || 'Truck / Lot'}
+            totalKg={totalKgNum}
+            gradeRows={referenceSlipRows}
+            status="draft"
+          />
+        </View>
+      </View>
     </SafeAreaView>
   );
 }

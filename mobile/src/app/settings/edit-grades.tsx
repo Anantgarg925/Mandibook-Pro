@@ -173,7 +173,7 @@ export default function EditGradesScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top', 'bottom']}>
       <View
         style={{
           flexDirection: 'row',
@@ -181,15 +181,14 @@ export default function EditGradesScreen() {
           gap: Spacing.sm,
           paddingHorizontal: Spacing.md,
           paddingVertical: Spacing.sm,
-          backgroundColor: Colors.surface,
-          borderBottomWidth: 1,
-          borderBottomColor: Colors.border,
+          backgroundColor: Colors.primary,
+          borderBottomWidth: 0,
         }}
       >
         <Pressable testID="grades-back" onPress={() => router.back()} style={{ padding: 4 }}>
-          <ArrowLeft size={24} color={Colors.text} />
+          <ArrowLeft size={24} color="#FFFFFF" />
         </Pressable>
-        <Text style={{ flex: 1, fontSize: FontSize.lg, fontWeight: '800', color: Colors.text }}>
+        <Text style={{ flex: 1, fontSize: FontSize.lg, fontWeight: '800', color: '#FFFFFF' }}>
           Grades / ग्रेड
         </Text>
         <Pressable
@@ -200,7 +199,7 @@ export default function EditGradesScreen() {
             paddingVertical: 8,
             paddingHorizontal: Spacing.md,
             borderRadius: Radius.round,
-            backgroundColor: saving ? Colors.border : pressed ? Colors.primaryPressed : Colors.primary,
+            backgroundColor: saving ? Colors.border : pressed ? Colors.primaryPressed : 'rgba(255, 255, 255, 0.2)',
           })}
         >
           {saving ? (

@@ -105,7 +105,7 @@ export default function EditChargesScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top', 'bottom']}>
       <View
         style={{
           flexDirection: 'row',
@@ -113,37 +113,19 @@ export default function EditChargesScreen() {
           gap: Spacing.sm,
           paddingHorizontal: Spacing.md,
           paddingVertical: Spacing.sm,
-          backgroundColor: Colors.surface,
-          borderBottomWidth: 1,
-          borderBottomColor: Colors.border,
+          backgroundColor: Colors.primary,
+          borderBottomWidth: 0,
         }}
       >
         <Pressable testID="charges-back" onPress={() => router.back()} style={{ padding: 4 }}>
-          <ArrowLeft size={24} color={Colors.text} />
+          <ArrowLeft size={24} color="#FFFFFF" />
         </Pressable>
-        <Text style={{ flex: 1, fontSize: FontSize.lg, fontWeight: '800', color: Colors.text }}>
+        <Text style={{ flex: 1, fontSize: FontSize.lg, fontWeight: '800', color: '#FFFFFF' }}>
           Charges / कमीशन
         </Text>
-        <Pressable
-          testID="save-charges"
-          onPress={handleSave}
-          disabled={saving}
-          style={({ pressed }) => ({
-            paddingVertical: 8,
-            paddingHorizontal: Spacing.md,
-            borderRadius: Radius.round,
-            backgroundColor: saving ? Colors.border : pressed ? Colors.primaryPressed : Colors.primary,
-          })}
-        >
-          {saving ? (
-            <ActivityIndicator color="#FFF" size="small" />
-          ) : (
-            <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: '#FFF' }}>Save</Text>
-          )}
-        </Pressable>
       </View>
 
-      <ScrollView>
+      <ScrollView contentContainerStyle={{ paddingBottom: 96 }}>
         <ChargeRow
           testID="charge-apmc"
           label="APMC Commission %"
@@ -180,6 +162,36 @@ export default function EditChargesScreen() {
           onChange={set('telePost')}
         />
       </ScrollView>
+
+      <View
+        style={{
+          padding: Spacing.md,
+          backgroundColor: Colors.surface,
+          borderTopWidth: 1,
+          borderTopColor: Colors.border,
+        }}
+      >
+        <Pressable
+          testID="save-charges"
+          onPress={handleSave}
+          disabled={saving}
+          style={({ pressed }) => ({
+            height: 56,
+            borderRadius: Radius.md,
+            backgroundColor: saving ? Colors.border : pressed ? Colors.primaryPressed : Colors.primary,
+            alignItems: 'center',
+            justifyContent: 'center',
+          })}
+        >
+          {saving ? (
+            <ActivityIndicator color="#FFF" size="small" />
+          ) : (
+            <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: '#FFF' }}>
+              Save Changes
+            </Text>
+          )}
+        </Pressable>
+      </View>
     </SafeAreaView>
   );
 }

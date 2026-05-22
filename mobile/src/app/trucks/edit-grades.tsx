@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, ScrollView, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { supabase, mapTruck } from '@/lib/supabase';
 import { useShop } from '@/context/ShopContext';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import type { Truck, GradeInventory } from '@/types/truck';
@@ -14,10 +14,20 @@ export default function EditGradesScreen() {
   const { truckId } = useLocalSearchParams<{ truckId: string }>();
   const { shop } = useShop();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
 
   const { data: truck } = useQuery({
     queryKey: ['truck', shop?.shopId, truckId],
-    queryFn: () => api.get<Truck>(`/api/trucks/${truckId}?shopId=${shop!.shopId}`),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('trucks')
+        .select('*')
+        .eq('shop_id', shop!.shopId)
+        .eq('id', truckId)
+        .single();
+      if (error) throw new Error(error.message);
+      return mapTruck(data as Record<string, unknown>);
+    },
     enabled: !!shop?.shopId && !!truckId,
   });
 
@@ -34,8 +44,16 @@ export default function EditGradesScreen() {
   }, [truck]);
 
   const mutation = useMutation({
-    mutationFn: (gradeInventory: GradeInventory[]) =>
-      api.put<Truck>(`/api/trucks/${truckId}`, { gradeInventory }),
+    mutationFn: async (gradeInventory: GradeInventory[]) => {
+      const { data, error } = await supabase
+        .from('trucks')
+        .update({ grade_inventory: gradeInventory })
+        .eq('id', truckId)
+        .select()
+        .single();
+      if (error) throw new Error(error.message);
+      return data;
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['truck', shop?.shopId, truckId] });
       queryClient.invalidateQueries({ queryKey: ['trucks', shop?.shopId] });
@@ -68,14 +86,14 @@ export default function EditGradesScreen() {
       <View style={{
         flexDirection: 'row', alignItems: 'center', gap: Spacing.sm,
         paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm,
-        backgroundColor: Colors.surface, borderBottomWidth: 1, borderBottomColor: Colors.border,
+        backgroundColor: Colors.primary, borderBottomWidth: 0,
       }}>
         <Pressable testID="back-edit-grades" onPress={() => router.back()} style={{ padding: 4 }}>
-          <ArrowLeft size={24} color={Colors.text} />
+          <ArrowLeft size={24} color="#FFFFFF" />
         </Pressable>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: Colors.text }}>Grade Estimate</Text>
-          <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>{truck.truckNumber} — अनुमानित वजन बदलें</Text>
+          <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: '#FFFFFF' }}>Grade Estimate</Text>
+          <Text style={{ fontSize: FontSize.xs, color: 'rgba(255, 255, 255, 0.8)' }}>{truck.truckNumber} — अनुमानित वजन बदलें</Text>
         </View>
       </View>
 
@@ -127,7 +145,7 @@ export default function EditGradesScreen() {
         {/* Save button */}
         <View style={{
           position: 'absolute', bottom: 0, left: 0, right: 0,
-          padding: Spacing.md, backgroundColor: Colors.background,
+          padding: Spacing.md, paddingBottom: Spacing.md + insets.bottom, backgroundColor: Colors.background,
           borderTopWidth: 1, borderTopColor: Colors.border,
         }}>
           <Pressable
@@ -139,7 +157,7 @@ export default function EditGradesScreen() {
               backgroundColor: mutation.isPending ? Colors.border : Colors.primary,
             }}
           >
-            <Text style={{ fontSize: FontSize.md, color: '#FFF', fontWeight: '700' }}>
+            <Text style={{ fontSize: FontSize.md, color: mutation.isPending ? Colors.textSecond : '#FFF', fontWeight: '700' }}>
               {mutation.isPending ? 'सेव हो रहा है…' : 'अनुमान सेव करें'}
             </Text>
           </Pressable>

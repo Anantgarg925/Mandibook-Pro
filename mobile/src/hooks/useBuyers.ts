@@ -1,16 +1,26 @@
 import { useQuery } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { supabase, mapBuyer, mapInquiry, mapTransaction } from '@/lib/supabase';
 import { useShop } from '@/context/ShopContext';
-import type { Buyer, Transaction } from '@/types/inquiry';
+import type { Buyer, Inquiry, Transaction } from '@/types/inquiry';
+import { archiveQueryOptions } from '@/lib/queryOptions';
 
 export function useBuyers() {
   const { shop } = useShop();
 
   const { data: buyers = [], isLoading: loading } = useQuery({
     queryKey: ['buyers', shop?.shopId],
-    queryFn: () => api.get<Buyer[]>(`/api/buyers?shopId=${shop!.shopId}`),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('buyers')
+        .select('*')
+        .eq('shop_id', shop!.shopId)
+        .neq('code', '__cashbook__')
+        .order('name', { ascending: true });
+      if (error) throw new Error(error.message);
+      return (data ?? []).map((r) => mapBuyer(r as Record<string, unknown>)) as Buyer[];
+    },
     enabled: !!shop?.shopId,
-    refetchInterval: 15000,
+    ...archiveQueryOptions,
   });
 
   const getBuyer = (code: string) => buyers.find((b) => b.code === code) ?? null;
@@ -23,13 +33,42 @@ export function useBuyerTransactions(buyerCode: string) {
 
   const { data: transactions = [], isLoading: loading } = useQuery({
     queryKey: ['transactions', shop?.shopId, buyerCode],
-    queryFn: () =>
-      api.get<Transaction[]>(
-        `/api/transactions?shopId=${shop!.shopId}&buyerCode=${buyerCode}`
-      ),
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('shop_id', shop!.shopId)
+        .eq('buyer_code', buyerCode)
+        .order('date', { ascending: false });
+      if (error) throw new Error(error.message);
+      return (data ?? []).map((r) => mapTransaction(r as Record<string, unknown>)) as Transaction[];
+    },
     enabled: !!shop?.shopId && !!buyerCode,
-    refetchInterval: 15000,
+    ...archiveQueryOptions,
   });
 
   return { transactions, loading };
+}
+
+export function useBuyerBills(buyerName?: string) {
+  const { shop } = useShop();
+
+  const { data: bills = [], isLoading: loading } = useQuery({
+    queryKey: ['buyer-bills', shop?.shopId, buyerName],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('inquiries')
+        .select('*')
+        .eq('shop_id', shop!.shopId)
+        .eq('customer_name', buyerName!)
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false });
+      if (error) throw new Error(error.message);
+      return (data ?? []).map((r) => mapInquiry(r as Record<string, unknown>)) as Inquiry[];
+    },
+    enabled: !!shop?.shopId && !!buyerName,
+    ...archiveQueryOptions,
+  });
+
+  return { bills, loading };
 }

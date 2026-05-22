@@ -13,6 +13,7 @@ import { useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import { useShop } from '@/context/ShopContext';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
+import ActionButton from '@/components/ui/ActionButton';
 
 function Field({
   label,
@@ -100,7 +101,7 @@ export default function EditFirmScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top', 'bottom']}>
       <View
         style={{
           flexDirection: 'row',
@@ -108,37 +109,19 @@ export default function EditFirmScreen() {
           gap: Spacing.sm,
           paddingHorizontal: Spacing.md,
           paddingVertical: Spacing.sm,
-          backgroundColor: Colors.surface,
-          borderBottomWidth: 1,
-          borderBottomColor: Colors.border,
+          backgroundColor: Colors.primary,
+          borderBottomWidth: 0,
         }}
       >
         <Pressable testID="firm-back" onPress={() => router.back()} style={{ padding: 4 }}>
-          <ArrowLeft size={24} color={Colors.text} />
+          <ArrowLeft size={24} color="#FFFFFF" />
         </Pressable>
-        <Text style={{ flex: 1, fontSize: FontSize.lg, fontWeight: '800', color: Colors.text }}>
+        <Text style={{ flex: 1, fontSize: FontSize.lg, fontWeight: '800', color: '#FFFFFF' }}>
           Firm Profile
         </Text>
-        <Pressable
-          testID="save-firm"
-          onPress={handleSave}
-          disabled={saving}
-          style={({ pressed }) => ({
-            paddingVertical: 8,
-            paddingHorizontal: Spacing.md,
-            borderRadius: Radius.round,
-            backgroundColor: saving ? Colors.border : pressed ? Colors.primaryPressed : Colors.primary,
-          })}
-        >
-          {saving ? (
-            <ActivityIndicator color="#FFF" size="small" />
-          ) : (
-            <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: '#FFF' }}>Save</Text>
-          )}
-        </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingVertical: Spacing.sm }}>
+      <ScrollView contentContainerStyle={{ paddingVertical: Spacing.sm, paddingBottom: 96 }}>
         <Field
           testID="firm-name"
           label="FIRM NAME / दुकान का नाम"
@@ -194,6 +177,23 @@ export default function EditFirmScreen() {
           placeholder="name@upi"
         />
       </ScrollView>
+
+      <View
+        style={{
+          padding: Spacing.md,
+          backgroundColor: Colors.surface,
+          borderTopWidth: 1,
+          borderTopColor: Colors.border,
+        }}
+      >
+        <ActionButton
+          testID="save-firm"
+          label="Save Changes"
+          onPress={handleSave}
+          loading={saving}
+          disabled={saving}
+        />
+      </View>
     </SafeAreaView>
   );
 }

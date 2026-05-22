@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import { useShop } from '@/context/ShopContext';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
+import { supabase } from '@/lib/supabase';
 
 function PinInput({
   label,
@@ -56,15 +57,15 @@ function PinInput({
 
 export default function ChangePinScreen() {
   const router = useRouter();
-  const { shop, updateShop } = useShop();
+  const { shop, cacheShop } = useShop();
   const [currentPin, setCurrentPin] = useState('');
   const [newPin, setNewPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
-    if (currentPin !== shop?.adminPin) {
-      Alert.alert('Wrong PIN', 'Current PIN is incorrect.');
+    if (!shop?.shopId) {
+      Alert.alert('Error', 'Shop is not loaded.');
       return;
     }
     if (newPin.length < 4) {
@@ -77,19 +78,25 @@ export default function ChangePinScreen() {
     }
     setSaving(true);
     try {
-      await updateShop({ adminPin: newPin });
+      const { error } = await supabase.rpc('set_shop_admin_pin', {
+        p_shop_id: shop.shopId,
+        p_new_pin: newPin,
+        p_current_pin: currentPin,
+      });
+      if (error) throw new Error(error.message);
+      await cacheShop({ ...shop, adminPin: '' });
       Alert.alert('Done', 'PIN changed successfully.', [
         { text: 'OK', onPress: () => router.back() },
       ]);
-    } catch {
-      Alert.alert('Error', 'Could not save PIN.');
+    } catch (error) {
+      Alert.alert('Error', error instanceof Error ? error.message : 'Could not save PIN.');
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top', 'bottom']}>
       <View
         style={{
           flexDirection: 'row',
@@ -97,15 +104,14 @@ export default function ChangePinScreen() {
           gap: Spacing.sm,
           paddingHorizontal: Spacing.md,
           paddingVertical: Spacing.sm,
-          backgroundColor: Colors.surface,
-          borderBottomWidth: 1,
-          borderBottomColor: Colors.border,
+          backgroundColor: Colors.primary,
+          borderBottomWidth: 0,
         }}
       >
         <Pressable testID="pin-back" onPress={() => router.back()} style={{ padding: 4 }}>
-          <ArrowLeft size={24} color={Colors.text} />
+          <ArrowLeft size={24} color="#FFFFFF" />
         </Pressable>
-        <Text style={{ flex: 1, fontSize: FontSize.lg, fontWeight: '800', color: Colors.text }}>
+        <Text style={{ flex: 1, fontSize: FontSize.lg, fontWeight: '800', color: '#FFFFFF' }}>
           Change PIN
         </Text>
       </View>

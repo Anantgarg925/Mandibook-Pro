@@ -1,3 +1,14 @@
+import { Dimensions } from 'react-native';
+
+const { width } = Dimensions.get('window');
+// Base width standard (e.g., iPhone 12/13/14 Pro is 390, Android is ~360-380)
+const guidelineBaseWidth = 380;
+
+// Dynamic scaling function
+const scale = (size: number) => (width / guidelineBaseWidth) * size;
+// Moderate scale to ensure components don't shrink or grow excessively
+export const ms = (size: number, factor = 0.4) => Math.round(size + (scale(size) - size) * factor);
+
 export const Colors = {
   primary: '#1B5E20',
   primaryLight: '#2E7D32',
@@ -15,26 +26,26 @@ export const Colors = {
 } as const;
 
 export const Spacing = {
-  xs: 4,
-  sm: 8,
-  md: 16,
-  lg: 24,
-  xl: 32,
+  xs: ms(4),
+  sm: ms(8),
+  md: ms(14),
+  lg: ms(20),
+  xl: ms(28),
 } as const;
 
 export const FontSize = {
-  xs: 12,
-  sm: 14,
-  md: 16,
-  lg: 20,
-  xl: 24,
-  xxl: 28,
+  xs: ms(11),
+  sm: ms(12),
+  md: ms(14),
+  lg: ms(16),
+  xl: ms(20),
+  xxl: ms(24),
 } as const;
 
 export const Radius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
+  sm: ms(8),
+  md: ms(12),
+  lg: ms(14),
   round: 999,
 } as const;
 

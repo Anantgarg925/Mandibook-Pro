@@ -1,12 +1,14 @@
-import React, { useMemo } from 'react';
-import { View, Text, FlatList, Pressable } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useEffect, useMemo } from 'react';
+import { View, Text, FlatList, Pressable, BackHandler } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, AlertTriangle, CheckCircle, Truck, FileText } from 'lucide-react-native';
 import { useInquiries } from '@/hooks/useInquiries';
 import { useTodayTrucks } from '@/hooks/useTodayTrucks';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { toIndianCurrency } from '@/lib/formatters';
+import { useBillNotifications } from '@/context/BillNotificationContext';
+import { useMemberMode } from '@/hooks/useMemberMode';
 
 type Notification = {
   id: string;
@@ -27,6 +29,30 @@ export default function NotificationsScreen() {
   const router = useRouter();
   const { inquiries, pending } = useInquiries();
   const { trucks } = useTodayTrucks();
+  const { clearUnread } = useBillNotifications();
+  const isMemberMode = useMemberMode();
+  const insets = useSafeAreaInsets();
+
+  const goBack = () => {
+    if (isMemberMode) {
+      router.replace('/member-dashboard' as any);
+      return;
+    }
+    router.replace('/(tabs)' as any);
+  };
+
+  useEffect(() => {
+    clearUnread().catch(() => {});
+  }, [clearUnread]);
+
+  useEffect(() => {
+    if (isMemberMode === undefined) return undefined;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      router.replace((isMemberMode ? '/member-dashboard' : '/(tabs)') as any);
+      return true;
+    });
+    return () => subscription.remove();
+  }, [isMemberMode, router]);
 
   const notifications = useMemo(() => {
     const items: Notification[] = [];
@@ -52,7 +78,7 @@ export default function NotificationsScreen() {
     }
 
     for (const truck of trucks) {
-      const totalKg = truck.gradeInventory.reduce((s: number, g: any) => s + g.totalKg, 0);
+      const totalKg = truck.totalKg;
       const confirmedKg = truck.gradeInventory.reduce((s: number, g: any) => s + g.confirmedKg, 0);
       const provisionalKg = truck.gradeInventory.reduce((s: number, g: any) => s + g.provisionalKg, 0);
       const availableKg = Math.max(0, totalKg - confirmedKg - provisionalKg);
@@ -82,24 +108,24 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['bottom']}>
       <View style={{
+        paddingTop: insets.top + Spacing.sm,
         flexDirection: 'row',
         alignItems: 'center',
         gap: Spacing.sm,
         paddingHorizontal: Spacing.md,
-        paddingVertical: Spacing.sm,
-        backgroundColor: Colors.surface,
-        borderBottomWidth: 1,
-        borderBottomColor: Colors.border,
+        paddingBottom: Spacing.sm,
+        backgroundColor: Colors.primary,
+        borderBottomWidth: 0,
       }}>
-        <Pressable testID="notif-back" onPress={() => router.back()} style={{ padding: 4 }}>
-          <ArrowLeft size={24} color={Colors.text} />
+        <Pressable testID="notif-back" onPress={goBack} style={{ padding: 4 }}>
+          <ArrowLeft size={24} color="#FFFFFF" />
         </Pressable>
-        <Text style={{ flex: 1, fontSize: FontSize.lg, fontWeight: '800', color: Colors.text }}>
+        <Text style={{ flex: 1, fontSize: FontSize.lg, fontWeight: '800', color: '#FFFFFF' }}>
           Notifications
         </Text>
-        <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>
+        <Text style={{ fontSize: FontSize.xs, color: 'rgba(255, 255, 255, 0.8)' }}>
           {pending.length > 0 ? `${pending.length} pending` : null}
         </Text>
       </View>
@@ -117,7 +143,11 @@ export default function NotificationsScreen() {
               onPress={() => {
                 if (item.type === 'pending' || item.type === 'confirmed') {
                   const inquiryId = item.id.replace(/^(pending|confirmed)-/, '');
-                  router.push(`/bills/${inquiryId}` as any);
+                  if (item.type === 'confirmed') {
+                    router.push(`/slip/${inquiryId}` as any);
+                  } else {
+                    router.push({ pathname: '/authorization', params: { id: inquiryId } } as any);
+                  }
                 } else if (item.type === 'low_stock') {
                   const truckId = item.id.replace(/^low-/, '');
                   router.push(`/trucks/${truckId}` as any);

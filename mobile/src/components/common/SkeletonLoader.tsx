@@ -1,12 +1,5 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, ViewStyle } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withTiming,
-  withSequence,
-} from 'react-native-reanimated';
 import { Colors, Radius } from '@/lib/theme';
 
 function SkeletonBox({
@@ -18,30 +11,16 @@ function SkeletonBox({
   height: number;
   style?: ViewStyle;
 }) {
-  const opacity = useSharedValue(0.4);
-
-  useEffect(() => {
-    opacity.value = withRepeat(
-      withSequence(
-        withTiming(0.8, { duration: 700 }),
-        withTiming(0.4, { duration: 700 })
-      ),
-      -1,
-      false
-    );
-  }, []);
-
-  const animStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
-
+  // ✅ Static skeleton instead of infinite animation loop
   return (
-    <Animated.View
+    <View
       style={[
         {
           height,
           backgroundColor: Colors.border,
           borderRadius: Radius.sm,
+          opacity: 0.6,
         },
-        animStyle,
         { width: width ?? '100%' } as ViewStyle,
         style,
       ]}

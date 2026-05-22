@@ -4,6 +4,7 @@
     "slug": "mandibook-pro",
     "scheme": "mandibook",
     "version": "1.0.0",
+    "icon": "./assets/logo.png",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -13,14 +14,36 @@
     },
     "android": {
       "package": "com.mandibook.pro",
-      "edgeToEdgeEnabled": true,
+      "edgeToEdgeEnabled": false,
       "adaptiveIcon": {
+        "foregroundImage": "./assets/logo.png",
         "backgroundColor": "#00450d"
       }
     },
-    "plugins": ["expo-router"],
+    "androidNavigationBar": {
+      "backgroundColor": "#F0F4F0",
+      "barStyle": "dark-content"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-asset",
+      "expo-build-properties",
+      "expo-font",
+      "expo-mail-composer",
+      "expo-secure-store",
+      "expo-sqlite",
+      "expo-video",
+      "expo-web-browser"
+    ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "efd28e1e-9e9b-4096-b28f-dc72acba1811"
+      }
+    },
+    "owner": "anant925"
   }
 }

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { api } from '@/lib/api';
+import { supabase, mapShop } from '@/lib/supabase';
 
 export type Grade = { code: string; name: string };
 
@@ -10,6 +10,14 @@ export type ShopCharges = {
   bardanaPerSack: number;
   cartagePerKg: number;
   telePost: number;
+};
+
+export type TeamMember = {
+  id: string;
+  name: string;
+  phone: string;
+  pin: string;
+  role: string;
 };
 
 export type ShopData = {
@@ -26,7 +34,7 @@ export type ShopData = {
   grades: Grade[];
   charges: ShopCharges;
   adminPin: string;
-  teamNames: string[];
+  teamMembers: TeamMember[];
   createdAt: number;
 };
 
@@ -58,7 +66,7 @@ const DEFAULT_SHOP: Omit<ShopData, 'shopId' | 'createdAt'> = {
     telePost: 0,
   },
   adminPin: '',
-  teamNames: [],
+  teamMembers: [],
 };
 
 const STORAGE_KEY = 'mandibook_shop';
@@ -66,6 +74,7 @@ const STORAGE_KEY = 'mandibook_shop';
 type ShopContextType = {
   shop: ShopData | null;
   loading: boolean;
+  cacheShop: (data: ShopData) => Promise<void>;
   updateShop: (data: Partial<ShopData>) => Promise<void>;
   saveShop: (data: ShopData) => Promise<void>;
   grades: Grade[];
@@ -81,63 +90,81 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     async function load() {
       try {
+        // 1. Load from local cache first for instant UI
         const cached = await AsyncStorage.getItem(STORAGE_KEY);
         if (cached) {
           const parsed: ShopData = JSON.parse(cached);
           setShop(parsed);
           setLoading(false);
-          // Background sync from API
+          // 2. Background sync from Supabase
           try {
-            const remote = await api.get<ShopData>(`/api/shops/${parsed.shopId}`);
-            if (remote) {
+            const { data, error } = await supabase
+              .from('shops')
+              .select('*')
+              .eq('id', parsed.shopId)
+              .single();
+            if (!error && data) {
+              const remote = mapShop(data as Record<string, unknown>);
               setShop(remote);
               await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(remote));
             }
-          } catch (err: any) {
-            if (err?.message === 'Shop not found') {
-              // Shop exists locally but not in backend (e.g. created with wrong ID).
-              // Re-create it with the correct ID so trucks can be linked to it.
-              api.post('/api/shops', { ...parsed, id: parsed.shopId }).catch(() => {});
-            }
-            // Other errors (network, etc.) — keep using local cache silently.
+          } catch {
+            // Network error — keep using local cache silently
           }
         } else {
           setLoading(false);
         }
-      } catch (e) {
+      } catch {
         setLoading(false);
       }
     }
     load();
   }, []);
 
-  const syncFromApi = async (shopId: string): Promise<ShopData | null> => {
-    try {
-      const data = await api.get<ShopData>(`/api/shops/${shopId}`);
-      if (data) {
-        await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-        return data;
-      }
-    } catch (err: any) {
-      console.warn('[API] Sync failed:', err?.message);
-    }
-    return null;
-  };
-
-  const saveShop = useCallback(async (data: ShopData) => {
+  const cacheShop = useCallback(async (data: ShopData) => {
+    // Always save locally first
     await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data));
     setShop(data);
-    try {
-      // Try to update via API; if shop doesn't exist yet, create it
-      try {
-        await api.put<ShopData>(`/api/shops/${data.shopId}`, data);
-      } catch {
-        await api.post<ShopData>('/api/shops', { ...data, id: data.shopId });
-      }
-    } catch (err: any) {
-      console.warn('[API] Save failed (will use local cache):', err?.message);
-    }
   }, []);
+
+  const saveShop = useCallback(async (data: ShopData) => {
+    await cacheShop(data);
+    try {
+      // Upsert to Supabase
+      const { error } = await supabase.from('shops').upsert({
+        id: data.shopId,
+        firm_name: data.firmName,
+        owner_name: data.ownerName,
+        address: data.address,
+        city: data.city,
+        phone1: data.phone1,
+        phone2: data.phone2,
+        upi_id: data.upiId,
+        upi_apps: data.upiApps,
+        commodity: data.commodity,
+        grades: data.grades,
+        charges: data.charges,
+        admin_pin: null,
+        team_names: data.teamMembers.map(m => typeof m === 'string' ? m : JSON.stringify({ ...m, pin: undefined })),
+        created_at: data.createdAt,
+      });
+      if (error) {
+        console.warn('[Supabase] saveShop error:', error.message);
+      }
+      if (data.adminPin) {
+        const { error: pinError } = await supabase.rpc('set_shop_admin_pin', {
+          p_shop_id: data.shopId,
+          p_new_pin: data.adminPin,
+          p_current_pin: null,
+        });
+        if (pinError) {
+          console.warn('[Supabase] setShopAdminPin error:', pinError.message);
+        }
+      }
+    } catch (err: unknown) {
+      console.warn('[Supabase] saveShop failed (local cache used):', (err as Error).message);
+    }
+  }, [cacheShop]);
 
   const updateShop = useCallback(
     async (partial: Partial<ShopData>) => {
@@ -153,6 +180,7 @@ export function ShopProvider({ children }: { children: React.ReactNode }) {
       value={{
         shop,
         loading,
+        cacheShop,
         updateShop,
         saveShop,
         grades: shop?.grades ?? DEFAULT_SHOP.grades,

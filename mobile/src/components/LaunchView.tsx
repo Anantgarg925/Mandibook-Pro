@@ -1,15 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Image, StyleSheet, Pressable, ScrollView, Platform } from 'react-native';
+import { View, Text, Image, StyleSheet, Pressable, ScrollView, Platform, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withTiming,
+  withSpring,
   runOnJS,
 } from 'react-native-reanimated';
+import { BlurView } from 'expo-blur';
 import { MaterialIcons } from '@expo/vector-icons';
 import { toIndianDate } from '@/lib/formatters';
+import { getCurrentBusinessDate } from '@/lib/businessDay';
+import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 
 interface Props {
   visible: boolean;
@@ -20,10 +24,34 @@ interface Props {
   shopCity?: string;
 }
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+function ScaleButton({ onPress, children, style, testID }: any) {
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  return (
+    <AnimatedPressable
+      testID={testID}
+      onPress={onPress}
+      onPressIn={() => (scale.value = withSpring(0.96))}
+      onPressOut={() => (scale.value = withSpring(1))}
+      style={[style, animatedStyle]}
+    >
+      {children}
+    </AnimatedPressable>
+  );
+}
+
 export function LaunchView({ visible, onHide, onAdminPress, onMemberPress, shopName, shopCity }: Props) {
   const opacity = useSharedValue(0);
   const animationStarted = useRef(false);
   const [imageError, setImageError] = useState<boolean>(false);
+  const { width, height } = useWindowDimensions();
+  const isSmall = width < 380;
 
   useEffect(() => {
     if (visible) {
@@ -34,14 +62,9 @@ export function LaunchView({ visible, onHide, onAdminPress, onMemberPress, shopN
   const dismiss = (callback: () => void) => {
     if (animationStarted.current) return;
     animationStarted.current = true;
-    const hide = onHide;
-    const cb = callback;
-    const handleFinish = () => {
-      hide();
-      setTimeout(cb, 0);
-    };
     opacity.value = withTiming(0, { duration: 380 }, () => {
-      runOnJS(handleFinish)();
+      runOnJS(onHide)();
+      runOnJS(callback)();
     });
   };
 
@@ -49,7 +72,7 @@ export function LaunchView({ visible, onHide, onAdminPress, onMemberPress, shopN
     opacity: opacity.value,
   }));
 
-  const today = toIndianDate(Date.now());
+  const today = toIndianDate(getCurrentBusinessDate().getTime());
 
   return (
     <Animated.View
@@ -64,7 +87,7 @@ export function LaunchView({ visible, onHide, onAdminPress, onMemberPress, shopN
           bounces={false}
         >
           {/* Hero Image Section */}
-          <View style={styles.heroContainer}>
+          <View style={[styles.heroContainer, { height: isSmall ? 260 : 310 }]}>
             {imageError ? (
               <LinearGradient
                 colors={['#1a5c1f', '#2d7a34', '#f3faff']}
@@ -78,55 +101,62 @@ export function LaunchView({ visible, onHide, onAdminPress, onMemberPress, shopN
                 onError={() => setImageError(true)}
               />
             )}
+            {/* Darker gradient overlay to make text pop */}
             <LinearGradient
-              colors={['rgba(0,69,13,0.15)', 'rgba(0,69,13,0.05)', '#f3faff']}
+              colors={['rgba(0,0,0,0.4)', 'rgba(0,0,0,0.1)', '#f3faff']}
               style={StyleSheet.absoluteFill}
             />
 
-            {/* Identity Card */}
-            <View style={styles.identityCard}>
-              <Text style={styles.brandName}>MandiBook Pro</Text>
-              <View style={styles.brandUnderline} />
-              <Text style={styles.shopName}>
-                {shopCity ? `${shopName}, ${shopCity}` : shopName}
-              </Text>
-              <View style={styles.dateRow}>
-                <MaterialIcons name="calendar-today" size={14} color="#41493e" />
-                <Text style={styles.dateText}>{today}</Text>
-              </View>
+            {/* Glassmorphic Identity Card */}
+            <View style={{ width: '100%', paddingHorizontal: 20 }}>
+              <BlurView intensity={80} tint="light" style={styles.identityCard}>
+                <Text style={styles.brandName}>MandiBook Pro</Text>
+                <View style={styles.brandUnderline} />
+                <Text style={styles.shopName} numberOfLines={2}>
+                  {shopCity ? `${shopName}, ${shopCity}` : shopName}
+                </Text>
+                <View style={styles.dateRow}>
+                  <MaterialIcons name="calendar-today" size={14} color="#00450D" />
+                  <Text style={styles.dateText}>{today}</Text>
+                </View>
+              </BlurView>
             </View>
           </View>
 
           {/* Main Content */}
           <View style={styles.content}>
             {/* Admin Login */}
-            <Pressable
+            <ScaleButton
               testID="launch-admin-btn"
               onPress={() => dismiss(onAdminPress)}
               style={styles.adminBtnOuter}
-              android_ripple={{ color: 'rgba(255,255,255,0.2)', borderless: false }}
             >
-              {({ pressed }) => (
-                <View style={[styles.adminBtn, pressed && styles.adminBtnPressed]}>
-                  <View style={styles.btnLeft}>
-                    <View style={styles.adminIconWrap}>
-                      <MaterialIcons name="admin-panel-settings" size={24} color="#fff" />
-                    </View>
-                    <View>
-                      <Text style={styles.adminBtnTitle}>Admin Login</Text>
-                      <Text style={styles.adminBtnSub}>एडमिन लॉगिन</Text>
-                    </View>
+              <LinearGradient
+                colors={['#00450d', '#002B08']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.adminBtn}
+              >
+                <View style={styles.btnLeft}>
+                  <View style={styles.adminIconWrap}>
+                    <MaterialIcons name="admin-panel-settings" size={24} color="#fff" />
                   </View>
-                  <MaterialIcons name="arrow-forward-ios" size={16} color="rgba(255,255,255,0.75)" />
+                  <View>
+                    <Text style={styles.adminBtnTitle}>Admin Login</Text>
+                    <Text style={styles.adminBtnSub}>एडमिन लॉगिन</Text>
+                  </View>
                 </View>
-              )}
-            </Pressable>
+                <View style={styles.arrowIconWrap}>
+                  <MaterialIcons name="arrow-forward-ios" size={14} color="#00450D" />
+                </View>
+              </LinearGradient>
+            </ScaleButton>
 
             {/* Member Access */}
-            <Pressable
+            <ScaleButton
               testID="launch-member-btn"
               onPress={() => dismiss(onMemberPress)}
-              style={({ pressed }) => [styles.memberBtn, pressed && styles.memberBtnPressed]}
+              style={styles.memberBtn}
             >
               <View style={styles.btnLeft}>
                 <View style={styles.memberIconWrap}>
@@ -138,19 +168,27 @@ export function LaunchView({ visible, onHide, onAdminPress, onMemberPress, shopN
                 </View>
               </View>
               <MaterialIcons name="arrow-forward-ios" size={16} color="#00450d" />
-            </Pressable>
+            </ScaleButton>
 
             {/* Feature Bento Cards */}
             <View style={styles.bentoRow}>
               <View style={styles.bentoCard}>
-                <MaterialIcons name="account-balance-wallet" size={22} color="#00450d" style={{ marginBottom: 8 }} />
-                <Text style={styles.bentoTitle}>Fast Settlement</Text>
-                <Text style={styles.bentoSub}>त्वरित भुगतान</Text>
+                <View style={styles.bentoIconContainer}>
+                  <MaterialIcons name="account-balance-wallet" size={20} color="#00450D" />
+                </View>
+                <View>
+                  <Text style={styles.bentoTitle}>Fast Settlement</Text>
+                  <Text style={styles.bentoSub}>त्वरित भुगतान</Text>
+                </View>
               </View>
               <View style={styles.bentoCard}>
-                <MaterialIcons name="verified-user" size={22} color="#00450d" style={{ marginBottom: 8 }} />
-                <Text style={styles.bentoTitle}>100% Secure</Text>
-                <Text style={styles.bentoSub}>पूरी तरह सुरक्षित</Text>
+                <View style={[styles.bentoIconContainer, { backgroundColor: '#FFF8E1' }]}>
+                  <MaterialIcons name="verified-user" size={20} color="#854D0E" />
+                </View>
+                <View>
+                  <Text style={styles.bentoTitle}>100% Secure</Text>
+                  <Text style={styles.bentoSub}>पूरी तरह सुरक्षित</Text>
+                </View>
               </View>
             </View>
 
@@ -191,57 +229,59 @@ const styles = StyleSheet.create({
     backgroundColor: '#f3faff',
   },
   heroContainer: {
-    height: 310,
     position: 'relative',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    paddingBottom: 20,
-    paddingHorizontal: 20,
+    paddingBottom: 24,
   },
   identityCard: {
-    backgroundColor: 'rgba(255,255,255,0.93)',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 20,
+    padding: 24,
     alignItems: 'center',
     width: '100%',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.1,
+    shadowRadius: 16,
+    elevation: 5,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.6)',
+    borderColor: 'rgba(255,255,255,0.4)',
+    overflow: 'hidden',
   },
   brandName: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#00450d',
+    fontSize: 22,
+    fontWeight: '800',
+    color: '#00450D',
     letterSpacing: letterSpacingBrandName,
-    marginBottom: 4,
+    marginBottom: 6,
   },
   brandUnderline: {
-    width: 48,
-    height: 3,
+    width: 60,
+    height: 4,
     backgroundColor: '#feb300',
     borderRadius: 2,
-    marginBottom: 12,
+    marginBottom: 16,
   },
   shopName: {
-    fontSize: 17,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
     color: '#071e27',
     textAlign: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   dateRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
   },
   dateText: {
     fontSize: 13,
-    fontWeight: '700',
-    color: '#41493e',
+    fontWeight: '800',
+    color: '#00450D',
   },
   content: {
     padding: 20,
@@ -254,128 +294,147 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   adminBtnOuter: {
-    borderRadius: 14,
-    marginBottom: 12,
-    overflow: 'hidden',
+    marginBottom: 14,
+    borderRadius: 16,
+    shadowColor: '#00450d',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 6,
   },
   adminBtn: {
-    backgroundColor: '#00450d',
-    borderRadius: 14,
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 18,
-    shadowColor: '#00450d',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  adminBtnPressed: {
-    backgroundColor: '#003a0b',
   },
   adminIconWrap: {
     width: 48,
     height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   adminBtnTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#fff',
   },
   adminBtnSub: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.75)',
-    marginTop: 1,
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 2,
+    fontWeight: '500',
+  },
+  arrowIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(255,255,255,0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   memberBtn: {
     backgroundColor: '#fff',
-    borderRadius: 14,
+    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 18,
-    marginBottom: 16,
+    marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#c0c9bb',
+    borderColor: '#E5E7EB',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  memberBtnPressed: {
-    backgroundColor: '#f5f5f5',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
   memberIconWrap: {
     width: 48,
     height: 48,
-    borderRadius: 24,
-    backgroundColor: '#dbf1fe',
+    borderRadius: 14,
+    backgroundColor: '#F3FAFF',
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#DBF1FE',
   },
   memberBtnTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
     color: '#071e27',
   },
   memberBtnSub: {
-    fontSize: 12,
-    color: '#41493e',
-    marginTop: 1,
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 2,
+    fontWeight: '500',
   },
   bentoRow: {
     flexDirection: 'row',
     gap: 12,
-    marginBottom: 24,
+    marginBottom: 28,
   },
   bentoCard: {
     flex: 1,
-    backgroundColor: '#e6f6ff',
-    borderRadius: 14,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 16,
     borderWidth: 1,
-    borderColor: '#cfe6f2',
+    borderColor: '#E5E7EB',
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+    gap: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  bentoIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: '#E8F5E9',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   bentoTitle: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#00450d',
-    textTransform: 'uppercase',
-    letterSpacing: letterSpacingBentoTitle,
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#071e27',
     marginBottom: 2,
   },
   bentoSub: {
     fontSize: 10,
-    color: '#41493e',
+    color: '#64748B',
+    fontWeight: '600',
   },
   footer: {
     alignItems: 'center',
-    paddingTop: 4,
-    paddingBottom: 16,
+    paddingTop: 8,
+    paddingBottom: 24,
   },
   footerHindi: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#1b5e20',
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#00450D',
     opacity: 0.9,
     marginBottom: 6,
   },
   footerEnglish: {
-    fontSize: 10,
-    fontWeight: '700',
+    fontSize: 11,
+    fontWeight: '800',
     color: '#004a78',
     textTransform: 'uppercase',
     letterSpacing: letterSpacingFooterEnglish,
     opacity: 0.4,
-    marginBottom: 20,
+    marginBottom: 24,
   },
   footerDivider: {
     flexDirection: 'row',
@@ -384,13 +443,13 @@ const styles = StyleSheet.create({
   },
   dividerLine: {
     height: 1,
-    width: 28,
-    backgroundColor: '#c0c9bb',
+    width: 32,
+    backgroundColor: '#E5E7EB',
   },
   footerPowered: {
     fontSize: 9,
-    fontWeight: '700',
-    color: '#717a6d',
+    fontWeight: '800',
+    color: '#9CA3AF',
     letterSpacing: letterSpacingFooterPowered,
   },
   bottomAccent: {
@@ -398,8 +457,8 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: 3,
-    opacity: 0.5,
+    height: 4,
+    opacity: 0.8,
     zIndex: 1,
   },
 });

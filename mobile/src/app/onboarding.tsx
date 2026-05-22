@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { Check } from 'lucide-react-native';
+import { Check, User } from 'lucide-react-native';
 import { useShop, DEFAULT_SHOP } from '@/context/ShopContext';
 import type { Grade, ShopCharges, ShopData } from '@/context/ShopContext';
 import { Colors, Spacing, FontSize, Radius } from '@/lib/theme';
@@ -90,6 +90,7 @@ function ProgressBar({ step, total }: { step: number; total: number }) {
 export default function OnboardingScreen() {
   const router = useRouter();
   const { saveShop } = useShop();
+  const insets = useSafeAreaInsets();
   const [step, setStep] = useState(0);
   const [saving, setSaving] = useState(false);
 
@@ -150,7 +151,13 @@ export default function OnboardingScreen() {
       grades: form.grades,
       charges: form.charges,
       adminPin: form.adminPin,
-      teamNames: form.teamNames,
+      teamMembers: form.teamNames.map((name, index) => ({
+        id: `member_${Date.now()}_${index}`,
+        name,
+        phone: '',
+        pin: '',
+        role: 'MEMBER',
+      })),
       createdAt: Date.now(),
     };
     await saveShop(shopData);
@@ -164,7 +171,7 @@ export default function OnboardingScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top', 'bottom']}>
       <ProgressBar step={step} total={5} />
 
       <Text
@@ -178,6 +185,32 @@ export default function OnboardingScreen() {
       >
         {STEP_TITLES[step]}
       </Text>
+
+      {step === 0 ? (
+        <Pressable
+          testID="onboarding-member-login"
+          onPress={() => router.push('/access-choice' as any)}
+          style={{
+            marginHorizontal: Spacing.lg,
+            marginBottom: Spacing.sm,
+            paddingVertical: 12,
+            paddingHorizontal: 14,
+            borderRadius: Radius.md,
+            borderWidth: 1,
+            borderColor: Colors.primary,
+            backgroundColor: '#E8F5E9',
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+          }}
+        >
+          <User size={18} color={Colors.primary} />
+          <Text style={{ fontSize: FontSize.sm, color: Colors.primary, fontWeight: '800' }}>
+            Already registered? Access with your number + shared PIN
+          </Text>
+        </Pressable>
+      ) : null}
 
       <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         {step === 0 ? (
@@ -205,6 +238,7 @@ export default function OnboardingScreen() {
             teamNames={form.teamNames}
             onTeamNamesChange={(teamNames) => patch({ teamNames })}
             onPinSet={(adminPin) => patch({ adminPin })}
+            ownerName={form.ownerName}
           />
         )}
       </KeyboardAvoidingView>
@@ -214,6 +248,7 @@ export default function OnboardingScreen() {
           flexDirection: 'row',
           gap: Spacing.sm,
           padding: Spacing.lg,
+          paddingBottom: Math.max(Spacing.lg, insets.bottom),
           borderTopWidth: 1,
           borderTopColor: Colors.border,
           backgroundColor: Colors.surface,
@@ -253,7 +288,13 @@ export default function OnboardingScreen() {
             backgroundColor: canProceed() && !saving ? Colors.primary : Colors.border,
           }}
         >
-          <Text style={{ fontSize: FontSize.md, color: '#FFF', fontWeight: '700' }}>
+          <Text
+            style={{
+              fontSize: FontSize.md,
+              color: canProceed() && !saving ? '#FFF' : Colors.textSecond,
+              fontWeight: '700',
+            }}
+          >
             {saving ? 'Saving…' : step === 4 ? 'Finish Setup ✓' : 'Next →'}
           </Text>
         </Pressable>

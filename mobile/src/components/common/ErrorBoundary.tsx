@@ -1,6 +1,7 @@
 import React, { Component, type ReactNode } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
+import { observability } from '@/lib/observability';
 
 type State = { hasError: boolean; error: Error | null };
 
@@ -12,7 +13,9 @@ export class ErrorBoundary extends Component<{ children: ReactNode }, State> {
   }
 
   componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('[ErrorBoundary]', error, info);
+    observability.captureException(error, 'ErrorBoundary', {
+      componentStack: info.componentStack,
+    });
   }
 
   reset = () => this.setState({ hasError: false, error: null });

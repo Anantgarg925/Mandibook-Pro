@@ -2,7 +2,6 @@
 // NOTE TO AI: Do note change this file unless you are 110% sure you know what you are doing. It will likely break the app.
 
 const { getDefaultConfig } = require("expo/metro-config");
-const { withNativeWind } = require("nativewind/metro");
 const { withVibecodeMetro } = require("@vibecodeapp/sdk/metro");
 const path = require("path");
 const fs = require("fs");
@@ -61,6 +60,23 @@ config.resolver = {
     ],
   }),
   resolveRequest: (context, moduleName, platform) => {
+
+   if (
+      moduleName.startsWith("openai/_shims") ||
+      moduleName.startsWith("openai/shims")
+    ) {
+      return context.resolveRequest(context, moduleName, platform);
+    }
+
+   if (
+      moduleName === "openai" ||
+      (moduleName.startsWith("openai/") &&
+        !moduleName.startsWith("openai/_shims") &&
+        !moduleName.startsWith("openai/shims"))
+    ) {
+      console.log(`[Metro Resolve] Routing ${moduleName} safely to static index entry point.`);
+      return context.resolveRequest(context, "openai/index.js", platform);
+    }
     // Handle @/shared/* imports explicitly
     // This is needed because:
     // 1. extraNodeModules alone doesn't handle subpath resolution
@@ -76,6 +92,11 @@ config.resolver = {
     if (sharedFolderExists && moduleName === "@/shared") {
       console.log(`[Metro Resolve] @/shared exact: ${moduleName} -> ${sharedFolder}`);
       return context.resolveRequest(context, sharedFolder, platform);
+    }
+    if (moduleName.includes("opentelemetry")) {
+      console.log(`[Metro Resolve] Intercepting opentelemetry module: ${moduleName}`);
+      // Redirect it to an empty mock object since React Native doesn't use web tracing
+      return { type: "empty" };
     }
 
     // Handle relative ../shared/* imports (fallback for unmigrated legacy code)
@@ -125,5 +146,4 @@ config.resolver = {
   },
 };
 
-// Integrate NativeWind with the Metro configuration.
-module.exports = withNativeWind(withVibecodeMetro(config), { input: "./global.css" });
+module.exports = withVibecodeMetro(config);

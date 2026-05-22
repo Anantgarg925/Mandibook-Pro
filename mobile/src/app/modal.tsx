@@ -4,9 +4,9 @@ import { Platform, Text, View } from 'react-native';
 
 export default function ModalScreen() {
   return (
-    <View testID="modal-screen" className="flex-1 items-center justify-center bg-white dark:bg-black">
-      <Text className="text-xl font-bold text-black dark:text-white">Modal</Text>
-      <View className="my-8 h-px w-4/5 bg-gray-200 dark:bg-white/10" />
+    <View testID="modal-screen" style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF' }}>
+      <Text style={{ fontSize: 20, fontWeight: '700', color: '#000000' }}>Modal</Text>
+      <View style={{ marginVertical: 32, height: 1, width: '80%', backgroundColor: '#E5E7EB' }} />
 
       {/* Use a light status bar on iOS to account for the black space above the modal */}
       <StatusBar style={Platform.OS === 'ios' ? 'light' : 'auto'} />
