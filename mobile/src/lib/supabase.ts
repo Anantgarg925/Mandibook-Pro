@@ -2,17 +2,43 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import type { Inquiry, InquiryStatus, PaymentMode, SlipStatus } from '@/types/inquiry';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_KEY!;
+const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_KEY;
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    storage: AsyncStorage,
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: false,
-  },
-});
+// Create a fail-safe client to prevent boot-time crashes if keys are missing (common on Vercel build step or local start before env resolves)
+export const supabase = (supabaseUrl && supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        storage: AsyncStorage,
+        autoRefreshToken: true,
+        persistSession: true,
+        detectSessionInUrl: false,
+      },
+    })
+  : new Proxy({} as any, {
+      get(target, prop) {
+        if (prop === 'auth') {
+          return {
+            getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+            onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+          };
+        }
+        return (...args: any[]) => {
+          console.warn(`[Supabase Safe Proxy] Call to "${String(prop)}" failed because Supabase env variables are missing.`);
+          const builder = {
+            select: () => builder,
+            insert: () => builder,
+            update: () => builder,
+            upsert: () => builder,
+            delete: () => builder,
+            eq: () => builder,
+            single: () => Promise.resolve({ data: null, error: new Error('Supabase credentials missing') }),
+            then: (resolve: any) => resolve({ data: null, error: new Error('Supabase credentials missing') }),
+          };
+          return builder;
+        };
+      }
+    });
 
 // ─── helpers to map DB snake_case → app camelCase ────────────────────────────
 
