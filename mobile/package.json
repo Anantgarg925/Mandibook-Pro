@@ -11,7 +11,7 @@
     "lint": "expo lint",
     "typecheck": "tsc --noEmit",
     "test": "jest --runInBand",
-    "postinstall": "patch --batch --forward -p0 -d node_modules/@supabase/supabase-js -i patches/@supabase+supabase-js+2.106.0.patch || true",
+    "postinstall": "patch --batch --forward -p0 -d node_modules/@supabase/supabase-js -i ../../../patches/@supabase+supabase-js+2.106.0.patch || true",
     "seed:rmandi:150526": "node scripts/seed-rmandi-150526.mjs"
   },
   "dependencies": {
