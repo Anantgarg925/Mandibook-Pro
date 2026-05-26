@@ -78,13 +78,13 @@ export default function TruckDetailScreen() {
       router.replace('/member-trucks' as any);
       return;
     }
-    router.replace('/(tabs)/trucks' as any);
+    router.replace('/trucks' as any);
   };
 
   useEffect(() => {
     if (isMemberMode === undefined) return undefined;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      router.replace((isMemberMode ? '/member-trucks' : '/(tabs)/trucks') as any);
+      router.replace((isMemberMode ? '/member-trucks' : '/trucks') as any);
       return true;
     });
     return () => subscription.remove();

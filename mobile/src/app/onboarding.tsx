@@ -162,7 +162,7 @@ export default function OnboardingScreen() {
     };
     await saveShop(shopData);
     setSaving(false);
-    router.replace('/(tabs)');
+    router.replace('/');
   };
 
   const handleBack = () => {

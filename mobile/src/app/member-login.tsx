@@ -30,13 +30,13 @@ export default function MemberLoginScreen() {
 
   const goBack = () => {
     setLaunchComplete(false);
-    router.replace({ pathname: '/(tabs)', params: { access: 'choose' } } as any);
+    router.replace({ pathname: '/', params: { access: 'choose' } } as any);
   };
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       setLaunchComplete(false);
-      router.replace({ pathname: '/(tabs)', params: { access: 'choose' } } as any);
+      router.replace({ pathname: '/', params: { access: 'choose' } } as any);
       return true;
     });
     return () => subscription.remove();
@@ -103,7 +103,7 @@ export default function MemberLoginScreen() {
         AsyncStorage.setItem(APP_SESSION_KEY, JSON.stringify(session)).catch(() => {});
         if (isAdmin) {
           AsyncStorage.removeItem(MEMBER_SESSION_KEY).catch(() => {});
-          router.replace('/(tabs)');
+          router.replace('/');
         } else {
           AsyncStorage.setItem(MEMBER_SESSION_KEY, JSON.stringify(session)).catch(() => {});
           router.replace('/member-dashboard');

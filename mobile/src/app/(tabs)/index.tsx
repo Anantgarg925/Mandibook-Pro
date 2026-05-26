@@ -399,7 +399,7 @@ export default function HomeScreen() {
     await AsyncStorage.removeItem(APP_SESSION_KEY);
     await AsyncStorage.removeItem(MEMBER_SESSION_KEY);
     setLaunchComplete(false);
-    resetToRoute(router, '/(tabs)' as any);
+    resetToRoute(router, '/' as any);
   };
 
   useEffect(() => {
@@ -671,7 +671,7 @@ export default function HomeScreen() {
                     label="Confirmed Bills"
                     value={String(confirmed.length)}
                     onPress={() => router.push({
-                      pathname: '/(tabs)/bills',
+                      pathname: '/bills',
                       params: { filter: 'CONFIRMED' },
                     } as any)}
                   />
@@ -724,7 +724,7 @@ export default function HomeScreen() {
                   </View>
                   <Pressable
                     testID="view-all-trucks"
-                    onPress={() => router.push('/(tabs)/trucks' as any)}
+                    onPress={() => router.push('/trucks' as any)}
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 2 }}
                   >
                     <Text

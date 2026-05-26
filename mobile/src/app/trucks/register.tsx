@@ -244,17 +244,17 @@ export default function RegisterTruckScreen() {
       router.replace('/member-trucks' as any);
       return;
     }
-    router.replace('/(tabs)/trucks' as any);
+    router.replace('/trucks' as any);
   };
 
   const goToTrucks = () => {
-    router.replace((isMemberMode ? '/member-trucks' : '/(tabs)/trucks') as any);
+    router.replace((isMemberMode ? '/member-trucks' : '/trucks') as any);
   };
 
   useEffect(() => {
     if (isMemberMode === undefined) return undefined;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      router.replace((isMemberMode ? '/member-trucks' : '/(tabs)/trucks') as any);
+      router.replace((isMemberMode ? '/member-trucks' : '/trucks') as any);
       return true;
     });
     return () => subscription.remove();

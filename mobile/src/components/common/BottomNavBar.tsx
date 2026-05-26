@@ -7,11 +7,11 @@ import { useRouter as useExpoRouter, usePathname as useExpoPathname } from 'expo
 import { useMemberMode } from '@/hooks/useMemberMode';
 
 const ADMIN_TABS = [
-  { key: 'home',    labelEn: 'HOME',    labelHi: 'होम',     icon: Home,          path: '/(tabs)' },
-  { key: 'trucks',  labelEn: 'TRUCKS',  labelHi: 'ट्रक',     icon: Truck,         path: '/(tabs)/trucks' },
-  { key: 'bills',   labelEn: 'BILLS',   labelHi: 'बिल',      icon: ClipboardList, path: '/(tabs)/bills' },
+  { key: 'home',    labelEn: 'HOME',    labelHi: 'होम',     icon: Home,          path: '/' },
+  { key: 'trucks',  labelEn: 'TRUCKS',  labelHi: 'ट्रक',     icon: Truck,         path: '/trucks' },
+  { key: 'bills',   labelEn: 'BILLS',   labelHi: 'बिल',      icon: ClipboardList, path: '/bills' },
   { key: 'buyers',  labelEn: 'BUYERS',  labelHi: 'खरीदार',  icon: Users,         path: '/buyers' },
-  { key: 'reports', labelEn: 'REPORTS', labelHi: 'रिपोर्ट',  icon: BarChart2,     path: '/(tabs)/reports' },
+  { key: 'reports', labelEn: 'REPORTS', labelHi: 'रिपोर्ट',  icon: BarChart2,     path: '/reports' },
 ] as const;
 
 const MEMBER_TABS = [
@@ -30,7 +30,7 @@ export function BottomNavBar() {
 
   const getActiveKey = (): string => {
     if (pathname === '/reports' || pathname.startsWith('/reports/')) return 'reports';
-    if (pathname.startsWith('/(tabs)/bills') || pathname === '/bills') return 'bills';
+    if (pathname.startsWith('/bills')) return 'bills';
     if (pathname.includes('/bills/new')) return isMemberMode ? 'bills' : '';
     if (pathname.startsWith('/buyers')) return 'buyers';
     if (pathname.startsWith('/member-profile')) return 'profile';

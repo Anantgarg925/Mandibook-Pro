@@ -38,7 +38,7 @@ export default function NotificationsScreen() {
       router.replace('/member-dashboard' as any);
       return;
     }
-    router.replace('/(tabs)' as any);
+    router.replace('/' as any);
   };
 
   useEffect(() => {
@@ -48,7 +48,7 @@ export default function NotificationsScreen() {
   useEffect(() => {
     if (isMemberMode === undefined) return undefined;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      router.replace((isMemberMode ? '/member-dashboard' : '/(tabs)') as any);
+      router.replace((isMemberMode ? '/member-dashboard' : '/') as any);
       return true;
     });
     return () => subscription.remove();

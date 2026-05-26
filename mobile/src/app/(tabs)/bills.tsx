@@ -278,7 +278,7 @@ export default function BillsScreen() {
         borderBottomWidth: 1,
         borderBottomColor: BORDER,
       }}>
-        <Pressable hitSlop={10}>
+        <Pressable hitSlop={10} onPress={() => router.push('/settings' as any)}>
           <Menu size={24} color={GREEN} />
         </Pressable>
         <Text numberOfLines={1} adjustsFontSizeToFit style={{ flex: 1, textAlign: 'center', fontSize: isSmall ? FontSize.md : FontSize.lg, fontWeight: '800', color: GREEN }}>

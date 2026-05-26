@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { View, Text, FlatList, Pressable, TextInput, ScrollView } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -25,6 +25,7 @@ export default function TrucksScreen() {
   const { trucks, loading } = useTodayTrucks();
   const [filter, setFilter] = useState('ALL');
   const [query, setQuery] = useState('');
+  const searchInputRef = useRef<TextInput>(null);
   const pagerRef = React.useRef<PagerView>(null);
   const FILTER_TABS = ['ALL', 'ARRIVED', 'UNLOADING'];
 
@@ -78,6 +79,7 @@ export default function TrucksScreen() {
         }}>
           <TruckIcon size={20} color="#717A6D" />
           <TextInput
+            ref={searchInputRef}
             style={{ flex: 1, marginLeft: 12, fontSize: isSmall ? 14 : 16, color: '#111827' }}
             placeholder="Search truck number... / गाड़ी नंबर खोजें"
             placeholderTextColor="#6B7280"
@@ -192,7 +194,7 @@ export default function TrucksScreen() {
         borderBottomWidth: 1,
         borderBottomColor: BORDER,
       }}>
-        <Pressable hitSlop={10}>
+        <Pressable hitSlop={10} onPress={() => router.push('/settings' as any)}>
           <Menu size={24} color={GREEN} />
         </Pressable>
         <Text numberOfLines={1} adjustsFontSizeToFit style={{ flex: 1, textAlign: 'center', fontSize: isSmall ? FontSize.md : FontSize.lg, fontWeight: '800', color: GREEN }}>
@@ -200,10 +202,7 @@ export default function TrucksScreen() {
         </Text>
         <Pressable
           hitSlop={10}
-          onPress={() => {
-            // Focus search input or just trigger something. 
-            // In a real app this might focus the TextInput below.
-          }}
+          onPress={() => searchInputRef.current?.focus()}
           style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}
         >
           <Search size={24} color="#111827" />

@@ -28,13 +28,13 @@ export default function BillDetailScreen() {
       router.replace('/member-dashboard' as any);
       return;
     }
-    router.replace('/(tabs)/bills' as any);
+    router.replace('/bills' as any);
   };
 
   useEffect(() => {
     if (isMemberMode === undefined) return undefined;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      router.replace((isMemberMode ? '/member-dashboard' : '/(tabs)/bills') as any);
+      router.replace((isMemberMode ? '/member-dashboard' : '/bills') as any);
       return true;
     });
     return () => subscription.remove();
