@@ -75,8 +75,6 @@ export default function TabLayout() {
           headerShown: false,
         }}
       />
-      <Tabs.Screen name="auth" options={{ href: null }} />
-      <Tabs.Screen name="two" options={{ href: null }} />
       <Tabs.Screen name="settings" options={{ href: null }} />
     </Tabs>
   );

@@ -27,7 +27,6 @@ import { Colors } from '@/lib/theme';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 
 export const unstable_settings = {
-  // Ensure that reloading on `/modal` keeps a back button present.
   initialRouteName: '(tabs)',
 };
 
@@ -63,7 +62,6 @@ function RootLayoutNav({ colorScheme }: { colorScheme: 'light' | 'dark' | null |
         <Stack.Screen name="settings/change-pin" options={{ headerShown: false }} />
         <Stack.Screen name="trucks/edit-grades" options={{ headerShown: false }} />
         <Stack.Screen name="notifications" options={{ headerShown: false }} />
-        <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
       </Stack>
     </ThemeProvider>
   );
@@ -79,7 +77,6 @@ function PersistentNavigationShell({ colorScheme }: { colorScheme: 'light' | 'da
     pathname === '/member-login' ||
     pathname === '/access-choice' ||
     pathname === '/admin-login' ||
-    pathname === '/modal' ||
     pathname === '/+not-found' ||
     pathname.startsWith('/settings') ||
     (pathname.startsWith('/bills/') && pathname !== '/bills/new') ||
