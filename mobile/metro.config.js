@@ -128,6 +128,19 @@ config.resolver = {
 
     // Mock native-only modules on web
     if (platform === "web") {
+      if (
+        moduleName === "react-native-reanimated" ||
+        moduleName.startsWith("react-native-reanimated/") ||
+        moduleName === "react-native-worklets" ||
+        moduleName.startsWith("react-native-worklets/")
+      ) {
+        return context.resolveRequest(
+          context,
+          path.resolve(__dirname, "src/lib/reanimatedWebMock.ts"),
+          platform
+        );
+      }
+
       const nativeOnlyModules = [
         "react-native-pager-view",
         "reanimated-tab-view",
