@@ -71,8 +71,9 @@ function RootLayoutNav({ colorScheme }: { colorScheme: 'light' | 'dark' | null |
 
 function PersistentNavigationShell({ colorScheme }: { colorScheme: 'light' | 'dark' | null | undefined }) {
   const pathname = usePathname();
-  const { launchComplete } = useLaunch();
+  const { launchComplete, sessionHydrated } = useLaunch();
   const hideBottomNav =
+    !sessionHydrated ||
     !launchComplete ||
     pathname === '/onboarding' ||
     pathname === '/member-login' ||

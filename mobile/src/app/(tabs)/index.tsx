@@ -369,7 +369,7 @@ export default function HomeScreen() {
   const { access } = useLocalSearchParams<{ access?: string }>();
   const insets = useSafeAreaInsets();
   const { contentHPad, isSmall } = useResponsive();
-  const { launchComplete, setLaunchComplete } = useLaunch();
+  const { launchComplete, sessionHydrated, setLaunchComplete } = useLaunch();
   const { shop, loading: shopLoading, cacheShop } = useShop();
   const { unreadCount } = useBillNotifications();
   const { inquiries, pending, confirmed, loading: billsLoading } = useInquiries();
@@ -403,10 +403,33 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
+    if (!sessionHydrated || launchComplete || !minTimeElapsed) return;
+    if (shopLoading) return;
+    if (shop) return;
+
+    setSplashGone(true);
+    setMinTimeElapsed(true);
+    setLaunchVisible(false);
+    setLaunchGone(true);
+    router.replace('/onboarding');
+  }, [launchComplete, minTimeElapsed, router, sessionHydrated, shop, shopLoading]);
+
+  useEffect(() => {
+    if (!launchComplete) return;
+    setSplashGone(true);
+    setMinTimeElapsed(true);
+    setLaunchVisible(false);
+    setLaunchGone(true);
+    setPinVisible(false);
+    setPinGone(true);
+  }, [launchComplete]);
+
+  useEffect(() => {
+    if (!sessionHydrated) return;
     if (launchComplete) return;
     const timer = setTimeout(() => setMinTimeElapsed(true), 3000);
     return () => clearTimeout(timer);
-  }, [launchComplete]);
+  }, [launchComplete, sessionHydrated]);
 
   useEffect(() => {
     if (previousLaunchComplete.current && !launchComplete) {
