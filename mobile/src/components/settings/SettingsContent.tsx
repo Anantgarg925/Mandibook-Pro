@@ -198,7 +198,7 @@ export default function SettingsContent() {
     await AsyncStorage.removeItem(MEMBER_SESSION_KEY);
     await AsyncStorage.removeItem(APP_SESSION_KEY);
     setLaunchComplete(false);
-    resetToRoute(router, '/(tabs)' as any);
+    resetToRoute(router, { pathname: '/', params: { access: 'choose' } } as any);
   };
 
   return (

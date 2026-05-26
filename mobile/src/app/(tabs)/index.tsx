@@ -399,7 +399,7 @@ export default function HomeScreen() {
     await AsyncStorage.removeItem(APP_SESSION_KEY);
     await AsyncStorage.removeItem(MEMBER_SESSION_KEY);
     setLaunchComplete(false);
-    resetToRoute(router, '/' as any);
+    resetToRoute(router, { pathname: '/', params: { access: 'choose' } } as any);
   };
 
   useEffect(() => {
