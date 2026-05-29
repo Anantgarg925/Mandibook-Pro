@@ -6,7 +6,7 @@ export type Inquiry = {
   id: string;
   shopId: string;
   slipNumber: number;
-  truckId: string;
+  truckId: string | null;
   truckNumber: string;
   customerName: string;
   customerPhone: string;

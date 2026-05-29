@@ -4,11 +4,11 @@ import {
   Text,
   Pressable,
   TextInput,
-  ScrollView,
   KeyboardAvoidingView,
   Platform,
   useWindowDimensions,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -25,6 +25,8 @@ type Props = {
   ownerName?: string;
 };
 
+const INCLUDED_TEAM_MEMBER_LIMIT = 3;
+
 export default function Step5_Team({ teamNames, onTeamNamesChange, onPinSet, ownerName = '' }: Props) {
   const [pin, setPin] = useState('');
   const [confirmPin, setConfirmPin] = useState('');
@@ -33,7 +35,7 @@ export default function Step5_Team({ teamNames, onTeamNamesChange, onPinSet, own
   const shakeX = useSharedValue(0);
   const pinInputRef = useRef<TextInput>(null);
   const confirmPinInputRef = useRef<TextInput>(null);
-  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollViewRef = useRef<any>(null);
 
   const shakeStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: shakeX.value }],
@@ -96,7 +98,10 @@ export default function Step5_Team({ teamNames, onTeamNamesChange, onPinSet, own
     }, 500);
   };
 
-  const addTeamMember = () => onTeamNamesChange([...teamNames, '']);
+  const addTeamMember = () => {
+    if (teamNames.length >= INCLUDED_TEAM_MEMBER_LIMIT) return;
+    onTeamNamesChange([...teamNames, '']);
+  };
   const updateName = (i: number, v: string) => {
     const next = [...teamNames];
     next[i] = v;
@@ -106,11 +111,14 @@ export default function Step5_Team({ teamNames, onTeamNamesChange, onPinSet, own
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1, backgroundColor: Colors.background }}>
-      <ScrollView
+      <KeyboardAwareScrollView
         ref={scrollViewRef}
         contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: Spacing.lg, paddingBottom: Spacing.xl }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        bottomOffset={96}
+        extraKeyboardSpace={16}
+        disableScrollOnKeyboardHide
       >
         <View style={{ width: '100%', maxWidth: 380, alignSelf: 'center', alignItems: 'center' }}>
           {!pinDone && (
@@ -277,15 +285,23 @@ export default function Step5_Team({ teamNames, onTeamNamesChange, onPinSet, own
                 </Pressable>
               </View>
             ))}
-            <Pressable testID="add-team-member" onPress={addTeamMember} style={{ paddingVertical: Spacing.sm }}>
+            <Pressable
+              testID="add-team-member"
+              onPress={addTeamMember}
+              disabled={teamNames.length >= INCLUDED_TEAM_MEMBER_LIMIT}
+              style={{ paddingVertical: Spacing.sm, opacity: teamNames.length >= INCLUDED_TEAM_MEMBER_LIMIT ? 0.55 : 1 }}
+            >
               <Text style={{ color: Colors.primary, fontSize: FontSize.sm, fontWeight: '600' }}>
                 + टीम सदस्य जोड़ें
               </Text>
             </Pressable>
+            <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, lineHeight: 16 }}>
+              Pro plan में {INCLUDED_TEAM_MEMBER_LIMIT} टीम सदस्य शामिल हैं।
+            </Text>
           </View>
         ) : null}
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </KeyboardAvoidingView>
   );
 }

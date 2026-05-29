@@ -159,4 +159,4 @@ config.resolver = {
   },
 };
 
-module.exports = withVibecodeMetro(config);
+module.exports = config;

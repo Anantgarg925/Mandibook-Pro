@@ -149,7 +149,7 @@ export default function RootLayout() {
                       <PersistentNavigationShell colorScheme={colorScheme} />
                     </SubscriptionGate>
                     {FirstRunTutorialSafe ? <FirstRunTutorialSafe /> : null}
-                    <Analytics />
+                    {Platform.OS === 'web' ? <Analytics /> : null}
                   </BillNotificationProvider>
                 </ShopProvider>
               </LaunchProvider>

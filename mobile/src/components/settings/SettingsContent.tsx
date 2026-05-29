@@ -19,7 +19,7 @@ import {
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { useResponsive } from '@/hooks/useResponsive';
 import { useLaunch } from '@/context/LaunchContext';
-import { APP_SESSION_KEY, MEMBER_SESSION_KEY } from '@/lib/session';
+import { APP_SESSION_KEY, MEMBER_SESSION_KEY, IMPERSONATION_KEY } from '@/lib/session';
 import { resetToRoute } from '@/utils/navigation';
 
 const UI = {
@@ -34,6 +34,8 @@ const UI = {
   surfaceHigh: '#CFE6F2',
   secondary: '#7E5700',
 } as const;
+
+const OWNER_CONSOLE_ENABLED = process.env.EXPO_PUBLIC_OWNER_CONSOLE_ENABLED === 'true';
 
 type SettingsItem = {
   icon: React.FC<{ size: number; color: string }>;
@@ -195,10 +197,16 @@ export default function SettingsContent() {
   };
 
   const handleAdminLogout = async () => {
+    const wasImpersonating = await AsyncStorage.getItem(IMPERSONATION_KEY);
     await AsyncStorage.removeItem(MEMBER_SESSION_KEY);
     await AsyncStorage.removeItem(APP_SESSION_KEY);
+    await AsyncStorage.removeItem(IMPERSONATION_KEY);
     setLaunchComplete(false);
-    resetToRoute(router, { pathname: '/', params: { access: 'choose' } } as any);
+    if (wasImpersonating === 'true') {
+      resetToRoute(router, { pathname: '/owner/subscriptions' } as any);
+    } else {
+      resetToRoute(router, { pathname: '/', params: { access: 'choose' } } as any);
+    }
   };
 
   return (
@@ -243,7 +251,15 @@ export default function SettingsContent() {
             >
               <SettingsIcon color={UI.primary} size={22} />
             </View>
-            <View style={{ flex: 1 }}>
+            <Pressable
+              onLongPress={() => {
+                if (OWNER_CONSOLE_ENABLED) {
+                  router.push('/owner/subscriptions' as any);
+                }
+              }}
+              delayLongPress={1200}
+              style={{ flex: 1 }}
+            >
               <Text
                 numberOfLines={1}
                 style={{
@@ -266,7 +282,7 @@ export default function SettingsContent() {
               >
                 Manage firm & settings
               </Text>
-            </View>
+            </Pressable>
           </View>
         </View>
       </View>

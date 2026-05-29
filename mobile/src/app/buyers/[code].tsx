@@ -8,7 +8,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import {
   ArrowLeft, CreditCard, Eye, FileText, MessageCircle, Phone, Pencil,
-  Image as ImageIcon,
+  Image as ImageIcon, Plus, Trash2,
 } from 'lucide-react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Print from 'expo-print';
@@ -41,7 +41,7 @@ export default function BuyerLedgerScreen() {
   const [sharingBillId, setSharingBillId] = useState<string | null>(null);
   const [editVisible, setEditVisible] = useState(false);
   const [editName, setEditName] = useState('');
-  const [editPhone, setEditPhone] = useState('');
+  const [editPhones, setEditPhones] = useState<string[]>(['']);
   const [editNotes, setEditNotes] = useState('');
   const [openingAmount, setOpeningAmount] = useState('');
   const [openingType, setOpeningType] = useState<'DR' | 'CR'>('DR');
@@ -87,7 +87,7 @@ export default function BuyerLedgerScreen() {
       if (!editName.trim()) throw new Error('Name is required');
       const { error } = await supabase.from('buyers').update({
         name: editName.trim(),
-        phone: editPhone.trim(),
+        phone: editPhones.map(p => p.trim()).filter(Boolean).join(', '),
         notes: editNotes.trim(),
       }).eq('code', buyer.code).eq('shop_id', shop.shopId);
       if (error) throw new Error(error.message);
@@ -102,7 +102,7 @@ export default function BuyerLedgerScreen() {
   const openEditModal = () => {
     if (!buyer) return;
     setEditName(buyer.name);
-    setEditPhone(buyer.phone || '');
+    setEditPhones(buyer.phone ? buyer.phone.split(',').map(p => p.trim()).filter(Boolean) : ['']);
     setEditNotes(buyer.notes || '');
     setEditVisible(true);
   };
@@ -359,18 +359,20 @@ export default function BuyerLedgerScreen() {
                   </Text>
                 </View>
                 {buyer.phone ? (
-                  <>
-                    <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, flex: 1 }}>
-                      {buyer.phone}
-                    </Text>
-                    <Pressable
-                      testID="whatsapp-icon-btn"
-                      onPress={() => openWhatsApp(buyer.phone, generateBalanceMessage(buyer, shop!))}
-                      style={{ padding: 4 }}
-                    >
-                      <MessageCircle size={20} color="#25D366" />
-                    </Pressable>
-                  </>
+                  <View style={{ flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: 6, alignItems: 'center' }}>
+                    {buyer.phone.split(',').map((p) => p.trim()).filter(Boolean).map((p, i) => (
+                      <View key={i} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', paddingLeft: 8, paddingRight: 4, paddingVertical: 2, borderRadius: 14, gap: 6 }}>
+                        <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, fontWeight: '500' }}>{p}</Text>
+                        <Pressable
+                          testID="whatsapp-icon-btn"
+                          onPress={() => openWhatsApp(p, generateBalanceMessage(buyer, shop!))}
+                          style={{ padding: 4, backgroundColor: '#DCFCE7', borderRadius: 10 }}
+                        >
+                          <MessageCircle size={14} color="#16A34A" />
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
                 ) : (
                   <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, flex: 1 }}>
                     No phone
@@ -1010,17 +1012,40 @@ export default function BuyerLedgerScreen() {
                 onSubmitEditing={() => editPhoneRef.current?.focus()}
                 style={modalInputStyle}
               />
-              <TextInput
-                value={editPhone}
-                onChangeText={setEditPhone}
-                placeholder="Phone / मोबाइल"
-                placeholderTextColor="#94A3B8"
-                keyboardType="phone-pad"
-                returnKeyType="next"
-                ref={editPhoneRef}
-                onSubmitEditing={() => editNotesRef.current?.focus()}
-                style={modalInputStyle}
-              />
+              <View style={{ gap: 8 }}>
+                {editPhones.map((phone, index) => (
+                  <View key={index} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <TextInput
+                      value={phone}
+                      onChangeText={(text) => {
+                        const updated = [...editPhones];
+                        updated[index] = text;
+                        setEditPhones(updated);
+                      }}
+                      placeholder={index === 0 ? "Phone / मोबाइल" : "Additional Phone"}
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="phone-pad"
+                      returnKeyType="next"
+                      ref={index === 0 ? editPhoneRef : undefined}
+                      onSubmitEditing={() => editNotesRef.current?.focus()}
+                      style={[modalInputStyle, { flex: 1, marginBottom: 0 }]}
+                    />
+                    {index === Math.max(0, editPhones.length - 1) ? (
+                      <Pressable 
+                        onPress={() => setEditPhones([...editPhones, ''])} 
+                        style={{ padding: 12, backgroundColor: '#F1F5F9', borderRadius: 8, height: 48, justifyContent: 'center' }}>
+                        <Plus size={20} color="#64748B" />
+                      </Pressable>
+                    ) : (
+                      <Pressable 
+                        onPress={() => setEditPhones(editPhones.filter((_, i) => i !== index))} 
+                        style={{ padding: 12, backgroundColor: '#FEE2E2', borderRadius: 8, height: 48, justifyContent: 'center' }}>
+                        <Trash2 size={20} color="#EF4444" />
+                      </Pressable>
+                    )}
+                  </View>
+                ))}
+              </View>
               <TextInput
                 value={editNotes}
                 onChangeText={setEditNotes}

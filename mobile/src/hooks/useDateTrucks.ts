@@ -5,7 +5,7 @@ import type { Truck } from '@/types/truck';
 import { archiveQueryOptions } from '@/lib/queryOptions';
 
 type InquiryRow = {
-  truck_id: string;
+  truck_id: string | null;
   grade: string;
   grade_name: string;
   total_weight: number;
@@ -54,7 +54,7 @@ export function useDateTrucks(date: Date) {
         .or(`and(date.gte.${dateParam},date.lte.${dateEnd}),and(is_godown.eq.true,status.eq.ACTIVE)`)
         .order('created_at', { ascending: false });
       if (error) throw new Error(error.message);
-      const trucks = (data ?? []).map((r) => mapTruck(r as Record<string, unknown>)) as Truck[];
+      const trucks = (data ?? []).map((r: unknown) => mapTruck(r as Record<string, unknown>)) as Truck[];
       const { data: inquiryRows, error: inquiryError } = await supabase
         .from('inquiries')
         .select('truck_id, grade, grade_name, total_weight, status')

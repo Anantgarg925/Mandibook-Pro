@@ -26,7 +26,7 @@ import { AdminPinView } from '@/components/AdminPinView';
 import { DraggableFAB } from '@/components/common/DraggableFAB';
 import { useBillNotifications } from '@/context/BillNotificationContext';
 import { useResponsive } from '@/hooks/useResponsive';
-import { APP_SESSION_KEY, MEMBER_SESSION_KEY } from '@/lib/session';
+import { APP_SESSION_KEY, MEMBER_SESSION_KEY, IMPERSONATION_KEY } from '@/lib/session';
 import { getCurrentBusinessDate } from '@/lib/businessDay';
 import { mapShop, supabase } from '@/lib/supabase';
 import { resetToRoute } from '@/utils/navigation';
@@ -93,16 +93,35 @@ function MetricCard({
   const { isSmall } = useResponsive();
   const content = (
     <>
-      <Text
-        style={{
-          fontSize: FontSize.sm,
-          color: amber ? UI.secondary : UI.muted,
-          marginBottom: Spacing.sm,
-          fontWeight: '600',
-        }}
-      >
-        {label}
-      </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.xs, marginBottom: Spacing.sm }}>
+        <Text
+          style={{
+            flex: 1,
+            fontSize: FontSize.sm,
+            color: amber ? UI.secondary : UI.muted,
+            fontWeight: '700',
+          }}
+          numberOfLines={1}
+        >
+          {label}
+        </Text>
+        {onPress ? (
+          <View
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 12,
+              backgroundColor: amber ? '#FFF3E0' : '#E8F5E9',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 1,
+              borderColor: amber ? '#FFBA38' : '#C8E6C9',
+            }}
+          >
+            <ChevronRight size={15} color={amber ? UI.secondary : UI.primary} />
+          </View>
+        ) : null}
+      </View>
       <Text
         numberOfLines={1}
         adjustsFontSizeToFit={true}
@@ -132,22 +151,28 @@ function MetricCard({
   const cardStyle = {
     flex: 1,
     minHeight: isSmall ? 92 : 104,
-    backgroundColor: Colors.surface,
+    backgroundColor: onPress ? (amber ? '#FFFDF7' : '#F8FFF8') : Colors.surface,
     borderRadius: 14,
     padding: isSmall ? Spacing.sm : Spacing.md,
-    borderWidth: 1,
-    borderColor: amber ? '#FFBA38' : '#E5E7EB',
+    borderWidth: onPress ? 1.5 : 1,
+    borderColor: onPress ? (amber ? '#FFBA38' : Colors.border) : '#E5E7EB',
     justifyContent: 'center',
     overflow: 'hidden',
+    elevation: onPress ? 2 : 0,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: onPress ? 0.08 : 0,
+    shadowRadius: 5,
   } as const;
 
   if (onPress) {
     return (
       <Pressable
         onPress={onPress}
+        android_ripple={{ color: amber ? 'rgba(255,179,0,0.14)' : 'rgba(27,94,32,0.1)' }}
         style={({ pressed }) => [
           { flex: 1 },
-          pressed && { opacity: 0.86, transform: [{ scale: 0.99 }] },
+          pressed && { opacity: 0.88, transform: [{ scale: 0.985 }] },
         ]}
       >
         <View style={cardStyle}>{content}</View>
@@ -396,10 +421,16 @@ export default function HomeScreen() {
   };
 
   const logoutAdmin = async () => {
+    const wasImpersonating = await AsyncStorage.getItem(IMPERSONATION_KEY);
     await AsyncStorage.removeItem(APP_SESSION_KEY);
     await AsyncStorage.removeItem(MEMBER_SESSION_KEY);
+    await AsyncStorage.removeItem(IMPERSONATION_KEY);
     setLaunchComplete(false);
-    resetToRoute(router, { pathname: '/', params: { access: 'choose' } } as any);
+    if (wasImpersonating === 'true') {
+      resetToRoute(router, { pathname: '/owner/subscriptions' } as any);
+    } else {
+      resetToRoute(router, { pathname: '/', params: { access: 'choose' } } as any);
+    }
   };
 
   useEffect(() => {
@@ -774,7 +805,7 @@ export default function HomeScreen() {
 
                 {trucks.length > 3 ? (
                   <Pressable
-                    onPress={() => router.push('/(tabs)/trucks' as any)}
+                    onPress={() => router.push('/trucks' as any)}
                     style={{
                       paddingVertical: Spacing.sm,
                       alignItems: 'center',

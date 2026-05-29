@@ -243,6 +243,7 @@ export default function NewBillScreen() {
         truck_number: payload.inquiry.truckNumber,
         source_agent_name: payload.inquiry.sourceAgentName ?? '',
         source_agent_phone: payload.inquiry.sourceAgentPhone ?? '',
+        source_agent_hidden: !payload.inquiry.sourceAgentName,
         customer_name: payload.inquiry.customerName,
         customer_phone: payload.inquiry.customerPhone,
         grade: payload.inquiry.grade,
@@ -255,6 +256,11 @@ export default function NewBillScreen() {
         apmc_amount: payload.inquiry.apmcAmount,
         bardana_amount: payload.inquiry.bardanaAmount,
         cartage_amount: payload.inquiry.cartageAmount,
+        bardana_sacks: payload.inquiry.applyBardana ? payload.inquiry.bardanaSacks : 0,
+        bardana_rate: payload.inquiry.applyBardana ? payload.inquiry.bardanaRate : 0,
+        apply_bardana: payload.inquiry.applyBardana,
+        apply_apmc: payload.inquiry.applyApmc,
+        charge_snapshot: payload.inquiry.chargeSnapshot,
         net_amount: payload.inquiry.netAmount,
         payment_mode: payload.inquiry.paymentMode,
         upi_ref: payload.inquiry.upiRef,
@@ -352,6 +358,17 @@ export default function NewBillScreen() {
         apmcAmount: result.apmc,
         bardanaAmount: result.bardana,
         cartageAmount: result.cartage,
+        bardanaSacks: sacks,
+        bardanaRate: shop.charges?.bardanaPerSack ?? 0,
+        applyBardana,
+        applyApmc,
+        chargeSnapshot: {
+          apmcCommission: shop.charges?.apmcCommission ?? 0,
+          bardanaPerSack: shop.charges?.bardanaPerSack ?? 0,
+          cartagePerKg: shop.charges?.cartagePerKg ?? 0,
+          applyApmc,
+          applyBardana,
+        },
         netAmount: result.net,
         paymentMode,
         upiRef: upiRef.trim(),
@@ -593,8 +610,27 @@ export default function NewBillScreen() {
               {/* Grade-wise Stock Display */}
               <View style={{ marginBottom: Spacing.md }}>
                 <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginBottom: Spacing.sm, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                  📦 Available Grades
+                  Select Grade
                 </Text>
+                {!boughtFromAgent && selectedTruck && !hasBreakdown ? (
+                  <View
+                    style={{
+                      backgroundColor: '#FFF8E1',
+                      borderWidth: 1,
+                      borderColor: '#FBBF24',
+                      borderRadius: Radius.sm,
+                      padding: Spacing.sm,
+                      marginBottom: Spacing.sm,
+                    }}
+                  >
+                    <Text style={{ fontSize: FontSize.xs, color: '#7E5700', fontWeight: '800' }}>
+                      Shared truck stock: {toIndianWeight(truckAvailableKg)}
+                    </Text>
+                    <Text style={{ fontSize: FontSize.xs, color: '#7E5700', marginTop: 2 }}>
+                      Grade-wise load was not entered for this truck, so stock is common across all grades.
+                    </Text>
+                  </View>
+                ) : null}
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>
                   {boughtFromAgent ? (
                     // Show shop grades when buying from agent
@@ -653,9 +689,8 @@ export default function NewBillScreen() {
                     selectedTruck?.gradeInventory.length ? (
                       selectedTruck.gradeInventory.map((grade) => {
                         const gradeAvailable = Math.max(0, grade.totalKg - grade.confirmedKg - grade.provisionalKg);
-                        const displayAvailable = hasBreakdown ? gradeAvailable : truckAvailableKg;
                         const isSelected = selectedGrade === grade.code;
-                        const stockColor = displayAvailable > 0 ? Colors.success : Colors.danger;
+                        const stockColor = gradeAvailable > 0 ? Colors.success : Colors.danger;
                         return (
                           <Pressable
                             key={grade.code}
@@ -685,15 +720,26 @@ export default function NewBillScreen() {
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
                                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.textSecond }} />
                                 <Text numberOfLines={2} style={{ flex: 1, fontSize: FontSize.xs, color: Colors.textSecond }}>
-                                  {hasBreakdown ? `Total: ${toIndianWeight(grade.totalKg)}` : `Sold from truck: ${toIndianWeight(truckSoldKg)}`}
+                                  {hasBreakdown ? `Total: ${toIndianWeight(grade.totalKg)}` : 'Category only'}
                                 </Text>
                               </View>
                             </View>
                             <View style={{ alignSelf: 'flex-start', backgroundColor: isSelected ? 'rgba(76, 175, 80, 0.1)' : 'transparent', paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, borderRadius: Radius.sm }}>
-                              <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={{ fontSize: FontSize.md, fontWeight: '800', color: stockColor }}>
-                                {toIndianWeight(displayAvailable)}
-                              </Text>
-                              <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 2 }}>Available</Text>
+                              {hasBreakdown ? (
+                                <>
+                                  <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={{ fontSize: FontSize.md, fontWeight: '800', color: stockColor }}>
+                                    {toIndianWeight(gradeAvailable)}
+                                  </Text>
+                                  <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 2 }}>Available</Text>
+                                </>
+                              ) : (
+                                <>
+                                  <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: isSelected ? Colors.primary : Colors.textSecond }}>
+                                    {isSelected ? '✓' : 'Pick'}
+                                  </Text>
+                                  <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 2 }}>Grade</Text>
+                                </>
+                              )}
                             </View>
                           </Pressable>
                         );
@@ -732,7 +778,17 @@ export default function NewBillScreen() {
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond }}>बोरे / Sacks</Text>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: Colors.background,
+                      borderRadius: Radius.round,
+                      borderWidth: 1,
+                      borderColor: Colors.border,
+                      padding: 4,
+                    }}
+                  >
                     <Pressable
                       testID="sacks-minus"
                       onPress={() => {
@@ -744,17 +800,39 @@ export default function NewBillScreen() {
                         width: 44,
                         height: 44,
                         borderRadius: 22,
-                        borderWidth: 2,
-                        borderColor: Colors.primary,
+                        backgroundColor: '#FFFFFF',
+                        borderWidth: 1,
+                        borderColor: Colors.border,
                         alignItems: 'center',
                         justifyContent: 'center',
                       }}
                     >
                       <Minus size={18} color={Colors.primary} strokeWidth={2.5} />
                     </Pressable>
-                    <Text style={{ fontSize: 24, fontWeight: '800', color: Colors.text, minWidth: 36, textAlign: 'center' }}>
-                      {sacks}
-                    </Text>
+                    <TextInput
+                      testID="sacks-input"
+                      value={sacksText}
+                      onChangeText={(v) => {
+                        const cleaned = v.replace(/[^0-9]/g, '').slice(0, 4);
+                        setSacksText(cleaned);
+                        const num = parseInt(cleaned, 10);
+                        setSacks(isNaN(num) ? 0 : num);
+                      }}
+                      keyboardType="number-pad"
+                      returnKeyType="done"
+                      placeholder="0"
+                      placeholderTextColor={Colors.textSecond}
+                      selectTextOnFocus
+                      style={{
+                        width: 72,
+                        height: 44,
+                        fontSize: 22,
+                        fontWeight: '900',
+                        color: Colors.text,
+                        textAlign: 'center',
+                        paddingVertical: 0,
+                      }}
+                    />
                     <Pressable
                       testID="sacks-plus"
                       onPress={() => {
@@ -766,44 +844,14 @@ export default function NewBillScreen() {
                         width: 44,
                         height: 44,
                         borderRadius: 22,
-                        borderWidth: 2,
-                        borderColor: Colors.primary,
+                        backgroundColor: Colors.primary,
                         alignItems: 'center',
                         justifyContent: 'center',
                       }}
                     >
-                      <Plus size={18} color={Colors.primary} strokeWidth={2.5} />
+                      <Plus size={18} color="#FFFFFF" strokeWidth={2.5} />
                     </Pressable>
                   </View>
-                </View>
-                {/* Direct keyboard input for sack count */}
-                <View style={{ marginTop: Spacing.sm }}>
-                  <TextInput
-                    testID="sacks-input"
-                    style={{
-                      height: 48,
-                      borderWidth: 1,
-                      borderColor: Colors.border,
-                      borderRadius: Radius.sm,
-                      paddingHorizontal: Spacing.md,
-                      fontSize: FontSize.md,
-                      backgroundColor: Colors.background,
-                      color: Colors.text,
-                      textAlign: 'center',
-                      fontWeight: '700',
-                    }}
-                    placeholder="Type sack count / बोरे की संख्या टाइप करें"
-                    placeholderTextColor={Colors.textSecond}
-                    value={sacksText}
-                    onChangeText={(v) => {
-                      const cleaned = v.replace(/[^0-9]/g, '');
-                      setSacksText(cleaned);
-                      const num = parseInt(cleaned, 10);
-                      setSacks(isNaN(num) ? 0 : num);
-                    }}
-                    keyboardType="number-pad"
-                    returnKeyType="done"
-                  />
                 </View>
               </View>
 
@@ -859,11 +907,11 @@ export default function NewBillScreen() {
                   {available > 0 ? (
                     (parseFloat(weightPerSack) || 0) * sacks <= available ? (
                       <Text style={{ fontSize: FontSize.xs, color: Colors.success }}>
-                        उपलब्ध ({selectedGrade}): {toIndianWeight(available)} ✅
+                        {hasBreakdown ? `उपलब्ध (${selectedGrade})` : 'Shared truck stock'}: {toIndianWeight(available)} ✅
                       </Text>
                     ) : (
                       <Text style={{ fontSize: FontSize.xs, color: Colors.danger }}>
-                        ⚠ स्टॉक कम है! Only {toIndianWeight(available)} available
+                        ⚠ स्टॉक कम है! Only {toIndianWeight(available)} {hasBreakdown ? 'available in this grade' : 'shared stock available'}
                       </Text>
                     )
                   ) : null}
@@ -892,19 +940,23 @@ export default function NewBillScreen() {
           <View style={{ flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md }}>
             <Pressable
               testID="toggle-apmc"
-              onPress={() => setApplyApmc(!applyApmc)}
+              onPress={() => setApplyApmc((prev) => !prev)}
               style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.surface, padding: Spacing.md, borderRadius: Radius.md, borderWidth: 1, borderColor: applyApmc ? Colors.primary : Colors.border }}
             >
               <Text style={{ fontSize: FontSize.sm, color: applyApmc ? Colors.primary : Colors.textSecond, fontWeight: '700' }}>APMC</Text>
-              <Switch value={applyApmc} onValueChange={setApplyApmc} />
+              <View pointerEvents="none">
+                <Switch value={applyApmc} onValueChange={setApplyApmc} />
+              </View>
             </Pressable>
             <Pressable
               testID="toggle-bardana"
-              onPress={() => setApplyBardana(!applyBardana)}
+              onPress={() => setApplyBardana((prev) => !prev)}
               style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.surface, padding: Spacing.md, borderRadius: Radius.md, borderWidth: 1, borderColor: applyBardana ? Colors.primary : Colors.border }}
             >
               <Text style={{ fontSize: FontSize.sm, color: applyBardana ? Colors.primary : Colors.textSecond, fontWeight: '700' }}>Bardana</Text>
-              <Switch value={applyBardana} onValueChange={setApplyBardana} />
+              <View pointerEvents="none">
+                <Switch value={applyBardana} onValueChange={setApplyBardana} />
+              </View>
             </Pressable>
           </View>
 
@@ -920,9 +972,9 @@ export default function NewBillScreen() {
               }}
             >
               <CalcRow label="Gross" value={toIndianCurrency(calc.gross)} />
-              <CalcRow label="APMC" value={`−${toIndianCurrency(calc.apmc)}`} color={Colors.danger} />
-              <CalcRow label="Bardana" value={`−${toIndianCurrency(calc.bardana)}`} color={Colors.danger} />
-              {calc.cartage > 0 ? <CalcRow label="Cartage" value={`−${toIndianCurrency(calc.cartage)}`} color={Colors.danger} /> : null}
+              <CalcRow label="APMC" value={`+${toIndianCurrency(calc.apmc)}`} color={Colors.text} />
+              <CalcRow label="Bardana" value={`+${toIndianCurrency(calc.bardana)}`} color={Colors.text} />
+              {calc.cartage > 0 ? <CalcRow label="Cartage" value={`+${toIndianCurrency(calc.cartage)}`} color={Colors.text} /> : null}
               <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: Spacing.xs }} />
               <CalcRow label="Net" value={toIndianCurrency(calc.net)} bold />
             </View>
@@ -1276,7 +1328,7 @@ export default function NewBillScreen() {
             </Pressable>
             <Pressable
               testID="home-after-bill"
-              onPress={() => router.replace('/(tabs)')}
+              onPress={() => router.replace('/')}
               style={{
                 flex: 1,
                 height: 52,

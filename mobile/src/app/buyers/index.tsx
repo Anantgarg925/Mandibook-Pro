@@ -24,6 +24,8 @@ import {
   SlidersHorizontal,
   UserPlus,
   Users,
+  Plus,
+  Trash2,
 } from 'lucide-react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { DraggableFAB } from '@/components/common/DraggableFAB';
@@ -46,7 +48,7 @@ export default function BuyerListScreen() {
   const [search, setSearch] = useState('');
   const [addVisible, setAddVisible] = useState(false);
   const [newName, setNewName] = useState('');
-  const [newPhone, setNewPhone] = useState('');
+  const [newPhones, setNewPhones] = useState<string[]>(['']);
   const [openingAmount, setOpeningAmount] = useState('');
   const [openingType, setOpeningType] = useState<'DR' | 'CR'>('DR');
   const [notes, setNotes] = useState('');
@@ -55,12 +57,18 @@ export default function BuyerListScreen() {
   const addBuyerNotesRef = useRef<TextInput>(null);
 
   const fillBuyerFromContact = (contact: Contacts.Contact | Contacts.ExistingContact) => {
-    const phone = contact.phoneNumbers?.[0]?.number?.replace(/\D/g, '').slice(-10) ?? '';
+    const phones: string[] = [];
+    if (contact.phoneNumbers) {
+      contact.phoneNumbers.forEach(p => {
+        const cleaned = p.number?.replace(/\D/g, '').slice(-10);
+        if (cleaned && !phones.includes(cleaned)) phones.push(cleaned);
+      });
+    }
     const name =
       contact.name ||
       [contact.firstName, contact.middleName, contact.lastName].filter(Boolean).join(' ');
     if (name) setNewName(name);
-    if (phone) setNewPhone(phone);
+    if (phones.length > 0) setNewPhones(phones);
   };
 
   const pickBuyerContact = async () => {
@@ -102,11 +110,12 @@ export default function BuyerListScreen() {
       const amount = parseFloat(openingAmount) || 0;
       const signedBalance = openingType === 'CR' ? -amount : amount;
       const code = generateCode(newName, buyers.map((b) => b.code));
+      const phoneString = newPhones.map(p => p.trim()).filter(Boolean).join(', ');
       const { error } = await supabase.from('buyers').insert({
         shop_id: shop.shopId,
         code,
         name: newName.trim(),
-        phone: newPhone.trim(),
+        phone: phoneString,
         outstanding_balance: signedBalance,
         opening_balance: amount,
         opening_balance_type: openingType,
@@ -135,7 +144,7 @@ export default function BuyerListScreen() {
       queryClient.invalidateQueries({ queryKey: ['buyers', shop?.shopId] });
       setAddVisible(false);
       setNewName('');
-      setNewPhone('');
+      setNewPhones(['']);
       setOpeningAmount('');
       setOpeningType('DR');
       setNotes('');
@@ -494,18 +503,40 @@ export default function BuyerListScreen() {
                 onSubmitEditing={() => addBuyerPhoneRef.current?.focus()}
                 style={modalInputStyle}
               />
-              <TextInput
-                testID="add-buyer-phone"
-                value={newPhone}
-                onChangeText={setNewPhone}
-                placeholder="Phone / मोबाइल"
-                placeholderTextColor="#94A3B8"
-                keyboardType="phone-pad"
-                returnKeyType="next"
-                ref={addBuyerPhoneRef}
-                onSubmitEditing={() => addBuyerOpeningRef.current?.focus()}
-                style={modalInputStyle}
-              />
+              <View style={{ gap: 8 }}>
+                {newPhones.map((phone, index) => (
+                  <View key={index} style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <TextInput
+                      value={phone}
+                      onChangeText={(text) => {
+                        const updated = [...newPhones];
+                        updated[index] = text;
+                        setNewPhones(updated);
+                      }}
+                      placeholder={index === 0 ? "Phone / मोबाइल" : "Additional Phone"}
+                      placeholderTextColor="#94A3B8"
+                      keyboardType="phone-pad"
+                      returnKeyType="next"
+                      ref={index === 0 ? addBuyerPhoneRef : undefined}
+                      onSubmitEditing={() => addBuyerOpeningRef.current?.focus()}
+                      style={[modalInputStyle, { flex: 1, marginBottom: 0 }]}
+                    />
+                    {index === Math.max(0, newPhones.length - 1) ? (
+                      <Pressable 
+                        onPress={() => setNewPhones([...newPhones, ''])} 
+                        style={{ padding: 12, backgroundColor: '#F1F5F9', borderRadius: 8, height: 48, justifyContent: 'center' }}>
+                        <Plus size={20} color="#64748B" />
+                      </Pressable>
+                    ) : (
+                      <Pressable 
+                        onPress={() => setNewPhones(newPhones.filter((_, i) => i !== index))} 
+                        style={{ padding: 12, backgroundColor: '#FEE2E2', borderRadius: 8, height: 48, justifyContent: 'center' }}>
+                        <Trash2 size={20} color="#EF4444" />
+                      </Pressable>
+                    )}
+                  </View>
+                ))}
+              </View>
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 <TextInput
                   testID="add-buyer-opening"

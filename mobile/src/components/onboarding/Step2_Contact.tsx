@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
-import { View, Text, TextInput, ScrollView, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, Pressable, KeyboardAvoidingView, Platform } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { Check } from 'lucide-react-native';
 import { Colors, Spacing, FontSize, Radius } from '@/lib/theme';
 
@@ -74,10 +75,13 @@ export default function Step2_Contact({ data, onChange }: Props) {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-      <ScrollView
+      <KeyboardAwareScrollView
         contentContainerStyle={{ padding: Spacing.lg, paddingBottom: Spacing.xl }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        bottomOffset={96}
+        extraKeyboardSpace={16}
+        disableScrollOnKeyboardHide
       >
         <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: Colors.text, marginBottom: Spacing.lg }}>
           संपर्क जानकारी / Contact Details
@@ -165,7 +169,7 @@ export default function Step2_Contact({ data, onChange }: Props) {
             })}
           </View>
         </View>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </KeyboardAvoidingView>
   );
 }

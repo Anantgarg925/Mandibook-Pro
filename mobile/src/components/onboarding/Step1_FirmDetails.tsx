@@ -3,10 +3,10 @@ import {
   View,
   Text,
   TextInput,
-  ScrollView,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { Check } from 'lucide-react-native';
 import { Colors, Spacing, FontSize, Radius } from '@/lib/theme';
 
@@ -90,10 +90,13 @@ export default function Step1_FirmDetails({ data, onChange }: Props) {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       style={{ flex: 1 }}
     >
-      <ScrollView
+      <KeyboardAwareScrollView
         contentContainerStyle={{ padding: Spacing.lg, paddingBottom: Spacing.xl }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        bottomOffset={96}
+        extraKeyboardSpace={16}
+        disableScrollOnKeyboardHide
       >
         <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: Colors.text, marginBottom: Spacing.lg }}>
           फर्म की जानकारी / Firm Details
@@ -185,7 +188,7 @@ export default function Step1_FirmDetails({ data, onChange }: Props) {
             returnKeyType="done"
           />
         </Field>
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </KeyboardAvoidingView>
   );
 }

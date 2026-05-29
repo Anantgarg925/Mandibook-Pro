@@ -22,7 +22,7 @@ export function useInquiries() {
         .lte('date', dateEnd)
         .order('created_at', { ascending: false });
       if (error) throw new Error(error.message);
-      return (data ?? []).map((r) => mapInquiry(r as Record<string, unknown>)) as Inquiry[];
+      return (data ?? []).map((r: unknown) => mapInquiry(r as Record<string, unknown>)) as Inquiry[];
     },
     enabled: !!shop?.shopId,
     ...liveQueryOptions,

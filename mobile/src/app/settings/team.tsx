@@ -7,13 +7,18 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, UserPlus, Trash2, Edit2, Info, User, Eye, EyeOff } from 'lucide-react-native';
 import { useShop, type TeamMember } from '@/context/ShopContext';
+import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus';
 import { Colors, Radius, Spacing } from '@/lib/theme';
 import { supabase } from '@/lib/supabase';
 
 export default function TeamScreen() {
   const router = useRouter();
   const { shop, updateShop } = useShop();
+  const { data: subscriptionStatus } = useSubscriptionStatus();
   const [members, setMembers] = useState<TeamMember[]>(shop?.teamMembers ?? []);
+  const includedMemberLimit = subscriptionStatus?.included_user_count ?? 3;
+  const extraMemberPrice = subscriptionStatus?.extra_user_price_inr ?? 99;
+  const memberLimitReached = members.length >= includedMemberLimit;
   
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -28,6 +33,13 @@ export default function TeamScreen() {
   const [saving, setSaving] = useState(false);
 
   const openAdd = () => {
+    if (memberLimitReached) {
+      Alert.alert(
+        'Member limit reached',
+        `Your plan includes ${includedMemberLimit} team members. Extra members are Rs ${extraMemberPrice}/member/month.`
+      );
+      return;
+    }
     setEditingId(null);
     setNewName('');
     setNewNameHi('');
@@ -67,6 +79,13 @@ export default function TeamScreen() {
     
     if (members.find(m => m.phone === phone && m.id !== editingId)) {
       Alert.alert('Exists', 'A member with this phone number already exists.');
+      return;
+    }
+    if (!editingId && memberLimitReached) {
+      Alert.alert(
+        'Member limit reached',
+        `Your plan includes ${includedMemberLimit} team members. Extra members are Rs ${extraMemberPrice}/member/month.`
+      );
       return;
     }
     
@@ -284,7 +303,7 @@ export default function TeamScreen() {
         <Pressable
           onPress={openAdd}
           style={{
-            backgroundColor: '#0F4D19',
+            backgroundColor: memberLimitReached ? '#8FAE94' : '#0F4D19',
             flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
             paddingVertical: 14, borderRadius: Radius.sm, gap: 12
           }}
@@ -336,7 +355,9 @@ export default function TeamScreen() {
           </View>
           <View style={{ flex: 1 }}>
             <Text style={{ fontSize: 14, fontWeight: '700', color: '#1A5C1F' }}>{members.length} Total Staff Members</Text>
-            <Text style={{ fontSize: 12, color: '#4A4A4A' }}>You can add up to 5 members in the Pro plan.</Text>
+            <Text style={{ fontSize: 12, color: '#4A4A4A' }}>
+              Pro includes {includedMemberLimit} team members. Extra members are Rs {extraMemberPrice}/member/month.
+            </Text>
           </View>
         </View>
       </ScrollView>

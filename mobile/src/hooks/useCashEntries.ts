@@ -44,7 +44,7 @@ export function useCashEntries(date: Date) {
         .lte('date', dateEndParam)
         .order('created_at', { ascending: true });
       if (error) throw new Error(error.message);
-      return (data ?? []).map((r) => {
+      return (data ?? []).map((r: unknown) => {
         const t = mapTransaction(r as Record<string, unknown>);
         return {
           id: t.id,

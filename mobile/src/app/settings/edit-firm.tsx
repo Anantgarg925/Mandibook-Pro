@@ -4,10 +4,10 @@ import {
   Text,
   TextInput,
   Pressable,
-  ScrollView,
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
@@ -121,7 +121,14 @@ export default function EditFirmScreen() {
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingVertical: Spacing.sm, paddingBottom: 96 }}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={{ paddingVertical: Spacing.sm, paddingBottom: 112 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        bottomOffset={112}
+        extraKeyboardSpace={16}
+        disableScrollOnKeyboardHide
+      >
         <Field
           testID="firm-name"
           label="FIRM NAME / दुकान का नाम"
@@ -176,7 +183,7 @@ export default function EditFirmScreen() {
           onChange={set('upiId')}
           placeholder="name@upi"
         />
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       <View
         style={{

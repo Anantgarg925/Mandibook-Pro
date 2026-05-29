@@ -4,10 +4,10 @@ import {
   Text,
   TextInput,
   Pressable,
-  ScrollView,
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
@@ -125,7 +125,14 @@ export default function EditChargesScreen() {
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={{ paddingBottom: 96 }}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={{ paddingBottom: 112 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        bottomOffset={112}
+        extraKeyboardSpace={16}
+        disableScrollOnKeyboardHide
+      >
         <ChargeRow
           testID="charge-apmc"
           label="APMC Commission %"
@@ -161,7 +168,7 @@ export default function EditChargesScreen() {
           value={charges.telePost}
           onChange={set('telePost')}
         />
-      </ScrollView>
+      </KeyboardAwareScrollView>
 
       <View
         style={{

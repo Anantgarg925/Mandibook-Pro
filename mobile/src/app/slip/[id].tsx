@@ -487,8 +487,8 @@ export default function SlipPreviewScreen() {
               }}
             >
               <Text style={{ flex: 1, fontSize: 12, color: '#64748B' }}>APMC</Text>
-              <Text style={{ width: 70, fontSize: 12, color: '#ba1a1a', textAlign: 'right' }}>
-                {Math.round(inquiry.apmcAmount)}
+              <Text style={{ width: 70, fontSize: 12, color: '#071e27', textAlign: 'right' }}>
+                +{Math.round(inquiry.apmcAmount)}
               </Text>
               </View>
             ) : null}
@@ -504,8 +504,8 @@ export default function SlipPreviewScreen() {
                 }}
               >
                 <Text style={{ flex: 1, fontSize: 12, color: '#64748B' }}>Bardana</Text>
-                <Text style={{ width: 70, fontSize: 12, color: '#ba1a1a', textAlign: 'right' }}>
-                  {Math.round(inquiry.bardanaAmount)}
+                <Text style={{ width: 70, fontSize: 12, color: '#071e27', textAlign: 'right' }}>
+                  +{Math.round(inquiry.bardanaAmount)}
                 </Text>
               </View>
             ) : null}
@@ -521,8 +521,8 @@ export default function SlipPreviewScreen() {
                 }}
               >
                 <Text style={{ flex: 1, fontSize: 12, color: '#64748B' }}>Cartage</Text>
-                <Text style={{ width: 70, fontSize: 12, color: '#ba1a1a', textAlign: 'right' }}>
-                  {Math.round(inquiry.cartageAmount)}
+                <Text style={{ width: 70, fontSize: 12, color: '#071e27', textAlign: 'right' }}>
+                  +{Math.round(inquiry.cartageAmount)}
                 </Text>
               </View>
             ) : null}

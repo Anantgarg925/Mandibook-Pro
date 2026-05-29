@@ -1,1 +1,8 @@
 node_modules
+
+# APK builds
+*.apk
+*.aab
+
+# Archives
+*.zip

@@ -11,10 +11,12 @@ import {
   Alert,
   Modal,
   TextInput,
+  KeyboardAvoidingView,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, Plus, Share2, FileText } from 'lucide-react-native';
+import { ArrowLeft, Plus, Share2, FileText, Pencil, Trash2 } from 'lucide-react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
@@ -55,6 +57,13 @@ export default function TruckDetailScreen() {
   const [godownKg, setGodownKg] = useState('');
   const [wastageKg, setWastageKg] = useState('');
   const [wastageReason, setWastageReason] = useState('');
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editTruckNumber, setEditTruckNumber] = useState('');
+  const [editSenderName, setEditSenderName] = useState('');
+  const [editSenderCode, setEditSenderCode] = useState('');
+  const [editChlNumber, setEditChlNumber] = useState('');
+  const [editTotalKg, setEditTotalKg] = useState('');
+  const [editFreightAmount, setEditFreightAmount] = useState('');
   const referenceSlipRef = useRef<View>(null);
 
   const openBill = (bill: Inquiry) => {
@@ -116,7 +125,7 @@ export default function TruckDetailScreen() {
         .eq('truck_id', id)
         .order('created_at', { ascending: false });
       if (error) throw new Error(error.message);
-      return (data ?? []).map((r) => mapInquiry(r as Record<string, unknown>)) as Inquiry[];
+      return (data ?? []).map((r: unknown) => mapInquiry(r as Record<string, unknown>)) as Inquiry[];
     },
     enabled: !!shop?.shopId && !!id,
     ...archiveQueryOptions,
@@ -131,11 +140,113 @@ export default function TruckDetailScreen() {
         .eq('truck_id', id)
         .order('created_at', { ascending: true });
       if (error) throw new Error(error.message);
-      return (data ?? []).map((r) => mapTruckGradeEntry(r as Record<string, unknown>)) as TruckGradeEntry[];
+      return (data ?? []).map((r: unknown) => mapTruckGradeEntry(r as Record<string, unknown>)) as TruckGradeEntry[];
     },
     enabled: !!id,
     ...archiveQueryOptions,
   });
+
+  useEffect(() => {
+    if (!truck) return;
+    setEditTruckNumber(truck.truckNumber);
+    setEditSenderName(truck.senderName);
+    setEditSenderCode(truck.senderCode || '');
+    setEditChlNumber(truck.chlNumber || '');
+    setEditTotalKg(String(truck.totalKg || ''));
+    setEditFreightAmount(String(truck.freightAmount || ''));
+  }, [truck]);
+
+  const editTruckMutation = useMutation({
+    mutationFn: async () => {
+      if (!shop?.shopId || !truck) throw new Error('Missing truck');
+      const nextTotalKg = parseFloat(editTotalKg) || 0;
+      if (!editTruckNumber.trim()) throw new Error('Truck number is required.');
+      if (!editSenderName.trim()) throw new Error('Sender name is required.');
+      if (nextTotalKg <= 0) throw new Error('Total weight must be more than 0.');
+
+      const { error } = await supabase
+        .from('trucks')
+        .update({
+          truck_number: editTruckNumber.trim().toUpperCase(),
+          sender_name: editSenderName.trim(),
+          sender_code: editSenderCode.trim(),
+          chl_number: editChlNumber.trim(),
+          total_kg: nextTotalKg,
+          freight_amount: parseFloat(editFreightAmount) || 0,
+        })
+        .eq('id', truck.id)
+        .eq('shop_id', shop.shopId);
+      if (error) throw new Error(error.message);
+
+      if (editTruckNumber.trim().toUpperCase() !== truck.truckNumber) {
+        const { error: inquiryError } = await supabase
+          .from('inquiries')
+          .update({ truck_number: editTruckNumber.trim().toUpperCase() })
+          .eq('shop_id', shop.shopId)
+          .eq('truck_id', truck.id);
+        if (inquiryError) throw new Error(inquiryError.message);
+      }
+    },
+    onSuccess: () => {
+      setEditModalVisible(false);
+      queryClient.invalidateQueries({ queryKey: ['truck', shop?.shopId, id] });
+      queryClient.invalidateQueries({ queryKey: ['trucks', shop?.shopId] });
+      queryClient.invalidateQueries({ queryKey: ['inquiries', shop?.shopId] });
+    },
+    onError: (error) => {
+      Alert.alert('Could not update truck', error instanceof Error ? error.message : 'Please try again.');
+    },
+  });
+
+  const deleteTruckMutation = useMutation({
+    mutationFn: async () => {
+      if (!shop?.shopId || !truck) throw new Error('Missing truck');
+      if (truckBills.length > 0) {
+        throw new Error('This truck has bills. Delete or cancel those bills first, then delete the truck.');
+      }
+      const { error: gradeError } = await supabase
+        .from('truck_grade_entries')
+        .delete()
+        .eq('truck_id', truck.id);
+      if (gradeError) throw new Error(gradeError.message);
+      const { error } = await supabase
+        .from('trucks')
+        .delete()
+        .eq('id', truck.id)
+        .eq('shop_id', shop.shopId);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['trucks', shop?.shopId] });
+      router.replace((isMemberMode ? '/member-trucks' : '/trucks') as any);
+    },
+    onError: (error) => {
+      Alert.alert('Could not delete truck', error instanceof Error ? error.message : 'Please try again.');
+    },
+  });
+
+  const confirmDeleteTruck = () => {
+    if (deleteTruckMutation.isPending) return;
+    if (truckBills.length > 0) {
+      Alert.alert(
+        'Truck has bills',
+        'This truck cannot be deleted because bills are already linked to it. This protects your stock and ledger history.'
+      );
+      return;
+    }
+    Alert.alert(
+      'Delete truck?',
+      'This will permanently delete this truck and its grade breakdown. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => deleteTruckMutation.mutate(),
+        },
+      ]
+    );
+  };
 
   const moveToGodownMutation = useMutation({
     mutationFn: async () => {
@@ -295,6 +406,21 @@ export default function TruckDetailScreen() {
           style={{ padding: 8, marginRight: 4 }}
         >
           <Share2 size={20} color="#FFFFFF" />
+        </Pressable>
+        <Pressable
+          testID="edit-truck-button"
+          onPress={() => setEditModalVisible(true)}
+          style={{ padding: 8, marginRight: 4 }}
+        >
+          <Pencil size={20} color="#FFFFFF" />
+        </Pressable>
+        <Pressable
+          testID="delete-truck-button"
+          onPress={confirmDeleteTruck}
+          disabled={deleteTruckMutation.isPending}
+          style={{ padding: 8, opacity: deleteTruckMutation.isPending ? 0.5 : 1 }}
+        >
+          <Trash2 size={20} color="#FFFFFF" />
         </Pressable>
       </View>
 
@@ -803,7 +929,104 @@ export default function TruckDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}>
+            <KeyboardAwareScrollView
+              style={{
+                maxHeight: '88%',
+                backgroundColor: '#FFFFFF',
+                borderTopLeftRadius: 20,
+                borderTopRightRadius: 20,
+              }}
+              contentContainerStyle={{ padding: Spacing.md, paddingBottom: insets.bottom + Spacing.md }}
+              keyboardShouldPersistTaps="handled"
+              bottomOffset={120}
+              extraKeyboardSpace={16}
+              disableScrollOnKeyboardHide
+            >
+              <Text style={{ fontSize: FontSize.lg, fontWeight: '900', color: Colors.text }}>
+                Edit Truck Details
+              </Text>
+              <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond, marginTop: 4, marginBottom: Spacing.md }}>
+                Update truck, sender, CHL and load information.
+              </Text>
+
+              <EditField label="Truck Number" value={editTruckNumber} onChangeText={(v) => setEditTruckNumber(v.toUpperCase())} testID="edit-truck-number" />
+              <EditField label="Sender Name" value={editSenderName} onChangeText={setEditSenderName} testID="edit-sender-name" />
+              <EditField label="Sender Code" value={editSenderCode} onChangeText={setEditSenderCode} testID="edit-sender-code" />
+              <EditField label="CHL Number" value={editChlNumber} onChangeText={setEditChlNumber} testID="edit-chl-number" />
+              <EditField label="Total Load (kg)" value={editTotalKg} onChangeText={setEditTotalKg} keyboardType="decimal-pad" testID="edit-total-kg" />
+              <EditField label="Freight Amount" value={editFreightAmount} onChangeText={setEditFreightAmount} keyboardType="decimal-pad" testID="edit-freight-amount" />
+
+              <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md }}>
+                <Pressable
+                  onPress={() => setEditModalVisible(false)}
+                  style={{ flex: 1, minHeight: 52, borderRadius: Radius.sm, borderWidth: 1, borderColor: Colors.border, alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Text style={{ fontSize: FontSize.sm, fontWeight: '900', color: Colors.text }}>Cancel</Text>
+                </Pressable>
+                <Pressable
+                  testID="save-truck-edit"
+                  onPress={() => editTruckMutation.mutate()}
+                  disabled={editTruckMutation.isPending}
+                  style={{ flex: 1, minHeight: 52, borderRadius: Radius.sm, backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center', opacity: editTruckMutation.isPending ? 0.7 : 1 }}
+                >
+                  <Text style={{ fontSize: FontSize.sm, fontWeight: '900', color: '#FFFFFF' }}>
+                    {editTruckMutation.isPending ? 'Saving...' : 'Save Changes'}
+                  </Text>
+                </Pressable>
+              </View>
+            </KeyboardAwareScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
+  );
+}
+
+function EditField({
+  label,
+  value,
+  onChangeText,
+  keyboardType,
+  testID,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (value: string) => void;
+  keyboardType?: 'default' | 'decimal-pad';
+  testID: string;
+}) {
+  return (
+    <View style={{ marginBottom: Spacing.sm }}>
+      <Text style={{ fontSize: FontSize.xs, fontWeight: '800', color: Colors.textSecond, marginBottom: 6 }}>
+        {label}
+      </Text>
+      <TextInput
+        testID={testID}
+        value={value}
+        onChangeText={onChangeText}
+        keyboardType={keyboardType ?? 'default'}
+        placeholderTextColor={Colors.textSecond}
+        style={{
+          minHeight: 52,
+          borderWidth: 1,
+          borderColor: Colors.border,
+          borderRadius: Radius.sm,
+          paddingHorizontal: Spacing.md,
+          fontSize: FontSize.md,
+          color: Colors.text,
+          backgroundColor: Colors.surface,
+        }}
+      />
+    </View>
   );
 }
 

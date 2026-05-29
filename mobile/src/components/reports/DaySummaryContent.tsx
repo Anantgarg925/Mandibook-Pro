@@ -87,7 +87,7 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
         .gte('date', dateParam)
         .lte('date', dateEndParam);
       if (error) throw new Error(error.message);
-      return (data || []).map((r) => mapInquiry(r as Record<string, unknown>)) as Inquiry[];
+      return (data || []).map((r: unknown) => mapInquiry(r as Record<string, unknown>)) as Inquiry[];
     },
     enabled: !!shop?.shopId,
     ...archiveQueryOptions,
@@ -284,9 +284,9 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
   }));
   const allReceipts: CashEntry[] = [
     ...cashReceiptsFromSales,
-    ...cashEntries.filter(e => e.type === 'RECEIPT'),
+    ...cashEntries.filter((e: CashEntry) => e.type === 'RECEIPT'),
   ];
-  const allPayments: CashEntry[] = cashEntries.filter(e => e.type === 'PAYMENT');
+  const allPayments: CashEntry[] = cashEntries.filter((e: CashEntry) => e.type === 'PAYMENT');
   const totalReceipts = allReceipts.reduce((s, e) => s + e.amount, 0);
   const totalPayments = allPayments.reduce((s, e) => s + e.amount, 0);
   const closingBalance = totalReceipts - totalPayments;

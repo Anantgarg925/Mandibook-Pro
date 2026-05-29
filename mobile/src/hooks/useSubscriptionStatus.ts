@@ -2,17 +2,27 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useShop } from '@/context/ShopContext';
 
+export type SubscriptionLifecycleStatus = 'trial' | 'active' | 'payment_pending' | 'expired' | 'cancelled' | 'rejected';
+
 export type SubscriptionStatus = {
   shop_id: string;
-  status: 'trial' | 'active' | 'payment_pending' | 'expired' | 'cancelled';
+  status: SubscriptionLifecycleStatus;
   is_allowed: boolean;
   days_remaining: number;
   trial_started_at: number;
   trial_ends_at: number;
   current_period_ends_at?: number | null;
   monthly_price_inr: number;
+  pricing_plan?: 'early_lifetime' | 'standard';
+  early_customer_number?: number | null;
+  included_user_count?: number;
+  extra_user_price_inr?: number;
+  standard_price_inr?: number;
   payment_requested_at?: number | null;
+  payment_grace_ends_at?: number | null;
   payment_note?: string | null;
+  payment_rejected_at?: number | null;
+  payment_rejected_reason?: string | null;
   server_time: number;
 };
 

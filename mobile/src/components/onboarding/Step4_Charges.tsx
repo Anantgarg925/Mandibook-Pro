@@ -1,5 +1,6 @@
 import React from 'react';
-import { View, Text, TextInput, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, KeyboardAvoidingView, Platform } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { Colors, Spacing, FontSize } from '@/lib/theme';
 import type { ShopCharges } from '@/context/ShopContext';
 
@@ -59,10 +60,13 @@ function ChargeField({
 export default function Step4_Charges({ charges, onChange }: Props) {
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
-      <ScrollView
+      <KeyboardAwareScrollView
         contentContainerStyle={{ padding: Spacing.lg, paddingBottom: Spacing.xl }}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        bottomOffset={96}
+        extraKeyboardSpace={16}
+        disableScrollOnKeyboardHide
       >
         <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: Colors.text, marginBottom: 4 }}>
           दर और कमीशन
@@ -115,7 +119,7 @@ export default function Step4_Charges({ charges, onChange }: Props) {
           onChange={(v) => onChange({ telePost: v })}
           hint="तार व डाक — प्रति खेप संचार खर्च (0 if not applicable)"
         />
-      </ScrollView>
+      </KeyboardAwareScrollView>
     </KeyboardAvoidingView>
   );
 }

@@ -23,8 +23,9 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
   const { shop } = useShop();
   const { trucks } = useTodayTrucks();
   const queryClient = useQueryClient();
+  const isAgentStock = !inquiry.truckId || inquiry.truckNumber === 'Agent Stock' || !!inquiry.sourceAgentName;
 
-  const [truckId, setTruckId] = useState(inquiry.truckId);
+  const [truckId, setTruckId] = useState<string | null>(inquiry.truckId ?? null);
   const [customerName, setCustomerName] = useState(inquiry.customerName);
   const [customerPhone, setCustomerPhone] = useState(inquiry.customerPhone);
   const [grade, setGrade] = useState(inquiry.grade);
@@ -61,7 +62,7 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
   const bardanaRateNum = parseFloat(bardanaRate) || 0;
 
   useEffect(() => {
-    setTruckId(inquiry.truckId);
+    setTruckId(inquiry.truckId ?? null);
     setCustomerName(inquiry.customerName);
     setCustomerPhone(inquiry.customerPhone);
     setGrade(inquiry.grade);
@@ -142,8 +143,10 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
   const buildInquiryUpdate = (status?: 'PENDING' | 'CONFIRMED') => {
     if (!calc) throw new Error('Missing calculation');
     return {
-      truck_id: truckId,
-      truck_number: selectedTruck?.truckNumber ?? inquiry.truckNumber,
+      truck_id: isAgentStock ? null : truckId,
+      truck_number: isAgentStock ? 'Agent Stock' : selectedTruck?.truckNumber ?? inquiry.truckNumber,
+      source_agent_name: inquiry.sourceAgentName ?? '',
+      source_agent_phone: inquiry.sourceAgentPhone ?? '',
       customer_name: customerName.trim(),
       customer_phone: customerPhone.trim(),
       grade,
@@ -181,7 +184,7 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
 
   const validateEdits = (requirePayment = false) => {
     const e: Record<string, string> = {};
-    if (!truckId) e.truck = 'गाड़ी चुनें / Select truck';
+    if (!isAgentStock && !truckId) e.truck = 'गाड़ी चुनें / Select truck';
     if (paymentMode === 'UDHAARI' && !customerName.trim() && !customerPhone.trim()) {
       e.customer = 'उधारी के लिए नाम या नंबर डालें / Enter name or phone';
     }
@@ -233,7 +236,7 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
 
         const normalizedName = customerName.trim().toLowerCase();
         const normalizedPhone = customerPhone.trim();
-        const existing = (buyerRows ?? []).find((buyer) => {
+        const existing = ((buyerRows ?? []) as Record<string, unknown>[]).find((buyer) => {
           const buyerPhone = String(buyer.phone ?? '').trim();
           const buyerName = String(buyer.name ?? '').trim().toLowerCase();
           return (
@@ -439,37 +442,51 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
           </View>
           <View style={{ padding: Spacing.sm, gap: 6 }}>
             <View>
-              <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600', marginBottom: 6 }}>Truck</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                {trucks.map((truck) => {
-                  const active = truck.id === truckId;
-                  return (
-                    <Pressable
-                      key={truck.id}
-                      testID={`auth-truck-${inquiry.id}-${truck.id}`}
-                      onPress={() => {
-                        setTruckId(truck.id);
-                        if (!truck.gradeInventory.find((g) => g.code === grade)) {
-                          setGrade(truck.gradeInventory[0]?.code ?? grade);
-                        }
-                        if (errors.truck) setErrors((prev) => { const { truck: _truck, ...rest } = prev; return rest; });
-                      }}
-                      style={{
-                        paddingHorizontal: 10,
-                        paddingVertical: 7,
-                        borderRadius: Radius.round,
-                        borderWidth: 1,
-                        borderColor: active ? '#00450D' : '#CBD5E1',
-                        backgroundColor: active ? '#E8F5E9' : '#FFFFFF',
-                      }}
-                    >
-                      <Text style={{ fontSize: 11, fontWeight: '800', color: active ? '#00450D' : '#334155' }}>
-                        {truck.truckNumber}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
+              <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600', marginBottom: 6 }}>
+                {isAgentStock ? 'Source' : 'Truck'}
+              </Text>
+              {isAgentStock ? (
+                <View style={{ borderWidth: 1, borderColor: '#C8E6C9', backgroundColor: '#F0FDF4', borderRadius: Radius.sm, padding: Spacing.sm }}>
+                  <Text style={{ fontSize: 12, color: '#166534', fontWeight: '800' }}>
+                    Bought from agent
+                  </Text>
+                  <Text style={{ fontSize: 12, color: '#334155', fontWeight: '600', marginTop: 2 }}>
+                    {inquiry.sourceAgentName || 'Agent Stock'}
+                    {inquiry.sourceAgentPhone ? ` · ${inquiry.sourceAgentPhone}` : ''}
+                  </Text>
+                </View>
+              ) : (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {trucks.map((truck) => {
+                    const active = truck.id === truckId;
+                    return (
+                      <Pressable
+                        key={truck.id}
+                        testID={`auth-truck-${inquiry.id}-${truck.id}`}
+                        onPress={() => {
+                          setTruckId(truck.id);
+                          if (!truck.gradeInventory.find((g) => g.code === grade)) {
+                            setGrade(truck.gradeInventory[0]?.code ?? grade);
+                          }
+                          if (errors.truck) setErrors((prev) => { const { truck: _truck, ...rest } = prev; return rest; });
+                        }}
+                        style={{
+                          paddingHorizontal: 10,
+                          paddingVertical: 7,
+                          borderRadius: Radius.round,
+                          borderWidth: 1,
+                          borderColor: active ? '#00450D' : '#CBD5E1',
+                          backgroundColor: active ? '#E8F5E9' : '#FFFFFF',
+                        }}
+                      >
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: active ? '#00450D' : '#334155' }}>
+                          {truck.truckNumber}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
               {errors.truck ? <Text style={{ color: Colors.danger, fontSize: FontSize.xs, marginTop: 4 }}>{errors.truck}</Text> : null}
             </View>
 

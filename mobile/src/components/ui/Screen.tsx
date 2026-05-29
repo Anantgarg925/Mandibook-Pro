@@ -1,5 +1,6 @@
 import React, { type ReactNode } from 'react';
-import { ScrollView, View, type ViewStyle } from 'react-native';
+import { View, type ViewStyle } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView, type Edge } from 'react-native-safe-area-context';
 import { Colors, Spacing } from '@/lib/theme';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -35,9 +36,12 @@ export function Screen({
       style={[{ flex: 1, backgroundColor: Colors.background }, style]}
     >
       {scroll ? (
-        <ScrollView
+        <KeyboardAwareScrollView
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          bottomOffset={bottomPadding + 24}
+          extraKeyboardSpace={16}
+          disableScrollOnKeyboardHide
           contentContainerStyle={[
             {
               paddingHorizontal,
@@ -48,7 +52,7 @@ export function Screen({
           ]}
         >
           {children}
-        </ScrollView>
+        </KeyboardAwareScrollView>
       ) : (
         <View style={[{ flex: 1, paddingHorizontal }, contentStyle]}>{children}</View>
       )}

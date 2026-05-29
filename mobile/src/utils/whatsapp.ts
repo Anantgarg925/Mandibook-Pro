@@ -63,23 +63,40 @@ export function generateBalanceMessage(buyer: Buyer, shop: ShopData): string {
 }
 
 export async function openWhatsApp(phone: string, message: string): Promise<void> {
-  const clean = phone.replace(/\D/g, '');
-  if (!clean) {
+  const phones = phone.split(',').map(p => p.replace(/\D/g, '')).filter(Boolean);
+  if (phones.length === 0) {
     Alert.alert('Mobile number missing', 'इस बिल में मोबाइल नंबर सेव नहीं है');
     return;
   }
-  const number = clean.startsWith('91') ? clean : `91${clean}`;
-  const text = encodeURIComponent(message);
-  const appUrl = `whatsapp://send?phone=${number}&text=${text}`;
-  const webUrl = `https://wa.me/${number}?text=${text}`;
 
-  try {
+  const launchWA = async (p: string) => {
+    const number = p.startsWith('91') ? p : `91${p}`;
+    const text = encodeURIComponent(message);
+    const appUrl = `whatsapp://send?phone=${number}&text=${text}`;
+    const webUrl = `https://wa.me/${number}?text=${text}`;
+
     try {
-      await Linking.openURL(appUrl);
+      try {
+        await Linking.openURL(appUrl);
+      } catch {
+        await Linking.openURL(webUrl);
+      }
     } catch {
-      await Linking.openURL(webUrl);
+      Alert.alert('Error', 'WhatsApp नहीं खुल सका');
     }
-  } catch {
-    Alert.alert('Error', 'WhatsApp नहीं खुल सका');
+  };
+
+  if (phones.length > 1) {
+    Alert.alert(
+      'Select Number',
+      'Which number would you like to send to?',
+      [
+        { text: phones[0], onPress: () => launchWA(phones[0]) },
+        { text: phones[1], onPress: () => launchWA(phones[1]) },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  } else {
+    await launchWA(phones[0]);
   }
 }

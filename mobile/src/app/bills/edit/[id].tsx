@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  View, Text, TextInput, ScrollView, Pressable,
+  View, Text, TextInput, Pressable,
   KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
 import { ArrowLeft, Check } from 'lucide-react-native';
@@ -83,7 +84,7 @@ export default function EditBillScreen() {
   const sacksRef = useRef<TextInput>(null);
   const weightRef = useRef<TextInput>(null);
   const rateRef = useRef<TextInput>(null);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<any>(null);
   const sectionY = useRef<Record<string, number>>({});
 
   const rememberSection = (key: string) => (event: any) => {
@@ -272,12 +273,15 @@ export default function EditBillScreen() {
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <ScrollView
+        <KeyboardAwareScrollView
           ref={scrollRef}
           style={{ flex: 1 }}
-          contentContainerStyle={{ padding: Spacing.md, paddingBottom: Spacing.md }}
+          contentContainerStyle={{ padding: Spacing.md, paddingBottom: 120 }}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
+          bottomOffset={120}
+          extraKeyboardSpace={16}
+          disableScrollOnKeyboardHide
         >
           {/* Customer Section */}
           <View onLayout={rememberSection('customer')}>
@@ -417,14 +421,14 @@ export default function EditBillScreen() {
               </Text>
               <CalcRow label="Total Weight" value={toIndianWeight(calc.totalWeight)} />
               <CalcRow label="Gross Amount" value={toIndianCurrency(calc.gross)} />
-              {calc.apmc > 0 ? <CalcRow label="APMC" value={`−${toIndianCurrency(calc.apmc)}`} color={Colors.danger} /> : null}
-              {calc.bardana > 0 ? <CalcRow label="Bardana" value={`−${toIndianCurrency(calc.bardana)}`} color={Colors.danger} /> : null}
-              {calc.cartage > 0 ? <CalcRow label="Cartage" value={`−${toIndianCurrency(calc.cartage)}`} color={Colors.danger} /> : null}
+              {calc.apmc > 0 ? <CalcRow label="APMC" value={`+${toIndianCurrency(calc.apmc)}`} color={Colors.text} /> : null}
+              {calc.bardana > 0 ? <CalcRow label="Bardana" value={`+${toIndianCurrency(calc.bardana)}`} color={Colors.text} /> : null}
+              {calc.cartage > 0 ? <CalcRow label="Cartage" value={`+${toIndianCurrency(calc.cartage)}`} color={Colors.text} /> : null}
               <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: Spacing.xs }} />
               <CalcRow label="Net Amount" value={toIndianCurrency(calc.net)} bold />
             </View>
           ) : null}
-        </ScrollView>
+        </KeyboardAwareScrollView>
 
         {/* Save Button */}
         <View

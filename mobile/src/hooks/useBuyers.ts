@@ -17,7 +17,7 @@ export function useBuyers() {
         .neq('code', '__cashbook__')
         .order('name', { ascending: true });
       if (error) throw new Error(error.message);
-      return (data ?? []).map((r) => mapBuyer(r as Record<string, unknown>)) as Buyer[];
+      return (data ?? []).map((r: unknown) => mapBuyer(r as Record<string, unknown>)) as Buyer[];
     },
     enabled: !!shop?.shopId,
     ...archiveQueryOptions,
@@ -41,7 +41,7 @@ export function useBuyerTransactions(buyerCode: string) {
         .eq('buyer_code', buyerCode)
         .order('date', { ascending: false });
       if (error) throw new Error(error.message);
-      return (data ?? []).map((r) => mapTransaction(r as Record<string, unknown>)) as Transaction[];
+      return (data ?? []).map((r: unknown) => mapTransaction(r as Record<string, unknown>)) as Transaction[];
     },
     enabled: !!shop?.shopId && !!buyerCode,
     ...archiveQueryOptions,
@@ -64,7 +64,7 @@ export function useBuyerBills(buyerName?: string) {
         .order('date', { ascending: false })
         .order('created_at', { ascending: false });
       if (error) throw new Error(error.message);
-      return (data ?? []).map((r) => mapInquiry(r as Record<string, unknown>)) as Inquiry[];
+      return (data ?? []).map((r: unknown) => mapInquiry(r as Record<string, unknown>)) as Inquiry[];
     },
     enabled: !!shop?.shopId && !!buyerName,
     ...archiveQueryOptions,

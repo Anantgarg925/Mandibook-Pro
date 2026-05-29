@@ -64,6 +64,7 @@ export function BillNotificationProvider({ children }: { children: React.ReactNo
   const queryClient = useQueryClient();
   const [unreadCount, setUnreadCount] = useState(0);
   const readyRef = useRef(false);
+  const channelInstanceRef = useRef(`${Date.now()}-${Math.random().toString(36).slice(2)}`);
 
   useEffect(() => {
     prepareNotificationSound()
@@ -94,7 +95,7 @@ export function BillNotificationProvider({ children }: { children: React.ReactNo
     if (!shop?.shopId) return;
 
     const channel = supabase
-      .channel(`new-bill-notifications-${shop.shopId}`)
+      .channel(`new-bill-notifications-${shop.shopId}-${channelInstanceRef.current}`)
       .on(
         'postgres_changes',
         {
@@ -103,7 +104,7 @@ export function BillNotificationProvider({ children }: { children: React.ReactNo
           table: 'inquiries',
           filter: `shop_id=eq.${shop.shopId}`,
         },
-        async (payload) => {
+        async (payload: { new: Record<string, unknown> }) => {
           const bill = payload.new as {
             id?: string;
             slip_number?: number;

@@ -92,10 +92,17 @@ export default function BillsScreen() {
   const [expandedGrades, setExpandedGrades] = useState<Record<string, boolean>>({});
   const pagerRef = React.useRef<PagerView>(null);
   const FILTER_TABS: FilterTab[] = ['ALL', 'PENDING', 'CONFIRMED', 'UDHAARI', 'GRADE'];
+  const filterIndex = (tab: FilterTab) => {
+    const index = FILTER_TABS.indexOf(tab);
+    return index >= 0 ? index : 0;
+  };
 
   useEffect(() => {
     if (filter === 'PENDING' || filter === 'CONFIRMED' || filter === 'UDHAARI' || filter === 'ALL') {
       setActiveFilter(filter);
+      requestAnimationFrame(() => {
+        pagerRef.current?.setPage(filterIndex(filter));
+      });
     }
   }, [filter]);
 
@@ -301,7 +308,7 @@ export default function BillsScreen() {
           <PagerView
             ref={pagerRef}
             style={{ flex: 1 }}
-            initialPage={FILTER_TABS.indexOf(activeFilter) !== -1 ? FILTER_TABS.indexOf(activeFilter) : 0}
+            initialPage={filterIndex(activeFilter)}
             onPageSelected={(e) => setActiveFilter(FILTER_TABS[e.nativeEvent.position])}
           >
             {FILTER_TABS.map((tabStatus, index) => {

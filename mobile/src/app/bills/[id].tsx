@@ -164,10 +164,10 @@ export default function BillDetailScreen() {
           >
             <Row label="Rate" value={`₹${inquiry.ratePerKg}/kg`} />
             <Row label="Gross" value={toIndianCurrency(inquiry.grossAmount)} />
-            <Row label="APMC" value={`−${toIndianCurrency(inquiry.apmcAmount)}`} valueColor={Colors.danger} />
-            <Row label="Bardana" value={`−${toIndianCurrency(inquiry.bardanaAmount)}`} valueColor={Colors.danger} />
+            <Row label="APMC" value={`+${toIndianCurrency(inquiry.apmcAmount)}`} valueColor={Colors.text} />
+            <Row label="Bardana" value={`+${toIndianCurrency(inquiry.bardanaAmount)}`} valueColor={Colors.text} />
             {inquiry.cartageAmount > 0 ? (
-              <Row label="Cartage" value={`−${toIndianCurrency(inquiry.cartageAmount)}`} valueColor={Colors.danger} />
+              <Row label="Cartage" value={`+${toIndianCurrency(inquiry.cartageAmount)}`} valueColor={Colors.text} />
             ) : null}
             <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: Spacing.xs }} />
             <Row label="Net Amount" value={toIndianCurrency(inquiry.netAmount)} bold />

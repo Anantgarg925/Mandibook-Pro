@@ -2,10 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
+  TextInput,
   Pressable,
   StyleSheet,
   Vibration,
-  useWindowDimensions,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, {
@@ -14,14 +16,12 @@ import Animated, {
   withTiming,
   withSequence,
   runOnJS,
-  withSpring,
   FadeIn,
 } from 'react-native-reanimated';
 import { MaterialIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
 const PIN_LENGTH = 4;
-const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'back'] as const;
 
 interface Props {
   visible: boolean;
@@ -34,57 +34,26 @@ interface Props {
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-function ScaleKey({ onPress, children, style, testID, isBack }: any) {
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  return (
-    <AnimatedPressable
-      testID={testID}
-      onPress={onPress}
-      onPressIn={() => (scale.value = withSpring(0.9))}
-      onPressOut={() => (scale.value = withSpring(1))}
-      style={[style, animatedStyle]}
-      android_ripple={{ color: isBack ? '#ffdad6' : 'rgba(0,69,13,0.1)', borderless: true, radius: 40 }}
-    >
-      {children}
-    </AnimatedPressable>
-  );
-}
-
 export function AdminPinView({ visible, onHide, onSuccess, onCancel, correctPin, onVerifyPin }: Props) {
   const insets = useSafeAreaInsets();
-  const [entered, setEntered] = useState<string[]>([]);
+  const inputRef = useRef<TextInput>(null);
+  const [entered, setEntered] = useState('');
   const [error, setError] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const opacity = useSharedValue(0);
   const animRef = useRef(false);
   const wasVisible = useRef(false);
   const shakeX = useSharedValue(0);
 
-  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
-  const isSmallHeight = screenHeight < 700;
-  const isVerySmallHeight = screenHeight < 600;
-
-  // Bound the keypad width so it doesn't grow too large on wide/tall screens
-  // and shrink it on small screens to prevent overlapping with the footer
-  let maxW = 340;
-  if (isVerySmallHeight) maxW = 240;
-  else if (isSmallHeight) maxW = 280;
-
-  const keypadW = Math.min(screenWidth - 32, maxW);
-  const keySize = Math.floor((keypadW - 48) / 3);
-  const keyFontSize = Math.floor(keySize * 0.4);
-
   useEffect(() => {
     if (visible) {
       wasVisible.current = true;
       animRef.current = false;
-      setEntered([]);
+      setEntered('');
       setError(false);
+      setVerifying(false);
       opacity.value = withTiming(1, { duration: 380 });
+      setTimeout(() => inputRef.current?.focus(), 250);
     } else if (wasVisible.current && !animRef.current) {
       animRef.current = true;
       const hide = onHide;
@@ -96,6 +65,7 @@ export function AdminPinView({ visible, onHide, onSuccess, onCancel, correctPin,
 
   const rejectPin = () => {
     setError(true);
+    setVerifying(false);
     Vibration.vibrate(400);
     shakeX.value = withSequence(
       withTiming(-12, { duration: 55 }),
@@ -105,12 +75,14 @@ export function AdminPinView({ visible, onHide, onSuccess, onCancel, correctPin,
       withTiming(0, { duration: 55 }),
     );
     setTimeout(() => {
-      setEntered([]);
+      setEntered('');
       setError(false);
+      inputRef.current?.focus();
     }, 700);
   };
 
   const verifyPin = async (pin: string) => {
+    setVerifying(true);
     const valid = onVerifyPin ? await onVerifyPin(pin) : pin === correctPin;
     if (valid) {
       onSuccess();
@@ -119,21 +91,13 @@ export function AdminPinView({ visible, onHide, onSuccess, onCancel, correctPin,
     }
   };
 
-  const handleKey = (key: string) => {
+  const handlePinChange = (value: string) => {
+    if (verifying) return;
     if (error) setError(false);
-    if (key === 'back') {
-      setEntered((prev) => prev.slice(0, -1));
-      return;
-    }
-    if (entered.length >= PIN_LENGTH) return;
-
-    const next = [...entered, key];
+    const next = value.replace(/\D/g, '').slice(0, PIN_LENGTH);
     setEntered(next);
 
-    if (next.length === PIN_LENGTH) {
-      const pin = next.join('');
-      verifyPin(pin).catch(rejectPin);
-    }
+    if (next.length === PIN_LENGTH) verifyPin(next).catch(rejectPin);
   };
 
   const containerStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
@@ -155,39 +119,41 @@ export function AdminPinView({ visible, onHide, onSuccess, onCancel, correctPin,
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top || 16 }]}>
         <View style={styles.headerLeft}>
-          <MaterialIcons name="shield" size={isVerySmallHeight ? 20 : 24} color="#00450d" />
-          <Text style={[styles.headerTitle, isVerySmallHeight && { fontSize: 16 }]}>MandiBook Pro</Text>
+          <MaterialIcons name="shield" size={24} color="#00450d" />
+          <Text style={styles.headerTitle}>MandiBook Pro</Text>
         </View>
         <Pressable
           testID="pin-cancel"
           onPress={onCancel}
           style={({ pressed }) => [
             styles.cancelBtn,
-            isVerySmallHeight && { width: 36, height: 36 },
             pressed && { backgroundColor: '#E2E8F0' }
           ]}
         >
-          <MaterialIcons name="close" size={isVerySmallHeight ? 20 : 22} color="#071e27" />
+          <MaterialIcons name="close" size={22} color="#071e27" />
         </Pressable>
       </View>
 
-      {/* Body */}
-      <View style={styles.body}>
+      <KeyboardAvoidingView
+        style={styles.body}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={insets.top}
+      >
         {/* Upper section */}
-        <View style={[styles.upperSection, { marginTop: isSmallHeight ? 8 : 32 }]}>
+        <View style={styles.upperSection}>
           {/* Lock icon */}
           <LinearGradient
             colors={['rgba(0,69,13,0.15)', 'rgba(0,69,13,0.05)']}
-            style={[styles.lockCircle, isVerySmallHeight && { width: 72, height: 72, marginBottom: 12 }]}
+            style={styles.lockCircle}
           >
-            <MaterialIcons name="lock-outline" size={isVerySmallHeight ? 36 : 48} color="#00450d" />
+            <MaterialIcons name="lock-outline" size={48} color="#00450d" />
           </LinearGradient>
 
-          <Text style={[styles.heading, isVerySmallHeight && { fontSize: 22 }]}>Enter Admin PIN</Text>
+          <Text style={styles.heading}>Enter Admin PIN</Text>
           <Text style={styles.headingHindi}>एडमिन पिन डालें</Text>
 
           {/* PIN dots */}
-          <Animated.View style={[styles.dotsRow, dotsStyle, { marginTop: isSmallHeight ? 12 : 24 }]}>
+          <Animated.View style={[styles.dotsRow, dotsStyle]}>
             {Array.from({ length: PIN_LENGTH }).map((_, i) => (
               <View
                 key={i}
@@ -214,50 +180,38 @@ export function AdminPinView({ visible, onHide, onSuccess, onCancel, correctPin,
           </View>
         </View>
 
-        {/* Keypad */}
-        <View style={[styles.keypad, { width: keypadW, marginBottom: isSmallHeight ? 0 : 24 }]}>
-          {KEYS.map((key, idx) => {
-            if (key === '') {
-              return (
-                <View
-                  key={idx}
-                  style={{ width: keySize, height: keySize, margin: isVerySmallHeight ? 6 : 8 }}
-                />
-              );
-            }
-            if (key === 'back') {
-              return (
-                <ScaleKey
-                  key={idx}
-                  testID="pin-backspace"
-                  isBack={true}
-                  onPress={() => handleKey('back')}
-                  style={{ width: keySize, height: keySize, margin: isVerySmallHeight ? 6 : 8 }}
-                >
-                  <View style={[styles.keyBtn, styles.backBtn, { borderRadius: keySize / 2 }]}>
-                    <MaterialIcons name="backspace" size={24} color="#ba1a1a" />
-                  </View>
-                </ScaleKey>
-              );
-            }
-            return (
-              <ScaleKey
-                key={idx}
-                testID={`pin-key-${key}`}
-                onPress={() => handleKey(key)}
-                style={{ width: keySize, height: keySize, margin: isVerySmallHeight ? 6 : 8 }}
-              >
-                <View style={[styles.keyBtn, styles.numBtn, { borderRadius: keySize / 2 }]}>
-                  <Text style={[styles.keyText, { fontSize: keyFontSize }]}>{key}</Text>
-                </View>
-              </ScaleKey>
-            );
-          })}
+        <View style={styles.inputWrap}>
+          <TextInput
+            ref={inputRef}
+            testID="admin-pin-native-input"
+            value={entered}
+            onChangeText={handlePinChange}
+            editable={!verifying}
+            keyboardType="number-pad"
+            inputMode="numeric"
+            textContentType="oneTimeCode"
+            secureTextEntry
+            maxLength={PIN_LENGTH}
+            caretHidden
+            autoFocus={visible}
+            style={styles.nativeInput}
+          />
+          <AnimatedPressable
+            testID="pin-keyboard-focus"
+            onPress={() => inputRef.current?.focus()}
+            style={styles.keyboardButton}
+            android_ripple={{ color: 'rgba(0,69,13,0.08)' }}
+          >
+            <MaterialIcons name="keyboard" size={20} color="#00450d" />
+            <Text style={styles.keyboardButtonText}>
+              {verifying ? 'Checking PIN...' : 'Use phone keyboard'}
+            </Text>
+          </AnimatedPressable>
         </View>
-      </View>
+      </KeyboardAvoidingView>
 
       {/* Footer */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + (isSmallHeight ? 12 : 24) }]} />
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 24 }]} />
 
       {/* Bottom accent */}
       <LinearGradient
@@ -317,6 +271,7 @@ const styles = StyleSheet.create({
   upperSection: {
     alignItems: 'center',
     width: '100%',
+    marginTop: 32,
   },
   lockCircle: {
     width: 96,
@@ -345,6 +300,7 @@ const styles = StyleSheet.create({
   dotsRow: {
     flexDirection: 'row',
     gap: 24,
+    marginTop: 24,
   },
   dot: {
     width: 18,
@@ -382,31 +338,39 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#ba1a1a',
   },
-  keypad: {
+  inputWrap: {
+    width: '100%',
+    maxWidth: 360,
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  nativeInput: {
+    position: 'absolute',
+    width: 1,
+    height: 1,
+    opacity: 0,
+  },
+  keyboardButton: {
+    minHeight: 52,
+    paddingHorizontal: 20,
+    borderRadius: 26,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1,
+    borderColor: '#C8E6C9',
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  keyBtn: {
     alignItems: 'center',
     justifyContent: 'center',
-    flex: 1,
-  },
-  numBtn: {
-    backgroundColor: '#ffffff',
+    gap: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
     elevation: 2,
   },
-  backBtn: {
-    backgroundColor: 'rgba(255, 255, 255, 0.5)',
-  },
-  keyText: {
+  keyboardButtonText: {
+    fontSize: 14,
     fontWeight: '800',
-    color: '#071e27',
+    color: '#00450d',
   },
   footer: {
     alignItems: 'center',
