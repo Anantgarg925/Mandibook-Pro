@@ -899,9 +899,8 @@ export default function BuyerLedgerScreen() {
         onRequestClose={() => setOpeningVisible(false)}
       >
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }} onPress={() => setOpeningVisible(false)}>
+          <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)' }} onPress={() => setOpeningVisible(false)} />
             <View
-              onStartShouldSetResponder={() => true}
               style={{
                 position: 'absolute',
                 left: 0,
@@ -977,7 +976,6 @@ export default function BuyerLedgerScreen() {
                 </Text>
               </Pressable>
             </View>
-          </Pressable>
         </KeyboardAvoidingView>
       </Modal>
 
@@ -986,9 +984,8 @@ export default function BuyerLedgerScreen() {
       {/* Edit Buyer Modal */}
       <Modal visible={editVisible} transparent animationType="slide" onRequestClose={() => setEditVisible(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' }} onPress={() => setEditVisible(false)}>
+          <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)' }} onPress={() => setEditVisible(false)} />
             <View
-              onStartShouldSetResponder={() => true}
               style={{
                 position: 'absolute',
                 left: 0,
@@ -1050,7 +1047,6 @@ export default function BuyerLedgerScreen() {
                 </Text>
               </Pressable>
             </View>
-          </Pressable>
         </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>

@@ -12,11 +12,14 @@ import {
   Platform,
   useWindowDimensions,
 } from 'react-native';
+import * as Contacts from 'expo-contacts';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
   ArrowLeft,
   Clock,
+  Phone,
   Search,
   SlidersHorizontal,
   UserPlus,
@@ -50,6 +53,30 @@ export default function BuyerListScreen() {
   const addBuyerPhoneRef = useRef<TextInput>(null);
   const addBuyerOpeningRef = useRef<TextInput>(null);
   const addBuyerNotesRef = useRef<TextInput>(null);
+
+  const fillBuyerFromContact = (contact: Contacts.Contact | Contacts.ExistingContact) => {
+    const phone = contact.phoneNumbers?.[0]?.number?.replace(/\D/g, '').slice(-10) ?? '';
+    const name =
+      contact.name ||
+      [contact.firstName, contact.middleName, contact.lastName].filter(Boolean).join(' ');
+    if (name) setNewName(name);
+    if (phone) setNewPhone(phone);
+  };
+
+  const pickBuyerContact = async () => {
+    try {
+      const permission = await Contacts.requestPermissionsAsync();
+      if (permission.status !== 'granted') {
+        Alert.alert('Contacts permission needed', 'Contact access is required to select buyer details.');
+        return;
+      }
+      const contact = await Contacts.presentContactPickerAsync();
+      if (contact) fillBuyerFromContact(contact);
+    } catch (err) {
+      console.log('Buyer contact picker error:', err);
+      Alert.alert('Could not open contacts', 'Please enter buyer details manually.');
+    }
+  };
 
   const sorted = useMemo(
     () =>
@@ -411,24 +438,52 @@ export default function BuyerListScreen() {
 
       <Modal visible={addVisible} transparent animationType="slide" onRequestClose={() => setAddVisible(false)}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
-          <Pressable style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.35)' }} onPress={() => setAddVisible(false)}>
-            <View
-              onStartShouldSetResponder={() => true}
-              style={{
-                position: 'absolute',
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: '#FFFFFF',
-                borderTopLeftRadius: 20,
-                borderTopRightRadius: 20,
+          <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)' }} onPress={() => setAddVisible(false)} />
+          <KeyboardAwareScrollView
+            onStartShouldSetResponder={() => true}
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: '#FFFFFF',
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              maxHeight: '86%',
+            }}
+              contentContainerStyle={{
                 padding: 20,
                 paddingBottom: 20 + insets.bottom,
               }}
+              keyboardShouldPersistTaps="handled"
+              bottomOffset={96}
+              extraKeyboardSpace={16}
+              disableScrollOnKeyboardHide
             >
               <Text style={{ fontSize: 18, fontWeight: '800', color: '#071e27', marginBottom: 14 }}>
                 Add Buyer / ग्राहक जोड़ें
               </Text>
+              <Pressable
+                testID="add-buyer-contact-picker"
+                onPress={pickBuyerContact}
+                style={{
+                  minHeight: 44,
+                  borderRadius: 8,
+                  borderWidth: 1,
+                  borderColor: '#C8E6C9',
+                  backgroundColor: '#E8F5E9',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexDirection: 'row',
+                  gap: 8,
+                  marginBottom: 10,
+                }}
+              >
+                <Phone size={18} color="#1b5e20" />
+                <Text style={{ fontSize: 14, fontWeight: '800', color: '#1b5e20' }}>
+                  Select from contacts
+                </Text>
+              </Pressable>
               <TextInput
                 testID="add-buyer-name"
                 value={newName}
@@ -510,8 +565,7 @@ export default function BuyerListScreen() {
                   {addBuyerMutation.isPending ? 'Saving...' : 'Save Buyer'}
                 </Text>
               </Pressable>
-            </View>
-          </Pressable>
+            </KeyboardAwareScrollView>
         </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
