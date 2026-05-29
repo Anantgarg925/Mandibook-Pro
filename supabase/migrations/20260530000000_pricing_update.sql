@@ -1,43 +1,59 @@
--- Early customer subscription pricing.
--- First 50 firms get Rs 399/month locked while subscribed; later firms pay Rs 550/month.
+-- Update standard_price_inr default to 649
+alter table if exists public.shop_subscriptions alter column standard_price_inr set default 649;
 
-alter table public.shop_subscriptions
-  add column if not exists pricing_plan text not null default 'early_lifetime',
-  add column if not exists early_customer_number integer,
-  add column if not exists included_user_count integer not null default 3,
-  add column if not exists extra_user_price_inr integer not null default 99,
-  add column if not exists standard_price_inr integer not null default 649;
-
-do $$
+create or replace function app_private.ensure_subscription_rows()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_now bigint := (extract(epoch from clock_timestamp()) * 1000)::bigint;
+  v_existing_early_count integer;
 begin
-  if not exists (
-    select 1
-    from pg_constraint
-    where conname = 'shop_subscriptions_pricing_plan_check'
-      and conrelid = 'public.shop_subscriptions'::regclass
-  ) then
-    alter table public.shop_subscriptions
-      add constraint shop_subscriptions_pricing_plan_check
-      check (pricing_plan in ('early_lifetime', 'standard'));
-  end if;
-end $$;
+  select count(*)::integer into v_existing_early_count
+  from public.shop_subscriptions
+  where pricing_plan = 'early_lifetime';
 
-with ranked as (
+  with missing as (
+    select
+      s.id as shop_id,
+      coalesce(
+        case when s.created_at < 1000000000000 then s.created_at * 1000 else s.created_at end,
+        v_now
+      ) as trial_start,
+      row_number() over (order by s.created_at asc, s.id asc) as rn
+    from public.shops s
+    left join public.shop_subscriptions sub on sub.shop_id = s.id
+    where sub.shop_id is null
+  )
+  insert into public.shop_subscriptions (
+    shop_id,
+    status,
+    trial_started_at,
+    trial_ends_at,
+    monthly_price_inr,
+    pricing_plan,
+    early_customer_number,
+    included_user_count,
+    extra_user_price_inr,
+    standard_price_inr
+  )
   select
     shop_id,
-    row_number() over (order by created_at asc, shop_id asc) as rn
-  from public.shop_subscriptions
-)
-update public.shop_subscriptions s
-set pricing_plan = case when ranked.rn <= 10 then 'early_lifetime' else 'standard' end,
-    early_customer_number = case when ranked.rn <= 10 then ranked.rn else null end,
-    monthly_price_inr = case when ranked.rn <= 10 then 399 else 649 end,
-    included_user_count = coalesce(s.included_user_count, 3),
-    extra_user_price_inr = coalesce(s.extra_user_price_inr, 99),
-    standard_price_inr = 649,
-    updated_at = (extract(epoch from clock_timestamp()) * 1000)::bigint
-from ranked
-where s.shop_id = ranked.shop_id;
+    'trial',
+    trial_start,
+    trial_start + (20::bigint * 24 * 60 * 60 * 1000),
+    case when v_existing_early_count + rn <= 10 then 399 else 649 end,
+    case when v_existing_early_count + rn <= 10 then 'early_lifetime' else 'standard' end,
+    case when v_existing_early_count + rn <= 10 then v_existing_early_count + rn else null end,
+    3,
+    99,
+    649
+  from missing
+  on conflict (shop_id) do nothing;
+end;
+$$;
 
 create or replace function public.get_subscription_status(p_shop_id text)
 returns jsonb
@@ -56,6 +72,7 @@ declare
   v_pricing_plan text;
   v_early_customer_number integer;
   v_monthly_price_inr integer;
+  v_grace_ends_at bigint;
 begin
   select * into v_shop
   from public.shops
@@ -105,7 +122,7 @@ begin
     v_early_customer_number,
     3,
     99,
-    550
+    649
   )
   on conflict (shop_id) do nothing;
 
@@ -125,10 +142,15 @@ begin
     where shop_id = p_shop_id;
   end if;
 
+  v_grace_ends_at := case
+    when v_sub.payment_requested_at is not null then v_sub.payment_requested_at + (24::bigint * 60 * 60 * 1000)
+    else null
+  end;
+
   v_status := case
-    when v_sub.status = 'cancelled' then 'cancelled'
+    when v_sub.status in ('cancelled', 'rejected') then v_sub.status
     when v_sub.current_period_ends_at is not null and v_sub.current_period_ends_at > v_now then 'active'
-    when v_sub.status = 'payment_pending' then 'payment_pending'
+    when v_sub.status = 'payment_pending' and v_grace_ends_at is not null and v_grace_ends_at > v_now then 'payment_pending'
     when v_sub.trial_ends_at > v_now then 'trial'
     else 'expired'
   end;
@@ -137,6 +159,10 @@ begin
     update public.shop_subscriptions
     set status = v_status,
         updated_at = v_now
+    where shop_id = p_shop_id;
+
+    select * into v_sub
+    from public.shop_subscriptions
     where shop_id = p_shop_id;
   end if;
 
@@ -160,11 +186,11 @@ begin
     'extra_user_price_inr', v_sub.extra_user_price_inr,
     'standard_price_inr', v_sub.standard_price_inr,
     'payment_requested_at', v_sub.payment_requested_at,
+    'payment_grace_ends_at', case when v_status = 'payment_pending' then v_grace_ends_at else null end,
     'payment_note', v_sub.payment_note,
+    'payment_rejected_at', v_sub.payment_rejected_at,
+    'payment_rejected_reason', v_sub.payment_rejected_reason,
     'server_time', v_now
   );
 end;
 $$;
-
-revoke all on function public.get_subscription_status(text) from public;
-grant execute on function public.get_subscription_status(text) to anon, authenticated;

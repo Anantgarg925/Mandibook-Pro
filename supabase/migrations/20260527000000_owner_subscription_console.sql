@@ -14,7 +14,7 @@ alter table public.shop_subscriptions
   add column if not exists early_customer_number integer,
   add column if not exists included_user_count integer not null default 3,
   add column if not exists extra_user_price_inr integer not null default 99,
-  add column if not exists standard_price_inr integer not null default 550,
+  add column if not exists standard_price_inr integer not null default 649,
   add column if not exists payment_rejected_at bigint,
   add column if not exists payment_rejected_reason text,
   add column if not exists payment_verified_by text;
@@ -118,9 +118,9 @@ begin
     'trial',
     trial_start,
     trial_start + (20::bigint * 24 * 60 * 60 * 1000),
-    case when v_existing_early_count + rn <= 50 then 399 else 550 end,
-    case when v_existing_early_count + rn <= 50 then 'early_lifetime' else 'standard' end,
-    case when v_existing_early_count + rn <= 50 then v_existing_early_count + rn else null end,
+    case when v_existing_early_count + rn <= 10 then 399 else 649 end,
+    case when v_existing_early_count + rn <= 10 then 'early_lifetime' else 'standard' end,
+    case when v_existing_early_count + rn <= 10 then v_existing_early_count + rn else null end,
     3,
     99,
     550
@@ -165,14 +165,14 @@ begin
   from public.shop_subscriptions
   where pricing_plan = 'early_lifetime';
 
-  if v_early_count < 50 then
+  if v_early_count < 10 then
     v_pricing_plan := 'early_lifetime';
     v_early_customer_number := v_early_count + 1;
     v_monthly_price_inr := 399;
   else
     v_pricing_plan := 'standard';
     v_early_customer_number := null;
-    v_monthly_price_inr := 550;
+    v_monthly_price_inr := 649;
   end if;
 
   insert into public.shop_subscriptions (

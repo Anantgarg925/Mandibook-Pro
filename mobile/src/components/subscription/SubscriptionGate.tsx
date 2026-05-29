@@ -27,6 +27,7 @@ const PAYTM_QR_IMAGE_URL = process.env.EXPO_PUBLIC_PAYTM_QR_IMAGE_URL ?? '';
 const UPI_PAYEE_NAME = process.env.EXPO_PUBLIC_UPI_PAYEE_NAME ?? '';
 const PAYTM_PHONE_UPI_ID = PAYTM_PHONE.length === 10 ? `${PAYTM_PHONE}@paytm` : '';
 const PRIMARY_UPI_ID = PAYTM_PHONE_UPI_ID || PAYTM_UPI_ID;
+const SUPPORT_WHATSAPP = (process.env.EXPO_PUBLIC_SUPPORT_WHATSAPP ?? '').replace(/\D/g, '');
 
 function formatDate(ms?: number | null) {
   if (!ms) return '';
@@ -120,8 +121,9 @@ function Paywall({
   submitting: boolean;
 }) {
   const [note, setNote] = useState('');
+  const [planType, setPlanType] = useState<'monthly' | 'annual'>('monthly');
   const amount = status?.monthly_price_inr ?? 399;
-  const standardAmount = status?.standard_price_inr ?? 550;
+  const standardAmount = status?.standard_price_inr ?? 649;
   const includedUsers = status?.included_user_count ?? 3;
   const extraUserPrice = status?.extra_user_price_inr ?? 99;
   const earlyCustomerNumber = status?.early_customer_number ?? null;
@@ -129,6 +131,9 @@ function Paywall({
   const monthlySaving = Math.max(0, standardAmount - amount);
   const yearlySaving = monthlySaving * 12;
   const dailyCost = Math.ceil(amount / 30);
+  const annualAmount = Math.round(amount * 10); // 2 months free on annual
+  const annualSaving = amount * 12 - annualAmount;
+  const payAmount = planType === 'annual' ? annualAmount : amount;
   const pending = status?.status === 'payment_pending';
   const openUpiPayment = async () => {
     if (!PRIMARY_UPI_ID) {
@@ -137,7 +142,7 @@ function Paywall({
     }
 
     try {
-      await Linking.openURL(buildUpiPaymentUrl(amount));
+      await Linking.openURL(buildUpiPaymentUrl(payAmount));
     } catch {
       Alert.alert(
         'Could not open UPI app',
@@ -164,11 +169,50 @@ function Paywall({
           <Text style={{ fontSize: FontSize.xs, fontWeight: '900', color: Colors.primary, letterSpacing: 0 }}>
             MANDIBOOK PRO
           </Text>
-          <Text style={{ marginTop: 4, fontSize: FontSize.xxl, fontWeight: '900', color: Colors.text, lineHeight: 30 }}>
-            Run the firm from every phone for {formatRupees(amount)}/month
+
+          {/* Daily cost hero — most persuasive line */}
+          <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'baseline', gap: 6 }}>
+            <Text style={{ fontSize: 36, fontWeight: '900', color: Colors.text, lineHeight: 42 }}>
+              {formatRupees(dailyCost)}
+            </Text>
+            <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: Colors.textSecond }}>
+              per day
+            </Text>
+          </View>
+          <Text style={{ marginTop: 2, fontSize: FontSize.sm, color: Colors.textSecond, lineHeight: 20 }}>
+            For the full firm — every phone, every member, every report.
           </Text>
-          <Text style={{ marginTop: 6, fontSize: FontSize.sm, color: Colors.textSecond, lineHeight: 20 }}>
-            Your 20 day free trial has ended. Keep billing, approvals, stock, udhaari, buyers, trucks, and reports working without interruption.
+
+          {/* Plan toggle */}
+          <View style={{ marginTop: Spacing.md, flexDirection: 'row', borderRadius: Radius.sm, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden' }}>
+            <Pressable
+              onPress={() => setPlanType('monthly')}
+              style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: planType === 'monthly' ? Colors.primary : Colors.surface }}
+            >
+              <Text style={{ fontSize: FontSize.sm, fontWeight: '900', color: planType === 'monthly' ? '#FFFFFF' : Colors.textSecond }}>
+                Monthly
+              </Text>
+              <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: planType === 'monthly' ? '#D7EED9' : Colors.textSecond }}>
+                {formatRupees(amount)}/mo
+              </Text>
+            </Pressable>
+            <Pressable
+              onPress={() => setPlanType('annual')}
+              style={{ flex: 1, paddingVertical: 10, alignItems: 'center', backgroundColor: planType === 'annual' ? Colors.primary : Colors.surface }}
+            >
+              <Text style={{ fontSize: FontSize.sm, fontWeight: '900', color: planType === 'annual' ? '#FFFFFF' : Colors.textSecond }}>
+                Annual
+              </Text>
+              <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: planType === 'annual' ? '#D7EED9' : '#2E7D32' }}>
+                Save {formatRupees(annualSaving)}/yr
+              </Text>
+            </Pressable>
+          </View>
+
+          <Text style={{ marginTop: 6, fontSize: FontSize.xs, color: Colors.textSecond, lineHeight: 17, fontWeight: '700' }}>
+            {planType === 'annual'
+              ? `Pay ${formatRupees(annualAmount)} once for 12 months — 2 months free.`
+              : 'Your 20 day free trial has ended. Keep billing, approvals, stock, udhaari, buyers, trucks, and reports working without interruption.'}
           </Text>
 
           <View
@@ -185,10 +229,10 @@ function Paywall({
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: Spacing.sm }}>
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: FontSize.xs, fontWeight: '900', color: isEarlyPlan ? '#7A5200' : Colors.textSecond }}>
-                  {isEarlyPlan ? 'EARLY PRICE LOCKED WHILE SUBSCRIBED' : 'MONTHLY PLAN'}
+                  {isEarlyPlan ? 'EARLY PRICE LOCKED WHILE SUBSCRIBED' : planType === 'annual' ? 'ANNUAL PLAN' : 'MONTHLY PLAN'}
                 </Text>
                 <Text style={{ marginTop: 2, fontSize: FontSize.xl, fontWeight: '900', color: Colors.text }}>
-                  {formatRupees(amount)}/month
+                  {planType === 'annual' ? `${formatRupees(annualAmount)}/year` : `${formatRupees(amount)}/month`}
                 </Text>
               </View>
               {isEarlyPlan ? (
@@ -203,7 +247,7 @@ function Paywall({
                   }}
                 >
                   <Text style={{ fontSize: FontSize.xs, fontWeight: '900', color: '#7A5200' }}>
-                    {earlyCustomerNumber ? `Early #${earlyCustomerNumber}` : 'First 50'}
+                    {earlyCustomerNumber ? `Early #${earlyCustomerNumber}` : 'First 10'}
                   </Text>
                 </View>
               ) : null}
@@ -211,7 +255,7 @@ function Paywall({
 
             {monthlySaving > 0 ? (
               <Text style={{ fontSize: FontSize.sm, color: '#7A5200', lineHeight: 19, fontWeight: '800' }}>
-                Standard price is {formatRupees(standardAmount)}/month. You save {formatRupees(monthlySaving)}/month, about {formatRupees(yearlySaving)}/year while subscribed.
+                After the first 10 firms, price goes to {formatRupees(standardAmount)}/month. You are locked at {formatRupees(amount)}/month as long as you stay subscribed.
               </Text>
             ) : (
               <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond, lineHeight: 19, fontWeight: '800' }}>
@@ -220,7 +264,7 @@ function Paywall({
             )}
 
             <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond, lineHeight: 19, fontWeight: '800' }}>
-              Includes {includedUsers} team members. Extra members can be added at {formatRupees(extraUserPrice)}/member/month.
+              Includes {includedUsers} team members free. Add more at {formatRupees(extraUserPrice)}/member/month — a 10-member firm pays only {formatRupees(amount + (7 * extraUserPrice))}/month total.
             </Text>
           </View>
 
@@ -256,10 +300,10 @@ function Paywall({
               })}
             >
               <Text style={{ fontSize: FontSize.md, fontWeight: '900', color: '#FFFFFF' }}>
-                Pay {formatRupees(amount)} with UPI app
+                Pay {formatRupees(payAmount)} with UPI app
               </Text>
               <Text style={{ marginTop: 2, fontSize: FontSize.xs, fontWeight: '700', color: '#D7EED9' }}>
-                {PAYTM_PHONE_UPI_ID ? `Pays to Paytm number ${PAYTM_PHONE}` : 'Opens Paytm, PhonePe, GPay, BHIM, or any UPI app'}
+                {planType === 'annual' ? '12 months · 2 months free' : PAYTM_PHONE_UPI_ID ? `Pays to Paytm number ${PAYTM_PHONE}` : 'Opens Paytm, PhonePe, GPay, BHIM, or any UPI app'}
               </Text>
             </Pressable>
           ) : null}
@@ -379,6 +423,17 @@ function Paywall({
               Refresh status
             </Text>
           </Pressable>
+
+          {SUPPORT_WHATSAPP ? (
+            <Pressable
+              onPress={() => Linking.openURL(`https://wa.me/91${SUPPORT_WHATSAPP}?text=MandiBook+subscription+help+needed`)}
+              style={{ marginTop: 4, height: 44, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 }}
+            >
+              <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: '#25D366' }}>
+                Need help? WhatsApp us
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -411,7 +466,8 @@ export function SubscriptionGate({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!data?.is_allowed) {
+  // DEV ONLY: Force show paywall to test UI
+  if  (!data?.is_allowed){
     return (
       <Paywall
         status={data}
