@@ -9,14 +9,18 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
-import { Phone, Clock, User } from 'lucide-react-native';
+import { Phone, Clock, User, ChevronDown } from 'lucide-react-native';
 import { supabase } from '@/lib/supabase';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { useShop } from '@/context/ShopContext';
 import { useTodayTrucks } from '@/hooks/useTodayTrucks';
 import { calculateCharges } from '@/utils/calculations';
+import { toIndianWeight } from '@/lib/formatters';
 import type { Inquiry, PaymentMode } from '@/types/inquiry';
 import PaymentSelector from './PaymentSelector';
+import EditableSlipRow from './EditableSlipRow';
+import * as Contacts from 'expo-contacts';
+import { useBuyers } from '@/hooks/useBuyers';
 
 export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
   const router = useRouter();
@@ -337,476 +341,323 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
     cancelMutation.mutate();
   };
 
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const { buyers } = useBuyers();
+  const [buyerSuggestions, setBuyerSuggestions] = useState<any[]>([]);
+
+  const handleCustomerNameChange = (val: string) => {
+    setCustomerName(val);
+    if (errors.customer) setErrors((prev) => { const { customer, ...rest } = prev; return rest; });
+    const lower = val.toLowerCase();
+    if (lower.length > 0) {
+      setBuyerSuggestions(
+        buyers.filter((b: any) => b.name.toLowerCase().includes(lower)).slice(0, 5)
+      );
+    } else {
+      setBuyerSuggestions([]);
+    }
+  };
+
+  const openContactPicker = async () => {
+    try {
+      const permission = await Contacts.requestPermissionsAsync();
+      if (permission.status === 'granted') {
+        const contact = await Contacts.presentContactPickerAsync();
+        if (contact) {
+          setCustomerName(contact.name || '');
+          if (contact.phoneNumbers && contact.phoneNumbers.length > 0) {
+            const phone = contact.phoneNumbers[0].number?.replace(/[^\d]/g, '') || '';
+            setCustomerPhone(phone);
+          }
+          setBuyerSuggestions([]);
+        }
+      }
+    } catch (error) {
+      console.log('Contact picker error:', error);
+    }
+  };
+
+  const selectBuyer = (b: any) => {
+    setCustomerName(b.name);
+    setCustomerPhone(b.phone);
+    setBuyerSuggestions([]);
+  };
+
+
+
+
   return (
     <View
       style={{
         backgroundColor: '#FFFFFF',
-        borderRadius: Radius.lg,
         marginHorizontal: Spacing.md,
         marginTop: Spacing.sm,
         marginBottom: Spacing.xl,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 8,
-        elevation: 5,
-        overflow: 'hidden',
-        borderWidth: 1,
-        borderColor: '#E2E8F0' // Light border similar to image
+        borderWidth: 2,
+        borderColor: '#111827',
+        padding: 22,
       }}
     >
-      {/* Top Header - Light Blue */}
+      <Text style={{ fontSize: 24, fontWeight: '900', color: '#111827', textAlign: 'center' }}>
+        {shop?.firmName?.toUpperCase() ?? 'MANDIBOOK'}
+      </Text>
+      <Text style={{ fontSize: 14, color: '#111827', textAlign: 'center', marginTop: 4, marginBottom: 16 }}>
+        {[shop?.phone1, shop?.phone2].filter(Boolean).join(' / ')}
+      </Text>
+
       <View
         style={{
-          backgroundColor: '#F0F9FF',
-          paddingHorizontal: Spacing.md,
-          paddingVertical: Spacing.sm,
-          borderBottomWidth: 1,
-          borderBottomColor: '#E2E8F0'
+          borderWidth: 2,
+          borderColor: '#111827',
+          marginBottom: 16,
+          paddingVertical: 8,
+          paddingHorizontal: 10,
         }}
       >
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
-          <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: '#0F2C23', letterSpacing: 0.5 }}>
-            SLIP #SL-{inquiry.slipNumber}
-          </Text>
-          <View style={{ backgroundColor: inquiry.status === 'DELIVERED' ? '#DBEAFE' : '#FDE047', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
-            <Text style={{ fontSize: 10, fontWeight: '800', color: inquiry.status === 'DELIVERED' ? '#1D4ED8' : '#1F2937' }}>
-              {inquiry.status === 'DELIVERED' ? 'DELIVERED' : 'VERIFICATION NEEDED'}
-            </Text>
-          </View>
-        </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-          <Clock size={12} color="#6B7280" style={{ marginRight: 4 }} />
-          <Text style={{ fontSize: FontSize.xs, color: '#6B7280', fontWeight: '500' }}>
-            {timeAgoStr}
-          </Text>
-        </View>
-      </View>
-
-      {/* Customer & Grade Section */}
-      <View style={{ padding: Spacing.md, flexDirection: 'row', alignItems: 'center' }}>
-        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#E0F2FE', alignItems: 'center', justifyContent: 'center', marginRight: Spacing.md }}>
-          <User size={22} color="#0EA5E9" />
-        </View>
-        <View style={{ flex: 1 }}>
-          <TextInput
-            testID={`auth-customer-name-${inquiry.id}`}
-            style={{
-              fontSize: FontSize.lg,
-              fontWeight: '800',
-              color: '#0F2C23',
-              borderBottomWidth: 1,
-              borderBottomColor: errors.customer ? Colors.danger : '#CBD5E1',
-              paddingVertical: 2,
-            }}
-            placeholder="Customer name"
-            placeholderTextColor="#94A3B8"
-            value={customerName}
-            onChangeText={(value) => {
-              setCustomerName(value);
-              if (errors.customer) setErrors((prev) => { const { customer, ...rest } = prev; return rest; });
-            }}
-          />
-          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-            <Phone size={12} color="#0EA5E9" style={{ marginRight: 4 }} />
-            <TextInput
-              testID={`auth-customer-phone-${inquiry.id}`}
-              style={{
-                flex: 1,
-                fontSize: FontSize.sm,
-                color: '#0EA5E9',
-                fontWeight: '700',
-                paddingVertical: 0,
-              }}
-              placeholder="Phone"
-              placeholderTextColor="#94A3B8"
-              value={customerPhone}
-              onChangeText={(value) => setCustomerPhone(value.replace(/\D/g, '').slice(0, 10))}
-              keyboardType="phone-pad"
-            />
-          </View>
-        </View>
-        <View style={{ alignItems: 'flex-end' }}>
-          <Text style={{ fontSize: 10, color: '#6B7280', fontWeight: '600', marginBottom: 2 }}>Grade / श्रेणी</Text>
-          <Text style={{ fontSize: FontSize.md, color: '#0F2C23', fontWeight: '800' }}>{gradeName}</Text>
-        </View>
-      </View>
-
-      {/* Slip details */}
-      <View style={{ paddingHorizontal: Spacing.md, paddingBottom: Spacing.md }}>
-        <View style={{ backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: Radius.sm, overflow: 'hidden' }}>
-          <View style={{ paddingHorizontal: Spacing.sm, paddingVertical: 10, backgroundColor: '#F8FAFC', borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }}>
-            <Text style={{ fontSize: 10, color: '#111827', fontWeight: '900', letterSpacing: 0.4 }}>
-              SLIP DETAILS
-            </Text>
-          </View>
-          <View style={{ padding: Spacing.sm, gap: 6 }}>
-            <View>
-              <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600', marginBottom: 6 }}>
-                {isAgentStock ? 'Source' : 'Truck'}
-              </Text>
-              {isAgentStock ? (
-                <View style={{ borderWidth: 1, borderColor: '#C8E6C9', backgroundColor: '#F0FDF4', borderRadius: Radius.sm, padding: Spacing.sm }}>
-                  <Text style={{ fontSize: 12, color: '#166534', fontWeight: '800' }}>
-                    Bought from agent
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#334155', fontWeight: '600', marginTop: 2 }}>
-                    {inquiry.sourceAgentName || 'Agent Stock'}
-                    {inquiry.sourceAgentPhone ? ` · ${inquiry.sourceAgentPhone}` : ''}
-                  </Text>
-                </View>
-              ) : (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                  {trucks.map((truck) => {
-                    const active = truck.id === truckId;
-                    return (
-                      <Pressable
-                        key={truck.id}
-                        testID={`auth-truck-${inquiry.id}-${truck.id}`}
-                        onPress={() => {
-                          setTruckId(truck.id);
-                          if (!truck.gradeInventory.find((g) => g.code === grade)) {
-                            setGrade(truck.gradeInventory[0]?.code ?? grade);
-                          }
-                          if (errors.truck) setErrors((prev) => { const { truck: _truck, ...rest } = prev; return rest; });
-                        }}
-                        style={{
-                          paddingHorizontal: 10,
-                          paddingVertical: 7,
-                          borderRadius: Radius.round,
-                          borderWidth: 1,
-                          borderColor: active ? '#00450D' : '#CBD5E1',
-                          backgroundColor: active ? '#E8F5E9' : '#FFFFFF',
-                        }}
-                      >
-                        <Text style={{ fontSize: 11, fontWeight: '800', color: active ? '#00450D' : '#334155' }}>
-                          {truck.truckNumber}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              )}
-              {errors.truck ? <Text style={{ color: Colors.danger, fontSize: FontSize.xs, marginTop: 4 }}>{errors.truck}</Text> : null}
-            </View>
-
-            <View>
-              <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600', marginBottom: 6 }}>Grade</Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                {gradeOptions.map((item) => {
-                  const active = item.code === grade;
-                  return (
-                    <Pressable
-                      key={item.code}
-                      testID={`auth-grade-${inquiry.id}-${item.code}`}
-                      onPress={() => {
-                        setGrade(item.code);
-                        if (errors.grade) setErrors((prev) => { const { grade: _grade, ...rest } = prev; return rest; });
-                      }}
-                      style={{
-                        paddingHorizontal: 10,
-                        paddingVertical: 7,
-                        borderRadius: Radius.round,
-                        borderWidth: 1,
-                        borderColor: active ? '#00450D' : '#CBD5E1',
-                        backgroundColor: active ? '#E8F5E9' : '#FFFFFF',
-                      }}
-                    >
-                      <Text style={{ fontSize: 11, fontWeight: '800', color: active ? '#00450D' : '#334155' }}>
-                        {item.name}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              {errors.grade ? <Text style={{ color: Colors.danger, fontSize: FontSize.xs, marginTop: 4 }}>{errors.grade}</Text> : null}
-            </View>
-
-            <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600', marginBottom: 4 }}>Sacks</Text>
-                <TextInput
-                  testID={`auth-sacks-${inquiry.id}`}
-                  style={{
-                    height: 44,
-                    borderWidth: errors.sacks ? 2 : 1,
-                    borderColor: errors.sacks ? Colors.danger : '#CBD5E1',
-                    borderRadius: Radius.sm,
-                    paddingHorizontal: 10,
-                    color: '#111827',
-                    fontWeight: '800',
-                    backgroundColor: '#FFFFFF',
-                  }}
-                  value={sacks}
-                  onChangeText={(value) => {
-                    setSacks(value.replace(/\D/g, ''));
-                    if (errors.sacks) setErrors((prev) => { const { sacks: _sacks, ...rest } = prev; return rest; });
-                  }}
-                  keyboardType="number-pad"
-                  placeholder="0"
-                  placeholderTextColor="#94A3B8"
-                />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600', marginBottom: 4 }}>Weight / sack</Text>
-                <TextInput
-                  testID={`auth-weight-${inquiry.id}`}
-                  style={{
-                    height: 44,
-                    borderWidth: errors.weight ? 2 : 1,
-                    borderColor: errors.weight ? Colors.danger : '#CBD5E1',
-                    borderRadius: Radius.sm,
-                    paddingHorizontal: 10,
-                    color: '#111827',
-                    fontWeight: '800',
-                    backgroundColor: '#FFFFFF',
-                  }}
-                  value={weightPerSack}
-                  onChangeText={(value) => {
-                    setWeightPerSack(value.replace(/[^0-9.]/g, ''));
-                    if (errors.weight) setErrors((prev) => { const { weight: _weight, ...rest } = prev; return rest; });
-                  }}
-                  keyboardType="decimal-pad"
-                  placeholder="0"
-                  placeholderTextColor="#94A3B8"
-                />
-              </View>
-            </View>
-            {(errors.sacks || errors.weight) ? (
-              <Text style={{ color: Colors.danger, fontSize: FontSize.xs }}>{errors.sacks || errors.weight}</Text>
-            ) : null}
-
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10 }}>
-              <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Total weight</Text>
-              <Text style={{ fontSize: 12, color: '#111827', fontWeight: '800' }}>{totalWeight} kg</Text>
-            </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10 }}>
-              <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Rate (current)</Text>
-              <Text style={{ fontSize: 12, color: '#111827', fontWeight: '800' }}>
-                {inquiry.ratePerKg > 0 ? `₹${inquiry.ratePerKg}/kg` : '-'}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </View>
-
-      {/* Summary Box */}
-      <View style={{ paddingHorizontal: Spacing.md, paddingBottom: Spacing.md }}>
-        <View style={{ flexDirection: 'row', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: Radius.sm, backgroundColor: '#FFFFFF' }}>
-          <View style={{ flex: 1, padding: Spacing.sm, alignItems: 'center', borderRightWidth: 1, borderRightColor: '#E2E8F0' }}>
-            <Text style={{ fontSize: 10, color: '#111827', fontWeight: '800', marginBottom: 6 }}>WEIGHT</Text>
-            <Text style={{ fontSize: FontSize.lg, color: '#0F2C23', fontWeight: '700' }}>{totalWeight} kg</Text>
-          </View>
-          <View style={{ flex: 1, padding: Spacing.sm, alignItems: 'center', borderRightWidth: 1, borderRightColor: '#E2E8F0' }}>
-            <Text style={{ fontSize: 10, color: '#111827', fontWeight: '800', marginBottom: 6 }}>RATE</Text>
-            <Text style={{ fontSize: FontSize.lg, color: '#0F2C23', fontWeight: '700' }}>{rateNum > 0 ? `₹${rateNum}` : '-'}</Text>
-          </View>
-          <View style={{ flex: 1, padding: Spacing.sm, alignItems: 'center' }}>
-            <Text style={{ fontSize: 10, color: '#111827', fontWeight: '800', marginBottom: 6 }}>TOTAL</Text>
-            <Text style={{ fontSize: FontSize.lg, color: '#166534', fontWeight: '800' }}>
-              {rateNum > 0 ? `₹${(totalWeight * rateNum).toLocaleString('en-IN')}` : '-'}
-            </Text>
-          </View>
-        </View>
-
-        <View style={{ marginTop: Spacing.sm, gap: 6 }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10 }}>
-            <View style={{ flex: 1, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: Radius.sm, padding: Spacing.sm }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <Text style={{ fontSize: 10, color: '#111827', fontWeight: '800' }}>APMC</Text>
-                <Switch value={applyApmc} onValueChange={setApplyApmc} />
-              </View>
-              <Text style={{ fontSize: FontSize.sm, color: applyApmc ? '#166534' : '#6B7280', fontWeight: '700' }}>
-                {applyApmc ? 'Applied' : 'Not Applied'}
-              </Text>
-            </View>
-            <View style={{ flex: 1, backgroundColor: '#F8FAFC', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: Radius.sm, padding: Spacing.sm }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                <Text style={{ fontSize: 10, color: '#111827', fontWeight: '800' }}>BARDANA</Text>
-                <Switch
-                  value={applyBardana}
-                  onValueChange={(value) => {
-                    setApplyBardana(value);
-                    if (value && (!bardanaSacks || bardanaSacks === '0')) setBardanaSacks(String(sacksNum || 0));
-                    if (value && (!bardanaRate || bardanaRate === '0')) setBardanaRate(String(shop?.charges?.bardanaPerSack ?? 0));
-                  }}
-                />
-              </View>
-              <Text style={{ fontSize: FontSize.sm, color: applyBardana ? '#166534' : '#6B7280', fontWeight: '700' }}>
-                {applyBardana ? 'Applied' : 'Not Applied'}
-              </Text>
-              {applyBardana ? (
-                <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
-                  <TextInput
-                    testID={`auth-bardana-sacks-${inquiry.id}`}
-                    style={{
-                      flex: 1,
-                      height: 36,
-                      borderWidth: 1,
-                      borderColor: '#CBD5E1',
-                      borderRadius: Radius.sm,
-                      paddingHorizontal: 8,
-                      fontSize: 12,
-                      color: '#111827',
-                      fontWeight: '700',
-                      backgroundColor: '#FFFFFF',
-                    }}
-                    value={bardanaSacks}
-                    onChangeText={(value) => setBardanaSacks(value.replace(/[^0-9.]/g, ''))}
-                    keyboardType="decimal-pad"
-                    placeholder="Sacks"
-                    placeholderTextColor="#94A3B8"
-                  />
-                  <TextInput
-                    testID={`auth-bardana-rate-${inquiry.id}`}
-                    style={{
-                      flex: 1,
-                      height: 36,
-                      borderWidth: 1,
-                      borderColor: '#CBD5E1',
-                      borderRadius: Radius.sm,
-                      paddingHorizontal: 8,
-                      fontSize: 12,
-                      color: '#111827',
-                      fontWeight: '700',
-                      backgroundColor: '#FFFFFF',
-                    }}
-                    value={bardanaRate}
-                    onChangeText={(value) => setBardanaRate(value.replace(/[^0-9.]/g, ''))}
-                    keyboardType="decimal-pad"
-                    placeholder="Rate"
-                    placeholderTextColor="#94A3B8"
-                  />
-                </View>
-              ) : null}
-            </View>
-          </View>
-
-          {calc ? (
-            <View style={{ backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E2E8F0', borderRadius: Radius.sm, padding: Spacing.sm }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Gross</Text>
-                <Text style={{ fontSize: 12, color: '#111827', fontWeight: '800' }}>₹{Math.round(calc.gross).toLocaleString('en-IN')}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-                <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>APMC</Text>
-                <Text style={{ fontSize: 12, color: '#111827', fontWeight: '800' }}>₹{Math.round(calc.apmc).toLocaleString('en-IN')}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-                <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Bardana</Text>
-                <Text style={{ fontSize: 12, color: '#111827', fontWeight: '800' }}>₹{Math.round(calc.bardana).toLocaleString('en-IN')}</Text>
-              </View>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-                <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '600' }}>Cartage</Text>
-                <Text style={{ fontSize: 12, color: '#111827', fontWeight: '800' }}>₹{Math.round(calc.cartage).toLocaleString('en-IN')}</Text>
-              </View>
-              <View style={{ height: 1, backgroundColor: '#E2E8F0', marginTop: 8, marginBottom: 8 }} />
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                <Text style={{ fontSize: 12, color: '#166534', fontWeight: '800' }}>Net</Text>
-                <Text style={{ fontSize: 12, color: '#166534', fontWeight: '900' }}>₹{Math.round(calc.net).toLocaleString('en-IN')}</Text>
-              </View>
-            </View>
-          ) : null}
-        </View>
-      </View>
-
-      <View style={{ height: 1, backgroundColor: '#F3F4F6' }} />
-
-      {/* Adjust Rate Section */}
-      <View style={{ padding: Spacing.md }}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm }}>
-          <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: '#111827' }}>Adjust Rate / रेट बदलें</Text>
-          <Text style={{ fontSize: FontSize.xs, color: '#4B5563', fontWeight: '500' }}>Per KG</Text>
-        </View>
-        <Animated.View style={shakeRateStyle}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: errors.rate ? 2 : 1, borderColor: errors.rate ? Colors.danger : '#D1D5DB', borderRadius: Radius.sm, height: 50, backgroundColor: '#FFFFFF', paddingHorizontal: Spacing.md }}>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#374151', marginRight: 12 }}>₹</Text>
-            <TextInput
-              testID={`rate-input-${inquiry.id}`}
-              disableFullscreenUI={true}
-              style={{ flex: 1, fontSize: 16, fontWeight: '800', color: '#0F2C23', padding: 0 }}
-              placeholder="0"
-              placeholderTextColor="#9CA3AF"
-              value={rate}
-              onChangeText={handleRateChange}
-              keyboardType="decimal-pad"
-            />
-          </View>
-          {errors.rate ? <Text style={{ color: Colors.danger, fontSize: FontSize.xs, marginTop: 4 }}>{errors.rate}</Text> : null}
-        </Animated.View>
-
-        <View style={{ marginTop: Spacing.md }}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.sm }}>
-            <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: '#111827' }}>
-              Total Bill Amount / कुल बिल
-            </Text>
-            <Text style={{ fontSize: FontSize.xs, color: '#4B5563', fontWeight: '500' }}>
-              Auto updates rate
-            </Text>
-          </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: errors.rate ? 2 : 1, borderColor: errors.rate ? Colors.danger : '#D1D5DB', borderRadius: Radius.sm, height: 50, backgroundColor: '#FFFFFF', paddingHorizontal: Spacing.md }}>
-            <Text style={{ fontSize: 16, fontWeight: '700', color: '#374151', marginRight: 12 }}>₹</Text>
-            <TextInput
-              testID={`total-bill-input-${inquiry.id}`}
-              disableFullscreenUI={true}
-              style={{ flex: 1, fontSize: 16, fontWeight: '800', color: '#0F2C23', padding: 0 }}
-              placeholder="0"
-              placeholderTextColor="#9CA3AF"
-              value={totalBillAmount}
-              onChangeText={handleTotalBillAmountChange}
-              keyboardType="decimal-pad"
-            />
-          </View>
-        </View>
-      </View>
-
-      <View style={{ height: 1, backgroundColor: '#F3F4F6' }} />
-
-      {/* Payment Selector */}
-      <View style={{ padding: Spacing.md }}>
-        <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: '#111827', marginBottom: Spacing.sm }}>
-          Payment Mode / भुगतान का तरीका
+        <Text style={{ fontSize: 18, fontWeight: '900', color: '#111827', textAlign: 'center' }}>
+          PENDING AUTHORIZATION
         </Text>
-        <Animated.View style={shakePaymentStyle}>
+        <Text style={{ fontSize: 14, fontWeight: '900', color: '#111827', textAlign: 'center', marginTop: 2 }}>
+          SLIP #SL-{inquiry.slipNumber} • {timeAgoStr}
+        </Text>
+      </View>
+
+      {/* Customer Name */}
+      <EditableSlipRow label="Customer" value={customerName || 'None'} isEditing={editingField === "customer"} onToggle={() => setEditingField(editingField === "customer" ? null : "customer")} isError={!!errors.customer} />
+      {editingField === 'customer' && (
+        <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <TextInput
+              style={{ flex: 1, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }}
+              placeholder="Customer name"
+              value={customerName}
+              onChangeText={handleCustomerNameChange}
+            />
+            <Pressable onPress={openContactPicker} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#E0F2FE', alignItems: 'center', justifyContent: 'center' }}>
+              <User size={20} color="#0EA5E9" />
+            </Pressable>
+          </View>
+          {buyerSuggestions.length > 0 && (
+            <View style={{ marginTop: 8, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, overflow: 'hidden' }}>
+              {buyerSuggestions.map((b) => (
+                <Pressable
+                  key={b.id || b.code}
+                  onPress={() => selectBuyer(b)}
+                  style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}
+                >
+                  <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>{b.name}</Text>
+                  <Text style={{ fontSize: 13, color: '#6B7280' }}>{b.phone}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+          <TextInput
+            style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827', marginTop: 8 }}
+            placeholder="Phone number"
+            keyboardType="phone-pad"
+            value={customerPhone}
+            onChangeText={(v) => setCustomerPhone(v.replace(/\D/g, '').slice(0, 10))}
+          />
+        </View>
+      )}
+
+      {/* Truck */}
+      <EditableSlipRow label="Truck / Lot" value={selectedTruck?.truckNumber || 'Agent Stock'} isEditing={editingField === "truck"} onToggle={() => setEditingField(editingField === "truck" ? null : "truck")} isError={!!errors.truck} />
+      {editingField === 'truck' && (
+        <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB', flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+          {trucks.map(truck => (
+            <Pressable
+              key={truck.id}
+              onPress={() => {
+                setTruckId(truck.id);
+                if (!truck.gradeInventory.find((g) => g.code === grade)) {
+                  setGrade(truck.gradeInventory[0]?.code ?? grade);
+                }
+                setEditingField(null);
+                if (errors.truck) setErrors(p => ({...p, truck: ''}));
+              }}
+              style={{ paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: truck.id === truckId ? '#00450D' : '#CBD5E1', backgroundColor: truck.id === truckId ? '#E8F5E9' : '#FFF' }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '800', color: truck.id === truckId ? '#00450D' : '#334155' }}>{truck.truckNumber}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+
+      {/* Grade */}
+      <EditableSlipRow label="Fruit Grade" value={gradeName} isEditing={editingField === "grade"} onToggle={() => setEditingField(editingField === "grade" ? null : "grade")} isError={!!errors.grade} />
+      {editingField === 'grade' && (
+        <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB', flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+          {gradeOptions.map(item => (
+            <Pressable
+              key={item.code}
+              onPress={() => { setGrade(item.code); setEditingField(null); if(errors.grade) setErrors(p => ({...p, grade: ''})); }}
+              style={{ paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: item.code === grade ? '#00450D' : '#CBD5E1', backgroundColor: item.code === grade ? '#E8F5E9' : '#FFF' }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: '800', color: item.code === grade ? '#00450D' : '#334155' }}>{item.name}</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+
+      {/* Quantity */}
+      <EditableSlipRow label="Quantity (Sacks)" value={`${sacksNum} sacks @ ${weightPerSackNum}kg`} isEditing={editingField === "quantity"} onToggle={() => setEditingField(editingField === "quantity" ? null : "quantity")} isError={!!errors.sacks || !!errors.weight} />
+      {editingField === 'quantity' && (
+        <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB', flexDirection: 'row', gap: 8 }}>
+          <TextInput
+            style={{ flex: 1, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }}
+            placeholder="Sacks"
+            keyboardType="number-pad"
+            value={sacks}
+            onChangeText={(v) => { setSacks(v.replace(/\D/g, '')); if(errors.sacks) setErrors(p => ({...p, sacks: ''})) }}
+          />
+          <TextInput
+            style={{ flex: 1, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }}
+            placeholder="Weight/Sack"
+            keyboardType="decimal-pad"
+            value={weightPerSack}
+            onChangeText={(v) => { setWeightPerSack(v.replace(/[^0-9.]/g, '')); if(errors.weight) setErrors(p => ({...p, weight: ''})) }}
+          />
+        </View>
+      )}
+
+      {/* Rate */}
+      <EditableSlipRow label="Rate (per kg)" value={rateNum > 0 ? `₹${rateNum}` : '-'} isEditing={editingField === "rate"} onToggle={() => setEditingField(editingField === "rate" ? null : "rate")} isError={!!errors.rate} />
+      {editingField === 'rate' && (
+        <Animated.View style={[{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB' }, shakeRateStyle]}>
+          <TextInput
+            style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827', fontWeight: '800' }}
+            placeholder="Enter Rate (₹/kg)"
+            keyboardType="decimal-pad"
+            value={rate}
+            onChangeText={handleRateChange}
+          />
+        </Animated.View>
+      )}
+
+      {/* Total Amount */}
+      <EditableSlipRow label="Total Bill Amount" value={totalBillAmount ? `₹${totalBillAmount}` : '-'} isEditing={editingField === "totalAmount"} onToggle={() => setEditingField(editingField === "totalAmount" ? null : "totalAmount")} />
+      {editingField === 'totalAmount' && (
+        <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB' }}>
+          <TextInput
+            style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827', fontWeight: '800' }}
+            placeholder="Enter Total Amount (₹) (Auto updates rate)"
+            keyboardType="decimal-pad"
+            value={totalBillAmount}
+            onChangeText={handleTotalBillAmountChange}
+          />
+        </View>
+      )}
+
+      {/* Payment */}
+      <EditableSlipRow label="Payment Mode" value={paymentMode} isEditing={editingField === "payment"} onToggle={() => setEditingField(editingField === "payment" ? null : "payment")} isError={!!errors.payment} />
+      {editingField === 'payment' && (
+        <Animated.View style={[{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB' }, shakePaymentStyle]}>
           <PaymentSelector
             selected={paymentMode}
-            onSelect={(m) => {
-              setPaymentMode(m);
-              if (errors.payment) setErrors((prev) => { const { payment, ...rest } = prev; return rest; });
-            }}
+            onSelect={(m) => { setPaymentMode(m); setEditingField(null); if(errors.payment) setErrors(p => ({...p, payment: ''})); }}
             upiRef={upiRef}
             onUpiRefChange={setUpiRef}
           />
-          {errors.payment ? <Text style={{ color: Colors.danger, fontSize: FontSize.xs, marginTop: 4 }}>{errors.payment}</Text> : null}
         </Animated.View>
+      )}
+
+
+      {/* APMC */}
+      <EditableSlipRow label="APMC" value={applyApmc ? `₹${Math.round(calc?.apmc || 0)}` : 'Not Applied'} isEditing={editingField === "apmc"} onToggle={() => setEditingField(editingField === "apmc" ? null : "apmc")} />
+      {editingField === 'apmc' && (
+        <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Text style={{ fontSize: 16, color: '#111827', fontWeight: '700' }}>Apply APMC Charges</Text>
+          <Switch value={applyApmc} onValueChange={setApplyApmc} />
+        </View>
+      )}
+
+      {/* Bardana */}
+      <EditableSlipRow label="Bardana" value={applyBardana ? `₹${Math.round(calc?.bardana || 0)}` : 'Not Applied'} isEditing={editingField === "bardana"} onToggle={() => setEditingField(editingField === "bardana" ? null : "bardana")} />
+      {editingField === 'bardana' && (
+        <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: applyBardana ? 8 : 0 }}>
+            <Text style={{ fontSize: 16, color: '#111827', fontWeight: '700' }}>Apply Bardana Charges</Text>
+            <Switch value={applyBardana} onValueChange={(val) => {
+              setApplyBardana(val);
+              if (val && (!bardanaSacks || bardanaSacks === '0')) setBardanaSacks(String(sacksNum || 0));
+              if (val && (!bardanaRate || bardanaRate === '0')) setBardanaRate(String(shop?.charges?.bardanaPerSack ?? 0));
+            }} />
+          </View>
+          {applyBardana && (
+            <View style={{ flexDirection: 'row', gap: 8 }}>
+              <TextInput
+                style={{ flex: 1, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }}
+                placeholder="Bardana Sacks"
+                keyboardType="number-pad"
+                value={bardanaSacks}
+                onChangeText={(v) => setBardanaSacks(v.replace(/\D/g, ''))}
+              />
+              <TextInput
+                style={{ flex: 1, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }}
+                placeholder="Bardana Rate"
+                keyboardType="decimal-pad"
+                value={bardanaRate}
+                onChangeText={(v) => setBardanaRate(v.replace(/[^0-9.]/g, ''))}
+              />
+            </View>
+          )}
+        </View>
+      )}
+
+      {/* View Details Box (Totals) */}
+      <View style={{ marginTop: 24, borderWidth: 1, borderColor: '#111827' }}>
+        <View style={{ flexDirection: 'row', backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#111827' }}>
+          <Text style={{ flex: 1, fontSize: 15, fontWeight: '900', color: '#111827', padding: 8 }}>Total Weight</Text>
+          <Text style={{ width: 150, fontSize: 15, fontWeight: '900', color: '#111827', padding: 8, textAlign: 'right' }}>
+            {toIndianWeight(totalWeight)}
+          </Text>
+        </View>
+        <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#111827' }}>
+          <Text style={{ flex: 1, fontSize: 15, color: '#111827', padding: 8 }}>Gross Amount</Text>
+          <Text style={{ width: 150, fontSize: 15, color: '#111827', padding: 8, textAlign: 'right' }}>
+            ₹{Math.round(calc?.gross || 0).toLocaleString('en-IN')}
+          </Text>
+        </View>
+        {(calc?.apmc || 0) > 0 && (
+          <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#111827' }}>
+            <Text style={{ flex: 1, fontSize: 15, color: '#111827', padding: 8 }}>APMC</Text>
+            <Text style={{ width: 150, fontSize: 15, color: '#111827', padding: 8, textAlign: 'right' }}>₹{Math.round(calc?.apmc ?? 0).toLocaleString('en-IN')}</Text>
+          </View>
+        )}
+        {(calc?.bardana || 0) > 0 && (
+          <View style={{ flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#111827' }}>
+            <Text style={{ flex: 1, fontSize: 15, color: '#111827', padding: 8 }}>Bardana</Text>
+            <Text style={{ width: 150, fontSize: 15, color: '#111827', padding: 8, textAlign: 'right' }}>₹{Math.round(calc?.bardana ?? 0).toLocaleString('en-IN')}</Text>
+          </View>
+        )}
+        <View style={{ flexDirection: 'row', backgroundColor: '#E8F5E9' }}>
+          <Text style={{ flex: 1, fontSize: 15, fontWeight: '900', color: '#166534', padding: 8 }}>Net Amount</Text>
+          <Text style={{ width: 150, fontSize: 15, fontWeight: '900', color: '#166534', padding: 8, textAlign: 'right' }}>
+            ₹{Math.round(calc?.net || 0).toLocaleString('en-IN')}
+          </Text>
+        </View>
       </View>
 
-      <View style={{ height: 1, backgroundColor: '#F3F4F6', marginTop: Spacing.sm }} />
-
       {/* Action buttons */}
-      <View style={{ padding: Spacing.md, gap: Spacing.sm }}>
+      <View style={{ marginTop: 24, gap: Spacing.sm }}>
         {errors.save ? <Text style={{ color: Colors.danger, fontSize: FontSize.xs }}>{errors.save}</Text> : null}
         
         <Pressable
           testID={`save-edits-${inquiry.id}`}
           onPress={handleSaveEdits}
           disabled={saveEditsMutation.isPending}
+          style={{
+            padding: 14,
+            borderWidth: 2,
+            borderColor: '#111827',
+            backgroundColor: saveEditsMutation.isPending ? '#CBD5E1' : '#FFFFFF',
+            alignItems: 'center',
+          }}
         >
-          {({ pressed }) => (
-            <View style={{
-              minHeight: 48,
-              borderRadius: Radius.md,
-              alignItems: 'center',
-              justifyContent: 'center',
-              borderWidth: 1.5,
-              borderColor: '#00450D',
-              backgroundColor: saveEditsMutation.isPending ? '#CBD5E1' : pressed ? '#E8F5E9' : '#FFFFFF',
-            }}>
-              <Text allowFontScaling={false} style={{ fontSize: FontSize.sm, color: '#00450D', fontWeight: '900' }}>
-                {saveEditsMutation.isPending ? 'Saving...' : 'Save Changes / बदलाव सेव करें'}
-              </Text>
-            </View>
-          )}
+          <Text style={{ fontSize: 16, fontWeight: '900', color: '#111827' }}>
+            {saveEditsMutation.isPending ? 'SAVING...' : 'SAVE CHANGES'}
+          </Text>
         </Pressable>
 
         <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
@@ -814,59 +665,37 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
             testID={`cancel-inquiry-${inquiry.id}`}
             onPress={handleCancel}
             disabled={cancelMutation.isPending}
-            style={{ flex: 1 }}
+            style={{
+              flex: 1,
+              padding: 14,
+              borderWidth: 2,
+              borderColor: '#DC2626',
+              backgroundColor: '#FFFFFF',
+              alignItems: 'center',
+            }}
           >
-            {({ pressed }) => (
-              <View style={{
-                minHeight: 62, 
-                borderRadius: Radius.md, 
-                alignItems: 'center', 
-                justifyContent: 'center',
-                borderWidth: 1.5, 
-                borderColor: '#DC2626', 
-                backgroundColor: pressed ? '#FEF2F2' : '#FFFFFF',
-              }}>
-                <Text allowFontScaling={false} style={{ fontSize: FontSize.sm, color: '#DC2626', fontWeight: '900' }}>Cancel</Text>
-                <Text allowFontScaling={false} style={{ fontSize: 12, color: '#DC2626', fontWeight: '900', marginTop: 2 }}>रद्द करें</Text>
-              </View>
-            )}
+            <Text style={{ fontSize: 16, fontWeight: '900', color: '#DC2626' }}>CANCEL</Text>
           </Pressable>
 
           <Pressable
             testID={`authorize-${inquiry.id}`}
             onPress={handleAuthorize}
             disabled={authorizeMutation.isPending}
-            style={{ flex: 1.5 }}
+            style={{
+              flex: 1.5,
+              padding: 14,
+              borderWidth: 2,
+              borderColor: '#111827',
+              backgroundColor: authorizeMutation.isPending ? '#CBD5E1' : '#FBBF24',
+              alignItems: 'center',
+            }}
           >
-            {({ pressed }) => (
-              <View style={{
-                minHeight: 62,
-                borderRadius: Radius.md,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: authorizeMutation.isPending ? '#CBD5E1' : pressed ? '#FBBF24' : '#FDE047',
-                borderWidth: 2,
-                borderColor: '#00450D',
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 3 },
-                shadowOpacity: 0.16,
-                shadowRadius: 6,
-                elevation: 4,
-              }}>
-                {authorizeMutation.isPending ? (
-                  <Text allowFontScaling={false} style={{ fontSize: FontSize.md, color: '#003807', fontWeight: '900' }}>Processing...</Text>
-                ) : (
-                  <>
-                    <Text allowFontScaling={false} style={{ fontSize: FontSize.lg, color: '#003807', fontWeight: '900' }}>Authorize</Text>
-                    <Text allowFontScaling={false} style={{ fontSize: 12, color: '#365314', fontWeight: '900', marginTop: 2 }}>स्वीकार करें</Text>
-                  </>
-                )}
-              </View>
-            )}
+            <Text style={{ fontSize: 16, fontWeight: '900', color: '#111827' }}>
+              {authorizeMutation.isPending ? 'PROCESSING...' : 'AUTHORIZE'}
+            </Text>
           </Pressable>
         </View>
       </View>
-
     </View>
   );
 }

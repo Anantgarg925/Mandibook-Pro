@@ -15,7 +15,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import * as Contacts from 'expo-contacts';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, ChevronDown, Minus, Plus, Phone, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, ChevronDown, Minus, Plus, Phone, Trash2, User } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -30,7 +30,7 @@ import { useBuyers } from '@/hooks/useBuyers';
 import { useMemberMode } from '@/hooks/useMemberMode';
 import PaymentSelector from '@/components/bills/PaymentSelector';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
-import { toIndianCurrency, toIndianWeight } from '@/lib/formatters';
+import { toIndianCurrency, toIndianWeight, toIndianDate } from '@/lib/formatters';
 import { calculateCharges } from '@/utils/calculations';
 import { getNextSlipNumber } from '@/utils/slipNumber';
 import type { Truck } from '@/types/truck';
@@ -67,6 +67,25 @@ function SectionHeader({ title, style }: { title: string, style?: any }) {
   );
 }
 
+
+function EditableSlipRow({ label, value, field, editingField, setEditingField, isError }: any) {
+  const isEditing = editingField === field;
+  return (
+    <Pressable
+      onPress={() => setEditingField(isEditing ? null : field)}
+      style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#D1D5DB' }}
+    >
+      <Text style={{ fontSize: 15, fontWeight: '800', color: '#111827' }}>{label}</Text>
+      <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' }}>
+        <Text style={{ fontSize: 15, color: isError ? Colors.danger : '#111827', textAlign: 'right', fontWeight: isEditing ? '800' : '500' }}>
+          {value || 'Tap to edit'}
+        </Text>
+        <ChevronDown size={16} color="#4B5563" style={{ marginLeft: 4, transform: [{ rotate: isEditing ? '180deg' : '0deg' }] }} />
+      </View>
+    </Pressable>
+  );
+}
+
 export default function NewBillScreen() {
   const router = useRouter();
   const { truckId: preselectedTruckId } = useLocalSearchParams<{ truckId?: string }>();
@@ -78,7 +97,8 @@ export default function NewBillScreen() {
   const insets = useSafeAreaInsets();
 
   const [slipNumber, setSlipNumber] = useState<number | null>(null);
-  const [selectedTruck, setSelectedTruck] = useState<Truck | null>(null);
+  const [selectedTruckId, setSelectedTruckId] = useState<string | null>(null);
+  const selectedTruck = trucks.find(t => t.id === selectedTruckId) || null;
   const [truckPickerVisible, setTruckPickerVisible] = useState(false);
   const [contactPickerVisible, setContactPickerVisible] = useState(false);
   const [phoneContacts, setPhoneContacts] = useState<any[]>([]);
@@ -104,6 +124,7 @@ export default function NewBillScreen() {
   const [applyApmc, setApplyApmc] = useState(true);
   const [applyBardana, setApplyBardana] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [editingField, setEditingField] = useState<string | null>('customer');
   const [entries, setEntries] = useState<any[]>([]);
 
   const successY = useSharedValue(400);
@@ -128,8 +149,8 @@ export default function NewBillScreen() {
 
   useEffect(() => {
     if (preselectedTruckId && trucks.length > 0) {
-      const t = trucks.find((tr) => tr.id === preselectedTruckId);
-      if (t) setSelectedTruck(t);
+      const t = trucks.find(t => t.id === preselectedTruckId);
+      if (t) setSelectedTruckId(t.id);
     }
   }, [preselectedTruckId, trucks]);
 
@@ -453,7 +474,7 @@ export default function NewBillScreen() {
         createdAt: Date.now(),
       },
       truckUpdate: selectedTruck ? {
-        id: selectedTruck.id,
+        id: selectedTruckId!,
         gradeInventory: newInventory,
       } : undefined,
       buyerUpsert: customerName.trim()
@@ -492,7 +513,7 @@ export default function NewBillScreen() {
   };
 
   const formComplete = !!(
-    (boughtFromAgent ? sourceAgentName.trim() : selectedTruck) &&
+    (boughtFromAgent ? sourceAgentName.trim() : selectedTruckId) &&
     (entries.length > 0 || (selectedGrade && sacks > 0))
   );
 
@@ -523,681 +544,262 @@ export default function NewBillScreen() {
 
       <View style={{ flex: 1, backgroundColor: Colors.background }}>
         <KeyboardAwareScrollView
-          ref={scrollRef}
+          style={{ flex: 1 }}
           contentContainerStyle={{ padding: Spacing.md, paddingBottom: 110 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           bottomOffset={110}
         >
-          {/* Payment Method - MOVED TO TOP */}
-          <View onLayout={rememberSection('payment')}>
-            <SectionHeader title="भुगतान / Payment Method" />
-          </View>
-          <View style={{ marginBottom: Spacing.md }}>
-            <PaymentSelector
-              selected={paymentMode}
-              onSelect={setPaymentMode}
-              upiRef={upiRef}
-              onUpiRefChange={setUpiRef}
-            />
-          </View>
+          <View style={{ borderWidth: 2, borderColor: '#111827', padding: 22, backgroundColor: '#FFFFFF', marginBottom: 40 }}>
+            {/* Header */}
+            <Text style={{ fontSize: 24, fontWeight: '900', color: '#111827', textAlign: 'center' }}>
+              {shop?.firmName?.toUpperCase() ?? 'MANDIBOOK'}
+            </Text>
+            <Text style={{ fontSize: 14, color: '#111827', textAlign: 'center', marginTop: 4, marginBottom: 16 }}>
+              {[shop?.phone1, shop?.phone2].filter(Boolean).join(' / ')}
+            </Text>
 
-          {/* Bought from Agent Toggle */}
-          <View style={{ marginBottom: Spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF', paddingVertical: 4, paddingHorizontal: Spacing.sm, borderRadius: Radius.sm, borderWidth: 1, borderColor: '#E5E7EB' }}>
-            <Text style={{ fontSize: FontSize.md, fontWeight: '600', color: Colors.text }}>Bought from another agent</Text>
-            <Switch
-              testID="bought-from-agent-toggle"
-              value={boughtFromAgent}
-              onValueChange={(v) => {
-                setBoughtFromAgent(v);
-                setSelectedTruck(null);
-                setSelectedGrade(null);
-                if (!v) { setSourceAgentName(''); setSourceAgentPhone(''); }
-                setTimeout(() => scrollToSection(v ? 'source' : 'truck'), 80);
-              }}
-            />
-          </View>
-
-          {boughtFromAgent ? (
-            <View onLayout={rememberSection('source')} style={{ gap: Spacing.sm, marginBottom: Spacing.md }}>
-              <TextInput
-                style={{ backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: Spacing.md, height: 48, fontSize: 16, color: '#111827' }}
-                placeholder="Agent name *"
-                placeholderTextColor="#9CA3AF"
-                value={sourceAgentName}
-                onChangeText={setSourceAgentName}
-              />
-              {errors?.sourceAgent ? <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '600' }}>⚠ {errors.sourceAgent}</Text> : null}
-              <TextInput
-                style={{ backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, paddingHorizontal: Spacing.md, height: 48, fontSize: 16, color: '#111827' }}
-                placeholder="Agent phone (optional)"
-                placeholderTextColor="#9CA3AF"
-                value={sourceAgentPhone}
-                onChangeText={setSourceAgentPhone}
-                keyboardType="phone-pad"
-              />
+            <View style={{ borderWidth: 2, borderColor: '#111827', marginBottom: 16, paddingVertical: 8, paddingHorizontal: 10 }}>
+              <Text style={{ fontSize: 18, fontWeight: '900', color: '#111827', textAlign: 'center' }}>
+                NEW BILL
+              </Text>
+              <Text style={{ fontSize: 14, fontWeight: '900', color: '#111827', textAlign: 'center', marginTop: 2 }}>
+                SLIP #SL-{slipNumber ?? '...'} • {toIndianDate(Date.now())}
+              </Text>
             </View>
-          ) : (
-            <View onLayout={rememberSection('truck')}>
-              {/* SECTION 1: Truck */}
-              <SectionHeader title="गाड़ी चुनें / Select Truck" />
 
-              <Pressable
-                testID="truck-picker-button"
-                onPress={() => setTruckPickerVisible(true)}
-                style={{
-                  ...inputStyle,
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: FontSize.md,
-                    color: selectedTruck ? Colors.text : Colors.textSecond,
-                  }}
-                >
-                  {selectedTruck ? `${selectedTruck.truckNumber} — ${selectedTruck.senderName}` : 'Select truck…'}
-                </Text>
-                <ChevronDown size={18} color={Colors.textSecond} />
-              </Pressable>
-              {errors.truck ? <Text style={{ color: Colors.danger, fontSize: FontSize.xs, marginTop: 4 }}>{errors.truck}</Text> : null}
-            </View>
-          )}
-
-          {/* SECTION 2: Customer */}
-          <View onLayout={rememberSection('customer')}>
-            <SectionHeader title="ग्राहक / Customer (Optional)" />
-          </View>
-          <View style={{ position: 'relative', zIndex: 10, marginBottom: Spacing.sm }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
-              <TextInput
-                testID="customer-name-input"
-                style={{ ...inputStyle, flex: 1 }}
-                placeholder="Customer name"
-                placeholderTextColor={Colors.textSecond}
-                value={customerName}
-                onChangeText={handleCustomerNameChange}
-              />
-              <Pressable
-                testID="contact-picker-btn"
-                onPress={openContactPicker}
-                style={{
-                  width: 56,
-                  height: 56,
-                  borderRadius: Radius.sm,
-                  backgroundColor: Colors.primary,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  borderWidth: 1,
-                  borderColor: Colors.primary,
-                }}
-              >
-                <Phone size={20} color="#FFF" />
-              </Pressable>
-            </View>
-            {buyerSuggestions.length > 0 ? (
-              <View
-                style={{
-                  backgroundColor: Colors.surface,
-                  borderWidth: 1,
-                  borderColor: Colors.border,
-                  borderTopWidth: 0,
-                  borderBottomLeftRadius: Radius.sm,
-                  borderBottomRightRadius: Radius.sm,
-                  marginTop: Spacing.xs,
-                  elevation: 20,
-                }}
-              >
-                {buyerSuggestions.map((b) => (
-                  <Pressable
-                    key={b.id}
-                    testID={`buyer-suggestion-${b.id}`}
-                    onPress={() => selectBuyer(b)}
-                    style={{ paddingVertical: 10, paddingHorizontal: Spacing.md, borderBottomWidth: 1, borderBottomColor: Colors.border }}
-                  >
-                    <Text style={{ fontSize: FontSize.sm, color: Colors.text, fontWeight: '600' }}>{b.name}</Text>
-                    <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>{b.phone}</Text>
+            {/* Customer */}
+            <EditableSlipRow label="Customer" value={customerName || 'None'} field="customer" editingField={editingField} setEditingField={setEditingField} isError={!!errors.customer} />
+            {editingField === 'customer' && (
+              <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <TextInput
+                    style={{ flex: 1, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }}
+                    placeholder="Customer name"
+                    value={customerName}
+                    onChangeText={(val) => {
+                      setCustomerName(val);
+                      if (errors.customer) setErrors((prev) => { const { customer, ...rest } = prev; return rest; });
+                      const lower = val.toLowerCase();
+                      if (lower.length > 0) {
+                        setBuyerSuggestions(buyers.filter((b) => b.name.toLowerCase().includes(lower)).slice(0, 5));
+                      } else setBuyerSuggestions([]);
+                    }}
+                  />
+                  <Pressable onPress={openContactPicker} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#E0F2FE', alignItems: 'center', justifyContent: 'center' }}>
+                    <User size={20} color="#0EA5E9" />
                   </Pressable>
+                </View>
+                {buyerSuggestions.length > 0 && (
+                  <View style={{ marginTop: 8, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, overflow: 'hidden' }}>
+                    {buyerSuggestions.map((b) => (
+                      <Pressable
+                        key={b.id || b.code}
+                        onPress={() => selectBuyer(b)}
+                        style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' }}
+                      >
+                        <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>{b.name}</Text>
+                        <Text style={{ fontSize: 13, color: '#6B7280' }}>{b.phone}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+                <TextInput
+                  style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827', marginTop: 8 }}
+                  placeholder="Phone number"
+                  keyboardType="phone-pad"
+                  value={customerPhone}
+                  onChangeText={(v) => setCustomerPhone(v.replace(/[^\d]/g, '').slice(0, 10))}
+                />
+              </View>
+            )}
+
+            {/* Added Items */}
+            {entries.length > 0 && (
+              <View style={{ marginTop: 16, marginBottom: 8 }}>
+                <Text style={{ fontSize: 14, fontWeight: '800', color: '#4B5563', marginBottom: 8, textTransform: 'uppercase' }}>Added Items</Text>
+                {entries.map((item, idx) => (
+                  <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', alignItems: 'center' }}>
+                    <View>
+                      <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>{item.gradeName} • {item.sacks} sacks</Text>
+                      <Text style={{ fontSize: 13, color: '#6B7280' }}>{item.totalWeight}kg @ ₹{item.ratePerKg}/kg</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: '#166534' }}>₹{Math.round(item.gross)}</Text>
+                      <Pressable onPress={() => setEntries(entries.filter((_, i) => i !== idx))} style={{ padding: 4 }}>
+                        <Trash2 size={18} color="#DC2626" />
+                      </Pressable>
+                    </View>
+                  </View>
                 ))}
               </View>
-            ) : null}
-          </View>
-          <TextInput
-            testID="customer-phone-input"
-            style={inputStyle}
-            placeholder="Phone number (optional)"
-            placeholderTextColor={Colors.textSecond}
-            value={customerPhone}
-            onChangeText={setCustomerPhone}
-            keyboardType="phone-pad"
-            returnKeyType="next"
-            onSubmitEditing={() => scrollToSection('grade')}
-          />
+            )}
 
-          {/* SECTION 3: Grade & Quantity */}
-          <View onLayout={rememberSection('grade')}>
-            <SectionHeader title="ग्रेड और मात्रा / Grade & Quantity" />
-          </View>
-          {selectedTruck || boughtFromAgent ? (
-            <>
-              {/* Grade-wise Stock Display */}
-              <View style={{ marginBottom: Spacing.md }}>
-                <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginBottom: Spacing.sm, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                  Select Grade
-                </Text>
-                {!boughtFromAgent && selectedTruck && !hasBreakdown ? (
-                  <View
-                    style={{
-                      backgroundColor: '#FFF8E1',
-                      borderWidth: 1,
-                      borderColor: '#FBBF24',
-                      borderRadius: Radius.sm,
-                      padding: Spacing.sm,
-                      marginBottom: Spacing.sm,
-                    }}
-                  >
-                    <Text style={{ fontSize: FontSize.xs, color: '#7E5700', fontWeight: '800' }}>
-                      Shared truck stock: {toIndianWeight(truckAvailableKg)}
-                    </Text>
-                    <Text style={{ fontSize: FontSize.xs, color: '#7E5700', marginTop: 2 }}>
-                      Grade-wise load was not entered for this truck, so stock is common across all grades.
-                    </Text>
+            {/* Current Item / Add New Item */}
+            <View style={{ marginTop: 24, marginBottom: 8 }}>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: '#4B5563', marginBottom: 8, textTransform: 'uppercase' }}>
+                {entries.length > 0 ? 'Add Another Item' : 'Item Details'}
+              </Text>
+
+              <EditableSlipRow label="Source" value={boughtFromAgent ? (sourceAgentName || 'Agent') : (selectedTruck?.truckNumber || 'Select Truck')} field="source" editingField={editingField} setEditingField={setEditingField} isError={!!errors.truck} />
+              {editingField === 'source' && (
+                <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                    <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>Bought from agent?</Text>
+                    <Switch
+                      value={boughtFromAgent}
+                      onValueChange={(v) => {
+                        setBoughtFromAgent(v);
+                        setSelectedTruckId(null);
+                        setSelectedGrade(null);
+                        if (!v) { setSourceAgentName(''); setSourceAgentPhone(''); }
+                      }}
+                    />
                   </View>
-                ) : null}
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm }}>
                   {boughtFromAgent ? (
-                    // Show shop grades when buying from agent
-                    shop?.grades && shop.grades.length > 0 ? (
-                      shop.grades.map((grade) => {
-                        const isSelected = selectedGrade === grade.code;
-                        return (
-                          <Pressable
-                            key={grade.code}
-                            testID={`grade-option-${grade.code}`}
-                            onPress={() => {
-                              setSelectedGrade(grade.code);
-                              setTimeout(() => scrollToSection('quantity'), 80);
-                            }}
-                            style={{
-                              flexBasis: '31%',
-                              flexGrow: 1,
-                              maxWidth: '32.5%',
-                              minHeight: 112,
-                              justifyContent: 'space-between',
-                              padding: Spacing.sm,
-                              borderRadius: Radius.sm,
-                              borderWidth: 2,
-                              borderColor: isSelected ? Colors.primary : Colors.border,
-                              backgroundColor: isSelected ? '#F0F7FF' : Colors.surface,
-                              elevation: isSelected ? 4 : 0,
-                            }}
-                          >
-                            <View>
-                              <Text numberOfLines={2} style={{ marginBottom: 4 }}>
-                                <Text style={{ fontSize: FontSize.lg, fontWeight: '900', color: Colors.text }}>
-                                  {grade.code}
-                                </Text>
-                                {grade.name && grade.name !== grade.code && (
-                                  <Text style={{ fontSize: FontSize.xs, fontWeight: '600', color: Colors.textSecond }}>
-                                    {` (${grade.name})`}
-                                  </Text>
-                                )}
-                              </Text>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
-                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.textSecond }} />
-                                <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>
-                                  Agent Stock
-                                </Text>
-                              </View>
-                            </View>
-                            <View style={{ alignSelf: 'flex-start', backgroundColor: isSelected ? 'rgba(76, 175, 80, 0.1)' : 'transparent', paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, borderRadius: Radius.sm }}>
-                              <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: Colors.primary }}>
-                                ✓
-                              </Text>
-                              <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 2 }}>Choose</Text>
-                            </View>
-                          </Pressable>
-                        );
-                      })
-                    ) : (
-                      <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond, textAlign: 'center', padding: Spacing.md }}>
-                        No grades available
-                      </Text>
-                    )
+                    <View style={{ gap: 8 }}>
+                      <TextInput
+                        style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }}
+                        placeholder="Agent name *"
+                        value={sourceAgentName}
+                        onChangeText={setSourceAgentName}
+                      />
+                      <TextInput
+                        style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }}
+                        placeholder="Agent phone (optional)"
+                        value={sourceAgentPhone}
+                        onChangeText={setSourceAgentPhone}
+                        keyboardType="phone-pad"
+                      />
+                    </View>
                   ) : (
-                    // Show truck grades when truck is selected
-                    selectedTruck?.gradeInventory.length ? (
-                      selectedTruck.gradeInventory.map((grade) => {
-                        const gradeAvailable = Math.max(0, grade.totalKg - grade.confirmedKg - grade.provisionalKg);
-                        const isSelected = selectedGrade === grade.code;
-                        const stockColor = gradeAvailable > 0 ? Colors.success : Colors.danger;
-                        return (
-                          <Pressable
-                            key={grade.code}
-                            testID={`grade-option-${grade.code}`}
-                            onPress={() => {
-                              setSelectedGrade(grade.code);
-                              setTimeout(() => scrollToSection('quantity'), 80);
-                            }}
-                            style={{
-                              flexBasis: '31%',
-                              flexGrow: 1,
-                              maxWidth: '32.5%',
-                              minHeight: 126,
-                              justifyContent: 'space-between',
-                              padding: Spacing.sm,
-                              borderRadius: Radius.sm,
-                              borderWidth: 2,
-                              borderColor: isSelected ? Colors.primary : Colors.border,
-                              backgroundColor: isSelected ? '#F0F7FF' : Colors.surface,
-                              elevation: isSelected ? 4 : 0,
-                            }}
-                          >
-                            <View>
-                              <Text numberOfLines={2} style={{ marginBottom: 4 }}>
-                                <Text style={{ fontSize: FontSize.lg, fontWeight: '900', color: Colors.text }}>
-                                  {grade.code}
-                                </Text>
-                                {grade.name && grade.name !== grade.code && (
-                                  <Text style={{ fontSize: FontSize.xs, fontWeight: '600', color: Colors.textSecond }}>
-                                    {` (${grade.name})`}
-                                  </Text>
-                                )}
-                              </Text>
-                              <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
-                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.textSecond }} />
-                                <Text numberOfLines={2} style={{ flex: 1, fontSize: FontSize.xs, color: Colors.textSecond }}>
-                                  {hasBreakdown ? `Total: ${toIndianWeight(grade.totalKg)}` : 'Category only'}
-                                </Text>
-                              </View>
-                            </View>
-                            <View style={{ alignSelf: 'flex-start', backgroundColor: isSelected ? 'rgba(76, 175, 80, 0.1)' : 'transparent', paddingHorizontal: Spacing.sm, paddingVertical: Spacing.xs, borderRadius: Radius.sm }}>
-                              {hasBreakdown ? (
-                                <>
-                                  <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={{ fontSize: FontSize.md, fontWeight: '800', color: stockColor }}>
-                                    {toIndianWeight(gradeAvailable)}
-                                  </Text>
-                                  <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 2 }}>Available</Text>
-                                </>
-                              ) : (
-                                <>
-                                  <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: isSelected ? Colors.primary : Colors.textSecond }}>
-                                    {isSelected ? '✓' : 'Pick'}
-                                  </Text>
-                                  <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 2 }}>Grade</Text>
-                                </>
-                              )}
-                            </View>
-                          </Pressable>
-                        );
-                      })
-                    ) : (
-                      <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond, textAlign: 'center', padding: Spacing.md }}>
-                        No grades available
-                      </Text>
-                    )
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                      {trucks.map(truck => (
+                        <Pressable
+                          key={truck.id}
+                          onPress={() => {
+                            setSelectedTruckId(truck.id);
+                            setSelectedGrade(null);
+                            if (errors.truck) setErrors(p => ({...p, truck: ''}));
+                          }}
+                          style={{ paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: truck.id === selectedTruckId ? '#00450D' : '#CBD5E1', backgroundColor: truck.id === selectedTruckId ? '#E8F5E9' : '#FFF' }}
+                        >
+                          <Text style={{ fontSize: 13, fontWeight: '800', color: truck.id === selectedTruckId ? '#00450D' : '#334155' }}>{truck.truckNumber}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
                   )}
                 </View>
-              </View>
-            </>
-          ) : (
-            <View style={{ padding: Spacing.md, backgroundColor: Colors.surface, borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, marginBottom: Spacing.md }}>
-              <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond, textAlign: 'center', fontWeight: '500' }}>
-                👆 पहले गाड़ी चुनें / Select truck first
-              </Text>
-            </View>
-          )}
-          {errors.grade ? <Text style={{ color: Colors.danger, fontSize: FontSize.xs, marginTop: 4 }}>{errors.grade}</Text> : null}
+              )}
 
-          {selectedGrade ? (
-            <>
-              {/* Sacks counter */}
-              <View
-                onLayout={rememberSection('quantity')}
+              <EditableSlipRow label="Fruit Grade" value={selectedGrade ? (selectedTruck?.gradeInventory.find(g => g.code === selectedGrade)?.name ?? shop?.grades?.find(g => g.code === selectedGrade)?.name ?? selectedGrade) : 'Select Grade'} field="grade" editingField={editingField} setEditingField={setEditingField} isError={!!errors.grade} />
+              {editingField === 'grade' && (
+                <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB', flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+                  {(boughtFromAgent ? (shop?.grades || []) : (selectedTruck?.gradeInventory || [])).map((item: any) => (
+                    <Pressable
+                      key={item.code}
+                      onPress={() => { setSelectedGrade(item.code); setEditingField('quantity'); if(errors.grade) setErrors(p => ({...p, grade: ''})); }}
+                      style={{ paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: item.code === selectedGrade ? '#00450D' : '#CBD5E1', backgroundColor: item.code === selectedGrade ? '#E8F5E9' : '#FFF' }}
+                    >
+                      <Text style={{ fontSize: 13, fontWeight: '800', color: item.code === selectedGrade ? '#00450D' : '#334155' }}>{item.name}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+
+              <EditableSlipRow label="Quantity (Sacks)" value={sacks > 0 ? `${sacks} sacks @ ${weightPerSack}kg` : ''} field="quantity" editingField={editingField} setEditingField={setEditingField} isError={!!errors.sacks} />
+              {editingField === 'quantity' && (
+                <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB', flexDirection: 'row', gap: 8 }}>
+                  <TextInput
+                    style={{ flex: 1, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }}
+                    placeholder="Sacks"
+                    keyboardType="number-pad"
+                    value={sacksText}
+                    onChangeText={(v) => { setSacksText(v); setSacks(parseInt(v.replace(/[^\d]/g, ''), 10) || 0); if(errors.sacks) setErrors(p => ({...p, sacks: ''})) }}
+                  />
+                  <TextInput
+                    style={{ flex: 1, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }}
+                    placeholder="Weight/Sack"
+                    keyboardType="decimal-pad"
+                    value={weightPerSack}
+                    onChangeText={(v) => { setWeightPerSack(v.replace(/[^0-9.]/g, '')); if(errors.weight) setErrors(p => ({...p, weight: ''})) }}
+                  />
+                </View>
+              )}
+
+              <EditableSlipRow label="Rate (per kg)" value={ratePerKg ? `₹${ratePerKg}` : ''} field="rate" editingField={editingField} setEditingField={setEditingField} isError={!!errors.rate} />
+              {editingField === 'rate' && (
+                <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB' }}>
+                  <TextInput
+                    style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827', fontWeight: '800' }}
+                    placeholder="Enter Rate (₹/kg)"
+                    keyboardType="decimal-pad"
+                    value={ratePerKg}
+                    onChangeText={(v) => { setRatePerKg(v.replace(/[^0-9.]/g, '')); if(errors.rate) setErrors(p => ({...p, rate: ''})); }}
+                  />
+                  <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12 }}>
+                    <Pressable
+                      onPress={handleAddEntry}
+                      style={{ backgroundColor: '#00450D', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}
+                    >
+                      <Plus size={18} color="#FFF" />
+                      <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 14 }}>ADD ITEM</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* Bill Settings (Payment, APMC, Bardana) */}
+            <View style={{ marginTop: 24 }}>
+              <EditableSlipRow label="Payment Mode" value={paymentMode} field="payment" editingField={editingField} setEditingField={setEditingField} />
+              {editingField === 'payment' && (
+                <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB' }}>
+                  <PaymentSelector selected={paymentMode} onSelect={setPaymentMode} upiRef={upiRef} onUpiRefChange={setUpiRef} />
+                </View>
+              )}
+
+              <EditableSlipRow label="APMC" value={applyApmc ? 'Applied' : 'Not Applied'} field="apmc" editingField={editingField} setEditingField={setEditingField} />
+              {editingField === 'apmc' && (
+                <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 16, color: '#111827', fontWeight: '700' }}>Apply APMC Charges</Text>
+                  <Switch value={applyApmc} onValueChange={setApplyApmc} />
+                </View>
+              )}
+
+              <EditableSlipRow label="Bardana" value={applyBardana ? 'Applied' : 'Not Applied'} field="bardana" editingField={editingField} setEditingField={setEditingField} />
+              {editingField === 'bardana' && (
+                <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={{ fontSize: 16, color: '#111827', fontWeight: '700' }}>Apply Bardana Charges</Text>
+                  <Switch value={applyBardana} onValueChange={setApplyBardana} />
+                </View>
+              )}
+            </View>
+
+            {/* Action buttons */}
+            <View style={{ marginTop: 24, gap: Spacing.sm }}>
+              {errors.save ? <Text style={{ color: Colors.danger, fontSize: FontSize.xs, textAlign: 'center' }}>{errors.save}</Text> : null}
+              
+              <Pressable
+                testID="save-bill-button"
+                onPress={handleSave}
+                disabled={saveMutation.isPending}
                 style={{
-                  marginTop: Spacing.md,
-                  backgroundColor: Colors.surface,
-                  borderRadius: Radius.md,
-                  borderWidth: 1,
-                  borderColor: Colors.border,
-                  padding: Spacing.sm,
+                  padding: 16,
+                  borderWidth: 2,
+                  borderColor: '#111827',
+                  backgroundColor: saveMutation.isPending ? '#CBD5E1' : '#FBBF24',
+                  alignItems: 'center',
                 }}
               >
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Text style={{ fontSize: FontSize.md, fontWeight: '600', color: Colors.text }}>बोरे / Sacks</Text>
-                  <View
-                    style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      backgroundColor: Colors.background,
-                      borderRadius: Radius.round,
-                      borderWidth: 1,
-                      borderColor: Colors.border,
-                      padding: 4,
-                    }}
-                  >
-                    <Pressable
-                      testID="sacks-minus"
-                      onPress={() => {
-                        const newVal = Math.max(0, sacks - 1);
-                        setSacks(newVal);
-                        setSacksText(newVal > 0 ? String(newVal) : '');
-                      }}
-                      style={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: 22,
-                        backgroundColor: '#FFFFFF',
-                        borderWidth: 1,
-                        borderColor: Colors.border,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Minus size={18} color={Colors.primary} strokeWidth={2.5} />
-                    </Pressable>
-                    <TextInput
-                      testID="sacks-input"
-                      value={sacksText}
-                      onChangeText={(v) => {
-                        const cleaned = v.replace(/[^0-9]/g, '').slice(0, 4);
-                        setSacksText(cleaned);
-                        const num = parseInt(cleaned, 10);
-                        setSacks(isNaN(num) ? 0 : num);
-                      }}
-                      keyboardType="number-pad"
-                      returnKeyType="done"
-                      placeholder="0"
-                      placeholderTextColor={Colors.textSecond}
-                      selectTextOnFocus
-                      style={{
-                        width: 72,
-                        height: 44,
-                        fontSize: 22,
-                        fontWeight: '900',
-                        color: Colors.text,
-                        textAlign: 'center',
-                        paddingVertical: 0,
-                      }}
-                    />
-                    <Pressable
-                      testID="sacks-plus"
-                      onPress={() => {
-                        const newVal = sacks + 1;
-                        setSacks(newVal);
-                        setSacksText(String(newVal));
-                      }}
-                      style={{
-                        width: 44,
-                        height: 44,
-                        borderRadius: 22,
-                        backgroundColor: Colors.primary,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                      }}
-                    >
-                      <Plus size={18} color="#FFFFFF" strokeWidth={2.5} />
-                    </Pressable>
-                  </View>
-                </View>
-              </View>
-
-              {/* Weight per sack */}
-              <View style={{ marginTop: Spacing.sm }}>
-                <Text style={{ fontSize: FontSize.md, fontWeight: '600', color: Colors.text, marginBottom: 6 }}>
-                  Weight/Sack (kg)
+                <Text style={{ fontSize: 18, fontWeight: '900', color: '#111827' }}>
+                  {saveMutation.isPending ? 'PROCESSING...' : 'SAVE BILL'}
                 </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
-                  <View style={{ position: 'relative' }}>
-                    <TextInput
-                      testID="weight-per-sack-input"
-                      style={[
-                        inputStyle,
-                        {
-                          width: 90,
-                          textAlign: 'center',
-                          backgroundColor: '#F3F4F6', // Distinct gray inset background
-                          borderColor: '#D1D5DB', // Stronger border
-                          borderWidth: 1.5,
-                          fontSize: FontSize.lg,
-                          fontWeight: '700'
-                        }
-                      ]}
-                      placeholder="e.g. 25"
-                      maxLength={5}
-                      placeholderTextColor="#9CA3AF"
-                      value={weightPerSack}
-                      onChangeText={setWeightPerSack}
-                      keyboardType="decimal-pad"
-                    />
-                    {/* Tiny "kg" label inside the input */}
-                    <Text style={{ position: 'absolute', right: 12, top: 18, fontSize: FontSize.xs, color: '#6B7280', fontWeight: '600' }}>kg</Text>
-                  </View>
-
-                  <View style={{
-                    flexDirection: 'row',
-                    flex: 1,
-                    marginLeft: 8,
-                    backgroundColor: '#F3F4F6',
-                    borderRadius: 24,
-                    padding: 4,
-                    borderWidth: 1,
-                    borderColor: '#E5E7EB'
-                  }}>
-                    {['20', '25', '30'].map((w) => {
-                      const isSelected = weightPerSack === w;
-                      return (
-                        <Pressable
-                          key={w}
-                          testID={`preset-weight-${w}`}
-                          onPress={() => setWeightPerSack(w)}
-                          style={{
-                            flex: 1,
-                            height: 40, // Fits nicely inside the container
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            borderRadius: 20,
-                            backgroundColor: isSelected ? Colors.primary : 'transparent',
-                            shadowColor: isSelected ? Colors.primary : 'transparent',
-                            shadowOffset: { width: 0, height: isSelected ? 2 : 0 },
-                            shadowOpacity: isSelected ? 0.2 : 0,
-                            shadowRadius: isSelected ? 4 : 0,
-                            elevation: isSelected ? 4 : 0,
-                          }}
-                        >
-                          <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: isSelected ? '#FFFFFF' : '#6B7280' }}>
-                            {w}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </View>
-              </View>
-
-              {/* Calculation preview card */}
-              {calc ? (
-                <Animated.View style={[calcStyle, { marginTop: Spacing.sm }]}>
-                  <View
-                    style={{
-                      backgroundColor: Colors.surface,
-                      borderRadius: Radius.md,
-                      borderLeftWidth: 4,
-                      borderLeftColor: Colors.success,
-                      borderWidth: 1,
-                      borderColor: Colors.border,
-                      padding: Spacing.md,
-                    }}
-                  >
-                    <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text, marginBottom: 4 }}>
-                      कुल वजन: {toIndianWeight((parseFloat(weightPerSack) || 0) * sacks)}
-                    </Text>
-                    {available > 0 ? (
-                      (parseFloat(weightPerSack) || 0) * sacks <= available ? (
-                        <Text style={{ fontSize: FontSize.xs, color: Colors.success }}>
-                          {hasBreakdown ? `उपलब्ध (${selectedGrade})` : 'Shared truck stock'}: {toIndianWeight(available)} ✅
-                        </Text>
-                      ) : (
-                        <Text style={{ fontSize: FontSize.xs, color: Colors.danger }}>
-                          ⚠ स्टॉक कम है! Only {toIndianWeight(available)} {hasBreakdown ? 'available in this grade' : 'shared stock available'}
-                        </Text>
-                      )
-                    ) : null}
-                  </View>
-                </Animated.View>
-              ) : null}
-            </>
-          ) : null}
-          {errors.sacks ? <Text style={{ color: Colors.danger, fontSize: FontSize.xs, marginTop: 4 }}>{errors.sacks}</Text> : null}
-
-
-          {/* ADDED ENTRIES */}
-          {entries.length > 0 ? (
-            <View style={{ marginBottom: Spacing.md, marginTop: Spacing.md }}>
-              <SectionHeader title="जोड़े गए आइटम / Added Items" />
-              {entries.map((entry, idx) => (
-                <View key={idx} style={{ backgroundColor: '#FFF', padding: Spacing.md, borderRadius: Radius.md, marginBottom: Spacing.sm, borderWidth: 1, borderColor: Colors.border, flexDirection: 'row', alignItems: 'center' }}>
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <Text style={{ fontWeight: '700', color: Colors.text }}>{entry.gradeName}</Text>
-                      <Text style={{ fontWeight: '700', color: Colors.text }}>₹{entry.netAmount.toFixed(0)}</Text>
-                    </View>
-                    <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>
-                      {entry.sacks} sacks @ {entry.weightPerSack}kg (Total {entry.totalWeight}kg)
-                      {entry.ratePerKg > 0 ? ` x ₹${entry.ratePerKg}/kg` : ''}
-                    </Text>
-                  </View>
-                  <Pressable 
-                    onPress={() => setEntries(prev => prev.filter((_, i) => i !== idx))}
-                    style={{ padding: Spacing.sm, marginLeft: Spacing.sm }}
-                  >
-                    <Trash2 size={20} color={Colors.danger} />
-                  </Pressable>
-                </View>
-              ))}
+              </Pressable>
             </View>
-          ) : null}
 
-          {/* SECTION 4: Rate */}
-          <View onLayout={rememberSection('rate')}>
-            <SectionHeader title="रेट / Rate (optional)" style={{ marginTop: 2 }} />
           </View>
-          <TextInput
-            testID="rate-per-kg-input"
-            style={inputStyle}
-            placeholder="₹ per kg"
-            placeholderTextColor={Colors.textSecond}
-            value={ratePerKg}
-            onChangeText={setRatePerKg}
-            keyboardType="decimal-pad"
-            returnKeyType="done"
-          />
-
-
-          {calc ? (
-            <Pressable
-              onPress={handleAddEntry}
-              style={{
-                marginTop: Spacing.md,
-                backgroundColor: Colors.surface,
-                borderWidth: 2,
-                borderColor: Colors.primary,
-                borderRadius: Radius.md,
-                paddingVertical: 10,
-                alignItems: 'center'
-              }}
-            >
-              <Text style={{ color: Colors.primary, fontWeight: '700', fontSize: FontSize.md }}>+ Add Another Item</Text>
-            </Pressable>
-          ) : null}
-
-          {/* APMC & Bardana Toggles */}
-          <View style={{ flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md }}>
-            <Pressable
-              testID="toggle-apmc"
-              onPress={() => setApplyApmc((prev) => !prev)}
-              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.surface, padding: Spacing.md, borderRadius: Radius.md, borderWidth: 1, borderColor: applyApmc ? Colors.primary : Colors.border }}
-            >
-              <Text style={{ fontSize: FontSize.md, color: applyApmc ? Colors.primary : Colors.text, fontWeight: '700' }}>APMC</Text>
-              <View pointerEvents="none">
-                <Switch value={applyApmc} onValueChange={setApplyApmc} />
-              </View>
-            </Pressable>
-            <Pressable
-              testID="toggle-bardana"
-              onPress={() => setApplyBardana((prev) => !prev)}
-              style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.surface, padding: Spacing.md, borderRadius: Radius.md, borderWidth: 1, borderColor: applyBardana ? Colors.primary : Colors.border }}
-            >
-              <Text style={{ fontSize: FontSize.md, color: applyBardana ? Colors.primary : Colors.text, fontWeight: '700' }}>Bardana</Text>
-              <View pointerEvents="none">
-                <Switch value={applyBardana} onValueChange={setApplyBardana} />
-              </View>
-            </Pressable>
-          </View>
-
-          {calc && rate > 0 ? (
-            <View
-              style={{
-                marginTop: Spacing.sm,
-                backgroundColor: Colors.surface,
-                borderRadius: Radius.md,
-                borderWidth: 1,
-                borderColor: Colors.border,
-                padding: Spacing.md,
-              }}
-            >
-              <CalcRow label="Gross" value={toIndianCurrency(calc.gross)} />
-              <CalcRow label="APMC" value={`+${toIndianCurrency(calc.apmc)}`} color={Colors.text} />
-              <CalcRow label="Bardana" value={`+${toIndianCurrency(calc.bardana)}`} color={Colors.text} />
-              {calc.cartage > 0 ? <CalcRow label="Cartage" value={`+${toIndianCurrency(calc.cartage)}`} color={Colors.text} /> : null}
-              <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: Spacing.xs }} />
-              <CalcRow label="Net" value={toIndianCurrency(calc.net)} bold />
-            </View>
-          ) : null}
-
-
-
         </KeyboardAwareScrollView>
-
-        {/* Save button */}
-        <View
-          style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            padding: Spacing.md,
-            backgroundColor: Colors.background,
-            borderTopWidth: 1,
-            borderTopColor: Colors.border,
-            elevation: 10,
-          }}
-        >
-          <Pressable
-            testID="save-bill-button"
-            onPress={handleSave}
-            disabled={!formComplete || saveMutation.isPending}
-            style={{
-              height: 56,
-              borderRadius: Radius.md,
-              alignItems: 'center',
-              justifyContent: 'center',
-              flexDirection: 'row',
-              gap: Spacing.sm,
-              backgroundColor: formComplete && !saveMutation.isPending ? Colors.success : Colors.border,
-            }}
-          >
-            {saveMutation.isPending ? (
-              <ActivityIndicator color="#FFF" size="small" />
-            ) : (
-              <Text style={{ fontSize: FontSize.md, color: '#FFF', fontWeight: '700' }}>
-                📋 बिल सेव करें / Save Bill
-              </Text>
-            )}
-          </Pressable>
-        </View>
       </View>
 
       {/* Truck Picker Modal */}
@@ -1288,7 +890,7 @@ export default function NewBillScreen() {
                       <Pressable
                         testID={`truck-option-${item.id}`}
                         onPress={() => {
-                          setSelectedTruck(item);
+                          setSelectedTruckId(item.id);
                           setSelectedGrade(null);
                           setTruckPickerVisible(false);
                           setTruckSearchText('');
