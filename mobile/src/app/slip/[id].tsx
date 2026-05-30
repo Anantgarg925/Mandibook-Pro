@@ -41,17 +41,21 @@ export default function SlipPreviewScreen() {
   const isMemberMode = useMemberMode();
 
   const goBack = () => {
-    if (isMemberMode) {
-      router.replace('/member-dashboard' as any);
-      return;
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      if (isMemberMode) {
+        router.replace('/member-dashboard' as any);
+      } else {
+        router.replace('/' as any);
+      }
     }
-    router.replace('/' as any);
   };
 
   useEffect(() => {
     if (isMemberMode === undefined) return undefined;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      router.replace((isMemberMode ? '/member-dashboard' : '/') as any);
+      goBack();
       return true;
     });
     return () => subscription.remove();
@@ -432,49 +436,52 @@ export default function SlipPreviewScreen() {
               ) : null}
             </View>
 
-            {/* Grade row */}
-            <View
-              style={{
-                flexDirection: 'row',
-                paddingVertical: 10,
-                borderBottomWidth: 1,
-                borderBottomColor: '#f1f5f9',
-                alignItems: 'center',
-              }}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, fontWeight: '700', color: '#071e27' }}>
-                  {shop.commodity}
+            {/* Grade rows */}
+            {((inquiry.chargeSnapshot as any)?.entries || [inquiry]).map((entry: any, index: number) => (
+              <View
+                key={index}
+                style={{
+                  flexDirection: 'row',
+                  paddingVertical: 10,
+                  borderBottomWidth: 1,
+                  borderBottomColor: '#f1f5f9',
+                  alignItems: 'center',
+                }}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#071e27' }}>
+                    {shop.commodity}
+                  </Text>
+                </View>
+                <Text style={{ width: 50, fontSize: 12, color: '#071e27', textAlign: 'center' }}>
+                  {entry.sacks}x{entry.weightPerSack}
                 </Text>
+                <Text style={{ width: 44, fontSize: 12, color: '#071e27', textAlign: 'center' }}>
+                  {entry.grade}
+                </Text>
+                <Text style={{ width: 46, fontSize: 12, color: '#071e27', textAlign: 'right' }}>
+                  {entry.totalWeight}kg
+                </Text>
+                {showFinalAmounts ? (
+                  <>
+                    <Text style={{ width: 44, fontSize: 13, color: '#071e27', textAlign: 'right' }}>
+                      {'\u20B9'}{entry.ratePerKg}
+                    </Text>
+                    <Text
+                      style={{
+                        width: 58,
+                        fontSize: 14,
+                        fontWeight: '700',
+                        color: '#00450d',
+                        textAlign: 'right',
+                      }}
+                    >
+                      {entry.grossAmount.toFixed(0)}
+                    </Text>
+                  </>
+                ) : null}
               </View>
-              <Text style={{ width: 50, fontSize: 12, color: '#071e27', textAlign: 'center' }}>
-                {inquiry.sacks}x{inquiry.weightPerSack}
-              </Text>
-              <Text style={{ width: 44, fontSize: 12, color: '#071e27', textAlign: 'center' }}>
-                {inquiry.grade}
-              </Text>
-              <Text style={{ width: 46, fontSize: 12, color: '#071e27', textAlign: 'right' }}>
-                {inquiry.totalWeight}kg
-              </Text>
-              {showFinalAmounts ? (
-                <>
-                  <Text style={{ width: 44, fontSize: 13, color: '#071e27', textAlign: 'right' }}>
-                    {'\u20B9'}{inquiry.ratePerKg}
-                  </Text>
-                  <Text
-                    style={{
-                      width: 58,
-                      fontSize: 14,
-                      fontWeight: '700',
-                      color: '#00450d',
-                      textAlign: 'right',
-                    }}
-                  >
-                    {inquiry.grossAmount.toFixed(0)}
-                  </Text>
-                </>
-              ) : null}
-            </View>
+            ))}
 
             {/* APMC charge */}
             {showFinalAmounts ? (

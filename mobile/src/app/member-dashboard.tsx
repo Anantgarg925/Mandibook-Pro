@@ -28,16 +28,19 @@ type MemberSession = {
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: Colors.warning,
+  DELIVERED: Colors.info,
   CONFIRMED: Colors.success,
   CANCELLED: Colors.danger,
 };
 const STATUS_BG: Record<string, string> = {
   PENDING: '#FFF8E1',
+  DELIVERED: '#DBEAFE',
   CONFIRMED: '#E8F5E9',
   CANCELLED: '#FFEBEE',
 };
 const STATUS_LABEL: Record<string, string> = {
   PENDING: 'PENDING',
+  DELIVERED: 'DELIVERED',
   CONFIRMED: 'PAID',
   CANCELLED: 'CANCELLED',
 };

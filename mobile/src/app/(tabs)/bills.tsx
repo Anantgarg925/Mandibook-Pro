@@ -22,10 +22,22 @@ const AMBER = '#FFB300';
 function BillCard({ item, onPress, isSmall }: { item: Inquiry; onPress: () => void; isSmall: boolean }) {
   const isConfirmed = item.status === 'CONFIRMED';
   const isCancelled = item.status === 'CANCELLED';
-  const statusDisplay = isConfirmed ? 'AUTHORIZED / अधिकृत' : isCancelled ? 'CANCELLED / रद्द' : 'PENDING / शेष';
+  const isDelivered = item.status === 'DELIVERED';
+  
+  const statusDisplay = isConfirmed ? 'AUTHORIZED / अधिकृत' 
+    : isCancelled ? 'CANCELLED / रद्द' 
+    : isDelivered ? 'DELIVERED / दिया'
+    : 'PENDING / शेष';
 
-  const statusBg = isConfirmed ? '#E8F5E9' : isCancelled ? '#FFEBEE' : '#FFF8E1';
-  const statusColor = isConfirmed ? '#166534' : isCancelled ? '#991B1B' : '#854D0E';
+  const statusBg = isConfirmed ? '#E8F5E9' 
+    : isCancelled ? '#FFEBEE' 
+    : isDelivered ? '#DBEAFE'
+    : '#FFF8E1';
+    
+  const statusColor = isConfirmed ? '#166534' 
+    : isCancelled ? '#991B1B' 
+    : isDelivered ? '#1D4ED8'
+    : '#854D0E';
 
   return (
     <Pressable
@@ -45,7 +57,7 @@ function BillCard({ item, onPress, isSmall }: { item: Inquiry; onPress: () => vo
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8, gap: Spacing.sm }}>
         <View style={{ flex: 1 }}>
           <Text numberOfLines={1} style={{ fontSize: FontSize.sm, fontWeight: '600', color: '#111827', marginBottom: 2 }}>
-            #{item.slipNumber} • {item.customerName || 'Cash'}
+            #{item.slipNumber} • {item.customerName || item.paymentMode || 'Cash'}
           </Text>
           <Text numberOfLines={1} style={{ fontSize: 11, color: '#4B5563' }}>
             {item.truckNumber || 'No Truck'} | {item.grade}
@@ -120,7 +132,7 @@ export default function BillsScreen() {
 
   const filteredBills =
     activeFilter === 'ALL' ? searchedBills
-      : activeFilter === 'PENDING' ? searchedBills.filter(b => b.status === 'PENDING')
+      : activeFilter === 'PENDING' ? searchedBills.filter(b => b.status === 'PENDING' || b.status === 'DELIVERED')
         : activeFilter === 'CONFIRMED' ? searchedBills.filter(b => b.status === 'CONFIRMED')
           : activeFilter === 'GRADE' ? searchedBills
             : searchedBills.filter(b => b.paymentMode === 'UDHAARI');
@@ -280,20 +292,20 @@ export default function BillsScreen() {
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: contentHPad,
+        paddingVertical: 14,
         minHeight: 56,
-        backgroundColor: BG,
-        borderBottomWidth: 1,
-        borderBottomColor: BORDER,
+        backgroundColor: GREEN,
+        borderBottomWidth: 0,
       }}>
         <Pressable hitSlop={10} onPress={() => router.push('/settings' as any)}>
-          <Menu size={24} color={GREEN} />
+          <Menu size={24} color="#FFFFFF" />
         </Pressable>
-        <Text numberOfLines={1} adjustsFontSizeToFit style={{ flex: 1, textAlign: 'center', fontSize: isSmall ? FontSize.md : FontSize.lg, fontWeight: '800', color: GREEN }}>
+        <Text numberOfLines={1} adjustsFontSizeToFit style={{ flex: 1, textAlign: 'center', fontSize: isSmall ? FontSize.md : FontSize.lg, fontWeight: '800', color: '#FFFFFF' }}>
           Bills / बिल
         </Text>
         <Pressable hitSlop={10} style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
           {/* Placeholder for balance/layout alignment with left icon */}
-          <Search size={24} color="#111827" opacity={0} />
+          <Search size={24} color="#FFFFFF" opacity={0} />
         </Pressable>
       </View>
 
@@ -365,7 +377,7 @@ export default function BillsScreen() {
                                       backgroundColor: '#F8FAFC'
                                     }}
                                   >
-                                    <Text style={{ fontSize: FontSize.xs, fontWeight: '800', color: '#111827' }}>#{bill.slipNumber} {bill.customerName || 'Cash'}</Text>
+                                    <Text style={{ fontSize: FontSize.xs, fontWeight: '800', color: '#111827' }}>#{bill.slipNumber} {bill.customerName || bill.paymentMode || 'Cash'}</Text>
                                     <Text style={{ fontSize: FontSize.xs, color: '#4B5563', marginTop: 4 }}>{bill.totalWeight} kg · ₹{bill.ratePerKg}/kg</Text>
                                     <Text style={{ fontSize: FontSize.xs, fontWeight: '900', color: GREEN, marginTop: 4 }}>{toIndianCurrency(bill.netAmount)}</Text>
                                   </Pressable>
@@ -382,7 +394,7 @@ export default function BillsScreen() {
 
               const pageBills =
                 tabStatus === 'ALL' ? searchedBills
-                  : tabStatus === 'PENDING' ? searchedBills.filter(b => b.status === 'PENDING')
+                  : tabStatus === 'PENDING' ? searchedBills.filter(b => b.status === 'PENDING' || b.status === 'DELIVERED')
                     : tabStatus === 'CONFIRMED' ? searchedBills.filter(b => b.status === 'CONFIRMED')
                       : searchedBills.filter(b => b.paymentMode === 'UDHAARI');
 

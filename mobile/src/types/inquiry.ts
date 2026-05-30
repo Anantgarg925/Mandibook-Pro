@@ -1,4 +1,4 @@
-export type InquiryStatus = 'PENDING' | 'CONFIRMED' | 'CANCELLED';
+export type InquiryStatus = 'PENDING' | 'DELIVERED' | 'CONFIRMED' | 'CANCELLED';
 export type SlipStatus = 'draft' | 'authorized';
 export type PaymentMode = 'CASH' | 'UPI' | 'UDHAARI' | 'CHEQUE' | 'PENDING';
 

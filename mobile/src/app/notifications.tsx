@@ -34,11 +34,15 @@ export default function NotificationsScreen() {
   const insets = useSafeAreaInsets();
 
   const goBack = () => {
-    if (isMemberMode) {
-      router.replace('/member-dashboard' as any);
-      return;
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      if (isMemberMode) {
+        router.replace('/member-dashboard' as any);
+      } else {
+        router.replace('/' as any);
+      }
     }
-    router.replace('/' as any);
   };
 
   useEffect(() => {
@@ -48,7 +52,7 @@ export default function NotificationsScreen() {
   useEffect(() => {
     if (isMemberMode === undefined) return undefined;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      router.replace((isMemberMode ? '/member-dashboard' : '/') as any);
+      goBack();
       return true;
     });
     return () => subscription.remove();

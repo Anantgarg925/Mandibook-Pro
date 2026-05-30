@@ -13,6 +13,7 @@ import { useLaunch } from '@/context/LaunchContext';
 import { mapShop, supabase } from '@/lib/supabase';
 import { Colors, Spacing, FontSize, Radius } from '@/lib/theme';
 import { APP_SESSION_KEY } from '@/lib/session';
+import { resetToRoute } from '@/utils/navigation';
 
 export default function AdminLoginScreen() {
   const router = useRouter();
@@ -29,7 +30,11 @@ export default function AdminLoginScreen() {
 
   const goBack = () => {
     setLaunchComplete(false);
-    router.replace({ pathname: '/', params: { access: 'choose' } } as any);
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace({ pathname: '/', params: { access: 'choose' } } as any);
+    }
   };
 
   useEffect(() => {
@@ -91,7 +96,7 @@ export default function AdminLoginScreen() {
 
       await AsyncStorage.setItem(APP_SESSION_KEY, JSON.stringify(session));
       setLaunchComplete(true);
-      router.replace('/');
+      resetToRoute(router, '/');
     } catch (err) {
       console.error('[Admin Login]', err);
       setError('लॉगिन विफल। इंटरनेट कनेक्शन चेक करें और दोबारा कोशिश करें।');

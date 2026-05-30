@@ -240,11 +240,15 @@ export default function RegisterTruckScreen() {
   const referenceSlipRows = gradeBreakdownOpen ? normalizeGradeRows(gradeRows) : [];
 
   const goBack = () => {
-    if (isMemberMode) {
-      router.replace('/member-trucks' as any);
-      return;
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      if (isMemberMode) {
+        router.replace('/member-trucks' as any);
+      } else {
+        router.replace('/trucks' as any);
+      }
     }
-    router.replace('/trucks' as any);
   };
 
   const goToTrucks = () => {
@@ -254,7 +258,7 @@ export default function RegisterTruckScreen() {
   useEffect(() => {
     if (isMemberMode === undefined) return undefined;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      router.replace((isMemberMode ? '/member-trucks' : '/trucks') as any);
+      goBack();
       return true;
     });
     return () => subscription.remove();

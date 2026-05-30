@@ -2,8 +2,8 @@ import React, { useEffect } from 'react';
 import { View, Text, Pressable, ScrollView, BackHandler } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, FileText, Pencil } from 'lucide-react-native';
-import { useQuery } from '@tanstack/react-query';
+import { ArrowLeft, FileText, Pencil, CheckCircle } from 'lucide-react-native';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, mapInquiry } from '@/lib/supabase';
 import { useShop } from '@/context/ShopContext';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
@@ -13,6 +13,7 @@ import { archiveQueryOptions } from '@/lib/queryOptions';
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: Colors.warning,
+  DELIVERED: Colors.info,
   CONFIRMED: Colors.success,
   CANCELLED: Colors.danger,
 };
@@ -23,22 +24,41 @@ export default function BillDetailScreen() {
   const { shop } = useShop();
   const isMemberMode = useMemberMode();
   const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const goBack = () => {
-    if (isMemberMode) {
-      router.replace('/member-dashboard' as any);
-      return;
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      if (isMemberMode) {
+        router.replace('/member-dashboard' as any);
+      } else {
+        router.replace('/bills' as any);
+      }
     }
-    router.replace('/bills' as any);
   };
 
   useEffect(() => {
     if (isMemberMode === undefined) return undefined;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      router.replace((isMemberMode ? '/member-dashboard' : '/bills') as any);
+      goBack();
       return true;
     });
     return () => subscription.remove();
   }, [isMemberMode, router]);
+
+  
+  const markDeliveredMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase
+        .from('inquiries')
+        .update({ status: 'DELIVERED' })
+        .eq('id', id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inquiry', shop?.shopId, id] });
+    }
+  });
 
   const { data: inquiry } = useQuery({
     queryKey: ['inquiry', shop?.shopId, id],
@@ -130,26 +150,29 @@ export default function BillDetailScreen() {
         </View>
 
         {/* Grade & Weight */}
-        <View
-          style={{
-            backgroundColor: '#FFFFFF',
-            borderRadius: 14,
-            borderWidth: 1,
-            borderColor: '#E5E7EB',
-            padding: Spacing.md,
-            marginBottom: Spacing.md,
-          }}
-        >
-          <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text, marginBottom: Spacing.sm }}>
-            {inquiry.grade} — {inquiry.gradeName}
-          </Text>
-          <Row label="Sacks" value={String(inquiry.sacks)} />
-          <Row label="Weight/Sack" value={`${inquiry.weightPerSack} kg`} />
-          <Row label="Total Weight" value={toIndianWeight(inquiry.totalWeight)} />
-        </View>
+        {((inquiry.chargeSnapshot as any)?.entries || [inquiry]).map((entry: any, index: number) => (
+          <View
+            key={index}
+            style={{
+              backgroundColor: '#FFFFFF',
+              borderRadius: 14,
+              borderWidth: 1,
+              borderColor: '#E5E7EB',
+              padding: Spacing.md,
+              marginBottom: Spacing.md,
+            }}
+          >
+            <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text, marginBottom: Spacing.sm }}>
+              {entry.grade} — {entry.gradeName}
+            </Text>
+            <Row label="Sacks" value={String(entry.sacks)} />
+            {entry.weightPerSack > 0 && <Row label="Weight/Sack" value={`${entry.weightPerSack} kg`} />}
+            <Row label="Total Weight" value={toIndianWeight(entry.totalWeight)} />
+          </View>
+        ))}
 
         {/* Financial breakdown */}
-        {inquiry.ratePerKg > 0 ? (
+        {inquiry.grossAmount > 0 ? (
           <View
             style={{
               backgroundColor: '#FFFFFF',
@@ -196,6 +219,37 @@ export default function BillDetailScreen() {
           borderTopColor: '#E5E7EB',
         }}
       >
+        
+        {isMemberMode === true && inquiry.status === 'PENDING' ? (
+          <Pressable
+            testID="mark-delivered-button"
+            onPress={() => markDeliveredMutation.mutate()}
+            disabled={markDeliveredMutation.isPending}
+          >
+            {({ pressed }) => (
+              <View style={{
+                height: 52,
+                borderRadius: Radius.md,
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
+                backgroundColor: pressed || markDeliveredMutation.isPending ? '#2563EB' : Colors.info,
+              }}>
+                <CheckCircle size={18} color="#FFF" />
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.78}
+                  style={{ fontSize: FontSize.md, fontWeight: '700', color: '#FFF' }}
+                >
+                  {markDeliveredMutation.isPending ? 'Marking...' : 'Mark as Delivered / डिलीवर करें'}
+                </Text>
+              </View>
+            )}
+          </Pressable>
+        ) : null}
+
         {isMemberMode === true && inquiry.status === 'PENDING' ? (
           <Pressable
             testID="edit-bill-button"

@@ -345,9 +345,8 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
       <View style={{ flex: 1 }}>
         {/* Header section -- static */}
         <View style={{
-          backgroundColor: '#ffffff',
-          borderBottomWidth: 1,
-          borderBottomColor: '#E5E7EB',
+          backgroundColor: '#00450d',
+          borderBottomWidth: 0,
           paddingHorizontal: 20,
           paddingVertical: 14,
           flexDirection: 'row',
@@ -359,12 +358,12 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
             <Text style={{
               fontSize: 26,
               fontWeight: '700',
-              color: '#00450d',
+              color: '#ffffff',
               letterSpacing: -0.5,
             }}>
               Day Report / आज की रिपोर्ट
             </Text>
-            <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+            <Text style={{ fontSize: 12, color: '#DFF4FF', marginTop: 2 }}>
               Daily Business Summary
             </Text>
           </View>

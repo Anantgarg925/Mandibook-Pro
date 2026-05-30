@@ -189,15 +189,15 @@ export default function TrucksScreen() {
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: contentHPad,
+        paddingVertical: 14,
         minHeight: 56,
-        backgroundColor: BG,
-        borderBottomWidth: 1,
-        borderBottomColor: BORDER,
+        backgroundColor: GREEN,
+        borderBottomWidth: 0,
       }}>
         <Pressable hitSlop={10} onPress={() => router.push('/settings' as any)}>
-          <Menu size={24} color={GREEN} />
+          <Menu size={24} color="#FFFFFF" />
         </Pressable>
-        <Text numberOfLines={1} adjustsFontSizeToFit style={{ flex: 1, textAlign: 'center', fontSize: isSmall ? FontSize.md : FontSize.lg, fontWeight: '800', color: GREEN }}>
+        <Text numberOfLines={1} adjustsFontSizeToFit style={{ flex: 1, textAlign: 'center', fontSize: isSmall ? FontSize.md : FontSize.lg, fontWeight: '800', color: '#FFFFFF' }}>
           Trucks / गाड़ियाँ
         </Text>
         <Pressable
@@ -205,7 +205,7 @@ export default function TrucksScreen() {
           onPress={() => searchInputRef.current?.focus()}
           style={{ width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}
         >
-          <Search size={24} color="#111827" />
+          <Search size={24} color="#FFFFFF" />
         </Pressable>
       </View>
 

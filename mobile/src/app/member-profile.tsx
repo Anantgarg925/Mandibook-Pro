@@ -31,7 +31,11 @@ export default function MemberProfileScreen() {
   const { shop } = useShop();
   const [member, setMember] = useState<MemberSession | null>(null);
   const goBack = () => {
-    router.replace('/member-dashboard' as any);
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/member-dashboard' as any);
+    }
   };
 
   useEffect(() => {
@@ -44,7 +48,7 @@ export default function MemberProfileScreen() {
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      router.replace('/member-dashboard' as any);
+      goBack();
       return true;
     });
     return () => subscription.remove();

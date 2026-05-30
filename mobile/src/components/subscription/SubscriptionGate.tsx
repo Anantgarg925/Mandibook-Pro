@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets, SafeAreaProvider } from 'react-native-safe-area-context';
-import { CheckCircle2, Clock3, Copy, RefreshCw } from 'lucide-react-native';
+import { CheckCircle2, Clock3, Copy, RefreshCw, X } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import { usePathname } from 'expo-router';
 import { useShop } from '@/context/ShopContext';
@@ -70,10 +70,12 @@ function TrialBanner({
   status,
   daysRemaining,
   until,
+  onDismiss,
 }: {
   status: string;
   daysRemaining: number;
   until?: number | null;
+  onDismiss: () => void;
 }) {
   const isTrial = status === 'trial';
   const isPending = status === 'payment_pending';
@@ -103,6 +105,9 @@ function TrialBanner({
           ? `Free trial: ${daysRemaining} day${daysRemaining === 1 ? '' : 's'} left`
           : `Subscription active until ${formatDate(until)}`}
       </Text>
+      <Pressable onPress={onDismiss} style={{ padding: 4, marginLeft: 4 }}>
+        <X size={16} color={isTrial || isPending ? '#6D4C00' : Colors.success} />
+      </Pressable>
     </View>
   );
 }
@@ -445,6 +450,7 @@ export function SubscriptionGate({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { data, isLoading, isFetching, refetch, submitPayment, submittingPayment } = useSubscriptionStatus();
   const insets = useSafeAreaInsets();
+  const [dismissed, setDismissed] = useState(false);
 
   const bypass =
     !shop?.shopId ||
@@ -479,7 +485,7 @@ export function SubscriptionGate({ children }: { children: ReactNode }) {
     );
   }
 
-  const showBanner = data?.status === 'trial' || data?.status === 'active' || data?.status === 'payment_pending';
+  const showBanner = !dismissed && (data?.status === 'trial' || data?.status === 'active' || data?.status === 'payment_pending');
   const { width, height } = Dimensions.get('window');
 
   return (
@@ -490,6 +496,7 @@ export function SubscriptionGate({ children }: { children: ReactNode }) {
             status={data.status}
             daysRemaining={data.days_remaining}
             until={data.status === 'payment_pending' ? data.payment_grace_ends_at : data.current_period_ends_at ?? data.trial_ends_at}
+            onDismiss={() => setDismissed(true)}
           />
         </View>
       ) : null}

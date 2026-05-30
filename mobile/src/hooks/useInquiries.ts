@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase, mapInquiry } from '@/lib/supabase';
 import { useShop } from '@/context/ShopContext';
@@ -28,9 +28,9 @@ export function useInquiries() {
     ...liveQueryOptions,
   });
 
-  const pending = inquiries.filter((i) => i.status === 'PENDING');
-  const confirmed = inquiries.filter((i) => i.status === 'CONFIRMED');
-  const udhaari = inquiries.filter((i) => i.paymentMode === 'UDHAARI');
+  const pending = useMemo(() => inquiries.filter((i) => i.status === 'PENDING' || i.status === 'DELIVERED'), [inquiries]);
+  const confirmed = useMemo(() => inquiries.filter((i) => i.status === 'CONFIRMED'), [inquiries]);
+  const udhaari = useMemo(() => inquiries.filter((i) => i.paymentMode === 'UDHAARI'), [inquiries]);
 
   const byTruck = useCallback(
     (truckId: string) => inquiries.filter((i) => i.truckId === truckId),

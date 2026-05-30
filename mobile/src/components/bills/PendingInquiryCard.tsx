@@ -140,7 +140,7 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
   const timeDiffMins = Math.floor((Date.now() - inquiry.date) / 60000);
   const timeAgoStr = timeDiffMins < 1 ? 'Just now' : `${timeDiffMins} mins ago`;
 
-  const buildInquiryUpdate = (status?: 'PENDING' | 'CONFIRMED') => {
+  const buildInquiryUpdate = (status?: 'PENDING' | 'DELIVERED' | 'CONFIRMED') => {
     if (!calc) throw new Error('Missing calculation');
     return {
       truck_id: isAgentStock ? null : truckId,
@@ -202,7 +202,7 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
       if (!shop?.shopId || !calc) throw new Error('Missing shop or calculation');
       const { error } = await supabase
         .from('inquiries')
-        .update(buildInquiryUpdate('PENDING'))
+        .update(buildInquiryUpdate(inquiry.status === 'DELIVERED' ? 'DELIVERED' : 'PENDING'))
         .eq('id', inquiry.id);
       if (error) throw new Error(error.message);
     },
@@ -369,9 +369,9 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
           <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: '#0F2C23', letterSpacing: 0.5 }}>
             SLIP #SL-{inquiry.slipNumber}
           </Text>
-          <View style={{ backgroundColor: '#FDE047', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
-            <Text style={{ fontSize: 10, fontWeight: '800', color: '#1F2937' }}>
-              VERIFICATION NEEDED
+          <View style={{ backgroundColor: inquiry.status === 'DELIVERED' ? '#DBEAFE' : '#FDE047', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12 }}>
+            <Text style={{ fontSize: 10, fontWeight: '800', color: inquiry.status === 'DELIVERED' ? '#1D4ED8' : '#1F2937' }}>
+              {inquiry.status === 'DELIVERED' ? 'DELIVERED' : 'VERIFICATION NEEDED'}
             </Text>
           </View>
         </View>

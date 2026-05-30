@@ -15,7 +15,7 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import * as Contacts from 'expo-contacts';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { ArrowLeft, ChevronDown, Minus, Plus, Phone } from 'lucide-react-native';
+import { ArrowLeft, ChevronDown, Minus, Plus, Phone, Trash2 } from 'lucide-react-native';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -27,6 +27,7 @@ import { useShop } from '@/context/ShopContext';
 import { useTodayTrucks } from '@/hooks/useTodayTrucks';
 import { getCurrentBusinessDate } from '@/lib/businessDay';
 import { useBuyers } from '@/hooks/useBuyers';
+import { useMemberMode } from '@/hooks/useMemberMode';
 import PaymentSelector from '@/components/bills/PaymentSelector';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { toIndianCurrency, toIndianWeight } from '@/lib/formatters';
@@ -48,10 +49,10 @@ const inputStyle = {
   textAlignVertical: 'center' as const,
 };
 
-function SectionHeader({ title }: { title: string }) {
+function SectionHeader({ title, style }: { title: string, style?: any }) {
   return (
     <Text
-      style={{
+      style={[{
         fontSize: FontSize.xs,
         fontWeight: '700',
         color: Colors.textSecond,
@@ -59,7 +60,7 @@ function SectionHeader({ title }: { title: string }) {
         letterSpacing: 0.8,
         marginBottom: Spacing.sm,
         marginTop: Spacing.lg,
-      }}
+      }, style]}
     >
       {title}
     </Text>
@@ -72,6 +73,7 @@ export default function NewBillScreen() {
   const { shop } = useShop();
   const { trucks } = useTodayTrucks();
   const { buyers } = useBuyers();
+  const isMemberMode = useMemberMode();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
 
@@ -98,9 +100,11 @@ export default function NewBillScreen() {
   const [sourceAgentName, setSourceAgentName] = useState('');
   const [sourceAgentPhone, setSourceAgentPhone] = useState('');
   const [savedSlip, setSavedSlip] = useState<number | null>(null);
+  const [savedInquiryId, setSavedInquiryId] = useState<string | null>(null);
   const [applyApmc, setApplyApmc] = useState(true);
   const [applyBardana, setApplyBardana] = useState(true);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [entries, setEntries] = useState<any[]>([]);
 
   const successY = useSharedValue(400);
   const calcOpacity = useSharedValue(0);
@@ -152,39 +156,21 @@ export default function NewBillScreen() {
 
   const openContactPicker = async () => {
     try {
-      setContactsLoading(true);
-      setContactSearchText('');
       const permission = await Contacts.requestPermissionsAsync();
       if (permission.status === 'granted') {
-        const contacts = await Contacts.getContactsAsync({
-          fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Emails],
-        });
-        
-        if (contacts && contacts.data.length > 0) {
-          // Filter contacts that have phone numbers
-          const contactsWithPhones = contacts.data.filter(
-            c => c.phoneNumbers && c.phoneNumbers.length > 0
-          );
-          setPhoneContacts(contactsWithPhones);
-          setContactPickerVisible(true);
+        const contact = await Contacts.presentContactPickerAsync();
+        if (contact) {
+          setCustomerName(contact.name || '');
+          if (contact.phoneNumbers && contact.phoneNumbers.length > 0) {
+            const phone = contact.phoneNumbers[0].number?.replace(/[^\d]/g, '') || '';
+            setCustomerPhone(phone);
+          }
+          setBuyerSuggestions([]);
         }
       }
-      setContactsLoading(false);
     } catch (error) {
-      setContactsLoading(false);
       console.log('Contact picker error:', error);
     }
-  };
-
-  const selectPhoneContact = (contact: any) => {
-    setCustomerName(contact.name || '');
-    if (contact.phoneNumbers && contact.phoneNumbers.length > 0) {
-      const phone = contact.phoneNumbers[0].number?.replace(/[^\d]/g, '') || '';
-      setCustomerPhone(phone);
-    }
-    setBuyerSuggestions([]);
-    setContactSearchText('');
-    setContactPickerVisible(false);
   };
 
   const selectBuyer = (b: Buyer) => {
@@ -211,17 +197,17 @@ export default function NewBillScreen() {
   const calc =
     sacks > 0 && wps > 0 && charges
       ? calculateCharges({
-          sacks,
-          weightPerSack: wps,
-          ratePerKg: rate,
-          charges: {
-            apmcPct: charges.apmcCommission,
-            bardanaPerSack: charges.bardanaPerSack,
-            cartagePerKg: charges.cartagePerKg,
-          },
-          applyApmc,
-          applyBardana,
-        })
+        sacks,
+        weightPerSack: wps,
+        ratePerKg: rate,
+        charges: {
+          apmcPct: charges.apmcCommission,
+          bardanaPerSack: charges.bardanaPerSack,
+          cartagePerKg: charges.cartagePerKg,
+        },
+        applyApmc,
+        applyBardana,
+      })
       : null;
 
   const calcStyle = useAnimatedStyle(() => ({ opacity: calcOpacity.value }));
@@ -229,16 +215,35 @@ export default function NewBillScreen() {
     transform: [{ translateY: successY.value }],
   }));
 
+  const markDeliveredMutation = useMutation({
+    mutationFn: async () => {
+      if (!savedInquiryId) throw new Error('Missing inquiry ID');
+      const { error } = await supabase
+        .from('inquiries')
+        .update({ status: 'DELIVERED' })
+        .eq('id', savedInquiryId);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inquiries', shop?.shopId] });
+      successY.value = 400; // hide bottom sheet
+      router.replace('/member-dashboard' as any);
+    },
+  });
+
   const saveMutation = useMutation({
     mutationFn: async (payload: {
       inquiry: any;
       truckUpdate?: { id: string; gradeInventory: any[] };
       buyerUpsert?: { name: string; phone: string } | null;
     }) => {
-      // 1. Create inquiry
+      // 1. Fetch latest slip just before saving to prevent simultaneous duplicates
+      const realTimeSlip = await getNextSlipNumber(payload.inquiry.shopId);
+
+      // 2. Create inquiry
       const dbInq = {
         shop_id: payload.inquiry.shopId,
-        slip_number: payload.inquiry.slipNumber,
+        slip_number: realTimeSlip,
         truck_id: payload.inquiry.truckId,
         truck_number: payload.inquiry.truckNumber,
         source_agent_name: payload.inquiry.sourceAgentName ?? '',
@@ -314,6 +319,39 @@ export default function NewBillScreen() {
     },
   });
 
+
+  const handleAddEntry = () => {
+    if (!validate() || !shop?.shopId || (!selectedTruck && !boughtFromAgent) || !selectedGrade) return;
+
+    const gradeInfo2 = selectedTruck?.gradeInventory.find((g) => g.code === selectedGrade);
+    const gradeName = gradeInfo2?.name ?? shop?.grades?.find(g => g.code === selectedGrade)?.name ?? selectedGrade;
+    const result = calc ?? calculateCharges({ sacks, weightPerSack: wps, ratePerKg: 0, charges: { apmcPct: 0, bardanaPerSack: 0, cartagePerKg: 0 }, applyApmc, applyBardana });
+
+    const newEntry = {
+      grade: selectedGrade,
+      gradeName,
+      sacks,
+      weightPerSack: wps,
+      totalWeight: result.totalWeight,
+      ratePerKg: rate,
+      grossAmount: result.gross,
+      apmcAmount: result.apmc,
+      bardanaAmount: result.bardana,
+      cartageAmount: result.cartage,
+      netAmount: result.net,
+    };
+
+    setEntries([...entries, newEntry]);
+
+    // Reset current item fields
+    setSelectedGrade(null);
+    setSacks(0);
+    setSacksText('');
+    setWeightPerSack('');
+    setRatePerKg('');
+    setErrors({});
+  };
+
   const validate = () => {
     const e: Record<string, string> = {};
     if (!boughtFromAgent && !selectedTruck) e.truck = 'गाड़ी चुनें';
@@ -325,29 +363,19 @@ export default function NewBillScreen() {
   };
 
   const handleSave = async () => {
-    if (!validate() || !shop?.shopId || (!selectedTruck && !boughtFromAgent) || !selectedGrade || saveMutation.isPending) return;
+    if (entries.length === 0 && (!validate() || !shop?.shopId || (!selectedTruck && !boughtFromAgent) || !selectedGrade || saveMutation.isPending)) return;
+    if (saveMutation.isPending) return;
 
     const slip = slipNumber ?? 1001;
-    const gradeInfo2 = selectedTruck?.gradeInventory.find((g) => g.code === selectedGrade);
-    const gradeName = gradeInfo2?.name ?? shop?.grades?.find(g => g.code === selectedGrade)?.name ?? selectedGrade;
-    const result = calc ?? calculateCharges({ sacks, weightPerSack: wps, ratePerKg: 0, charges: { apmcPct: 0, bardanaPerSack: 0, cartagePerKg: 0 }, applyApmc, applyBardana });
 
-    const newInventory = selectedTruck ? selectedTruck.gradeInventory.map((g) =>
-      g.code === selectedGrade
-        ? { ...g, provisionalKg: g.provisionalKg + result.totalWeight }
-        : g
-    ) : [];
+    // Combine existing entries with the current one if valid
+    const allEntries = [...entries];
+    if (selectedGrade && sacks > 0) {
+      const gradeInfo2 = selectedTruck?.gradeInventory.find((g) => g.code === selectedGrade);
+      const gradeName = gradeInfo2?.name ?? shop?.grades?.find(g => g.code === selectedGrade)?.name ?? selectedGrade;
+      const result = calc ?? calculateCharges({ sacks, weightPerSack: wps, ratePerKg: 0, charges: { apmcPct: 0, bardanaPerSack: 0, cartagePerKg: 0 }, applyApmc, applyBardana });
 
-    await saveMutation.mutateAsync({
-      inquiry: {
-        shopId: shop.shopId,
-        slipNumber: slip,
-        truckId: boughtFromAgent ? null : selectedTruck?.id,
-        truckNumber: boughtFromAgent ? 'Agent Stock' : selectedTruck?.truckNumber,
-        sourceAgentName: boughtFromAgent ? sourceAgentName.trim() : '',
-        sourceAgentPhone: boughtFromAgent ? sourceAgentPhone.trim() : '',
-        customerName: customerName.trim(),
-        customerPhone: customerPhone.trim(),
+      allEntries.push({
         grade: selectedGrade,
         gradeName,
         sacks,
@@ -358,18 +386,66 @@ export default function NewBillScreen() {
         apmcAmount: result.apmc,
         bardanaAmount: result.bardana,
         cartageAmount: result.cartage,
-        bardanaSacks: sacks,
-        bardanaRate: shop.charges?.bardanaPerSack ?? 0,
+        netAmount: result.net,
+      });
+    }
+
+    if (allEntries.length === 0) return;
+
+    const totalSacks = allEntries.reduce((sum, e) => sum + e.sacks, 0);
+    const totalWeight = allEntries.reduce((sum, e) => sum + e.totalWeight, 0);
+    const totalGross = allEntries.reduce((sum, e) => sum + e.grossAmount, 0);
+    const totalApmc = allEntries.reduce((sum, e) => sum + e.apmcAmount, 0);
+    const totalBardana = allEntries.reduce((sum, e) => sum + e.bardanaAmount, 0);
+    const totalCartage = allEntries.reduce((sum, e) => sum + e.cartageAmount, 0);
+    const totalNet = allEntries.reduce((sum, e) => sum + e.netAmount, 0);
+
+    const mainGrade = allEntries.length > 1 ? 'MIXED' : allEntries[0].grade;
+    const mainGradeName = allEntries.length > 1 ? 'Multiple Items' : allEntries[0].gradeName;
+
+    const newInventory = selectedTruck ? [...selectedTruck.gradeInventory] : [];
+    if (selectedTruck) {
+      for (const entry of allEntries) {
+        const idx = newInventory.findIndex(g => g.code === entry.grade);
+        if (idx !== -1) {
+          newInventory[idx] = { ...newInventory[idx], provisionalKg: newInventory[idx].provisionalKg + entry.totalWeight };
+        }
+      }
+    }
+
+    const createdInquiry = await saveMutation.mutateAsync({
+      inquiry: {
+        shopId: shop!.shopId,
+        slipNumber: slip,
+        truckId: boughtFromAgent ? null : selectedTruck?.id,
+        truckNumber: boughtFromAgent ? 'Agent Stock' : selectedTruck?.truckNumber,
+        sourceAgentName: boughtFromAgent ? sourceAgentName.trim() : '',
+        sourceAgentPhone: boughtFromAgent ? sourceAgentPhone.trim() : '',
+        customerName: customerName.trim(),
+        customerPhone: customerPhone.trim(),
+        grade: mainGrade,
+        gradeName: mainGradeName,
+        sacks: totalSacks,
+        weightPerSack: 0, // 0 means mixed or N/A
+        totalWeight,
+        ratePerKg: 0, // 0 means mixed
+        grossAmount: totalGross,
+        apmcAmount: totalApmc,
+        bardanaAmount: totalBardana,
+        cartageAmount: totalCartage,
+        bardanaSacks: applyBardana ? totalSacks : 0,
+        bardanaRate: shop!.charges?.bardanaPerSack ?? 0,
         applyBardana,
         applyApmc,
         chargeSnapshot: {
-          apmcCommission: shop.charges?.apmcCommission ?? 0,
-          bardanaPerSack: shop.charges?.bardanaPerSack ?? 0,
-          cartagePerKg: shop.charges?.cartagePerKg ?? 0,
+          apmcCommission: shop!.charges?.apmcCommission ?? 0,
+          bardanaPerSack: shop!.charges?.bardanaPerSack ?? 0,
+          cartagePerKg: shop!.charges?.cartagePerKg ?? 0,
           applyApmc,
           applyBardana,
+          entries: allEntries
         },
-        netAmount: result.net,
+        netAmount: totalNet,
         paymentMode,
         upiRef: upiRef.trim(),
         status: 'PENDING',
@@ -385,7 +461,10 @@ export default function NewBillScreen() {
         : null,
     });
 
-    setSavedSlip(slip);
+    setSavedSlip(createdInquiry?.slip_number ?? slip);
+    if (createdInquiry?.id) {
+      setSavedInquiryId(createdInquiry.id);
+    }
     setSuccess(true);
   };
 
@@ -402,6 +481,7 @@ export default function NewBillScreen() {
     setApplyApmc(true);
     setApplyBardana(true);
     setErrors({});
+    setEntries([]);
     setSuccess(false);
     saveMutation.reset();
     successY.value = 400;
@@ -413,12 +493,11 @@ export default function NewBillScreen() {
 
   const formComplete = !!(
     (boughtFromAgent ? sourceAgentName.trim() : selectedTruck) &&
-    selectedGrade &&
-    sacks > 0
+    (entries.length > 0 || (selectedGrade && sacks > 0))
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: Colors.background }} edges={['top']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#00450D' }} edges={['top']}>
       {/* Header */}
       <View
         style={{
@@ -426,27 +505,23 @@ export default function NewBillScreen() {
           alignItems: 'center',
           gap: Spacing.sm,
           paddingHorizontal: Spacing.md,
-          paddingVertical: Spacing.sm,
-          backgroundColor: Colors.surface,
-          borderBottomWidth: 1,
-          borderBottomColor: Colors.border,
+          paddingVertical: 14,
+          backgroundColor: '#00450D',
+          borderBottomWidth: 0,
         }}
       >
         <Pressable testID="back-from-bill" onPress={() => router.back()} style={{ padding: 4 }}>
-          <ArrowLeft size={24} color={Colors.text} />
+          <ArrowLeft size={24} color="#FFFFFF" />
         </Pressable>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: Colors.text }}>नया बिल</Text>
-          <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>
+          <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: '#FFFFFF' }}>नया बिल</Text>
+          <Text style={{ fontSize: FontSize.xs, color: '#DFF4FF' }}>
             Bill #{slipNumber ?? '…'}
           </Text>
         </View>
       </View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-      >
+      <View style={{ flex: 1, backgroundColor: Colors.background }}>
         <KeyboardAwareScrollView
           ref={scrollRef}
           contentContainerStyle={{ padding: Spacing.md, paddingBottom: 110 }}
@@ -468,8 +543,8 @@ export default function NewBillScreen() {
           </View>
 
           {/* Bought from Agent Toggle */}
-          <View style={{ marginBottom: Spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF', padding: Spacing.md, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB' }}>
-            <Text style={{ fontSize: 16, fontWeight: '600', color: '#111827' }}>Bought from another agent</Text>
+          <View style={{ marginBottom: Spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: '#FFFFFF', paddingVertical: 4, paddingHorizontal: Spacing.sm, borderRadius: Radius.sm, borderWidth: 1, borderColor: '#E5E7EB' }}>
+            <Text style={{ fontSize: FontSize.md, fontWeight: '600', color: Colors.text }}>Bought from another agent</Text>
             <Switch
               testID="bought-from-agent-toggle"
               value={boughtFromAgent}
@@ -506,28 +581,28 @@ export default function NewBillScreen() {
             <View onLayout={rememberSection('truck')}>
               {/* SECTION 1: Truck */}
               <SectionHeader title="गाड़ी चुनें / Select Truck" />
-          
-          <Pressable
-            testID="truck-picker-button"
-            onPress={() => setTruckPickerVisible(true)}
-            style={{
-              ...inputStyle,
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-            }}
-          >
-            <Text
-              style={{
-                fontSize: FontSize.md,
-                color: selectedTruck ? Colors.text : Colors.textSecond,
-              }}
-            >
-              {selectedTruck ? `${selectedTruck.truckNumber} — ${selectedTruck.senderName}` : 'Select truck…'}
-            </Text>
-            <ChevronDown size={18} color={Colors.textSecond} />
-          </Pressable>
-          {errors.truck ? <Text style={{ color: Colors.danger, fontSize: FontSize.xs, marginTop: 4 }}>{errors.truck}</Text> : null}
+
+              <Pressable
+                testID="truck-picker-button"
+                onPress={() => setTruckPickerVisible(true)}
+                style={{
+                  ...inputStyle,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: FontSize.md,
+                    color: selectedTruck ? Colors.text : Colors.textSecond,
+                  }}
+                >
+                  {selectedTruck ? `${selectedTruck.truckNumber} — ${selectedTruck.senderName}` : 'Select truck…'}
+                </Text>
+                <ChevronDown size={18} color={Colors.textSecond} />
+              </Pressable>
+              {errors.truck ? <Text style={{ color: Colors.danger, fontSize: FontSize.xs, marginTop: 4 }}>{errors.truck}</Text> : null}
             </View>
           )}
 
@@ -646,9 +721,9 @@ export default function NewBillScreen() {
                               setTimeout(() => scrollToSection('quantity'), 80);
                             }}
                             style={{
-                              flexBasis: '48%',
+                              flexBasis: '31%',
                               flexGrow: 1,
-                              maxWidth: '49%',
+                              maxWidth: '32.5%',
                               minHeight: 112,
                               justifyContent: 'space-between',
                               padding: Spacing.sm,
@@ -660,8 +735,15 @@ export default function NewBillScreen() {
                             }}
                           >
                             <View>
-                              <Text numberOfLines={1} style={{ fontSize: FontSize.sm, fontWeight: '800', color: Colors.text, marginBottom: 4 }}>
-                                {grade.name || grade.code}
+                              <Text numberOfLines={2} style={{ marginBottom: 4 }}>
+                                <Text style={{ fontSize: FontSize.lg, fontWeight: '900', color: Colors.text }}>
+                                  {grade.code}
+                                </Text>
+                                {grade.name && grade.name !== grade.code && (
+                                  <Text style={{ fontSize: FontSize.xs, fontWeight: '600', color: Colors.textSecond }}>
+                                    {` (${grade.name})`}
+                                  </Text>
+                                )}
                               </Text>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
                                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.textSecond }} />
@@ -700,9 +782,9 @@ export default function NewBillScreen() {
                               setTimeout(() => scrollToSection('quantity'), 80);
                             }}
                             style={{
-                              flexBasis: '48%',
+                              flexBasis: '31%',
                               flexGrow: 1,
-                              maxWidth: '49%',
+                              maxWidth: '32.5%',
                               minHeight: 126,
                               justifyContent: 'space-between',
                               padding: Spacing.sm,
@@ -714,8 +796,15 @@ export default function NewBillScreen() {
                             }}
                           >
                             <View>
-                              <Text numberOfLines={1} style={{ fontSize: FontSize.sm, fontWeight: '800', color: Colors.text, marginBottom: 4 }}>
-                                {grade.name || grade.code}
+                              <Text numberOfLines={2} style={{ marginBottom: 4 }}>
+                                <Text style={{ fontSize: FontSize.lg, fontWeight: '900', color: Colors.text }}>
+                                  {grade.code}
+                                </Text>
+                                {grade.name && grade.name !== grade.code && (
+                                  <Text style={{ fontSize: FontSize.xs, fontWeight: '600', color: Colors.textSecond }}>
+                                    {` (${grade.name})`}
+                                  </Text>
+                                )}
                               </Text>
                               <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.xs }}>
                                 <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.textSecond }} />
@@ -777,7 +866,7 @@ export default function NewBillScreen() {
                 }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond }}>बोरे / Sacks</Text>
+                  <Text style={{ fontSize: FontSize.md, fontWeight: '600', color: Colors.text }}>बोरे / Sacks</Text>
                   <View
                     style={{
                       flexDirection: 'row',
@@ -857,73 +946,143 @@ export default function NewBillScreen() {
 
               {/* Weight per sack */}
               <View style={{ marginTop: Spacing.sm }}>
-                <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond, marginBottom: 6 }}>
+                <Text style={{ fontSize: FontSize.md, fontWeight: '600', color: Colors.text, marginBottom: 6 }}>
                   Weight/Sack (kg)
                 </Text>
-                <TextInput
-                  testID="weight-per-sack-input"
-                  style={inputStyle}
-                  placeholder="e.g. 25"
-                  placeholderTextColor={Colors.textSecond}
-                  value={weightPerSack}
-                  onChangeText={setWeightPerSack}
-                  keyboardType="decimal-pad"
-                />
-                <View style={{ flexDirection: 'row', gap: Spacing.xs, marginTop: Spacing.xs }}>
-                  {['20', '25', '30'].map((w) => (
-                    <Pressable
-                      key={w}
-                      testID={`preset-weight-${w}`}
-                      onPress={() => setWeightPerSack(w)}
-                      style={{
-                        paddingVertical: 4,
-                        paddingHorizontal: Spacing.sm,
-                        borderRadius: Radius.round,
-                        backgroundColor: weightPerSack === w ? Colors.border : '#EEEEEE',
-                      }}
-                    >
-                      <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>{w} kg</Text>
-                    </Pressable>
-                  ))}
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: Spacing.md }}>
+                  <View style={{ position: 'relative' }}>
+                    <TextInput
+                      testID="weight-per-sack-input"
+                      style={[
+                        inputStyle,
+                        {
+                          width: 90,
+                          textAlign: 'center',
+                          backgroundColor: '#F3F4F6', // Distinct gray inset background
+                          borderColor: '#D1D5DB', // Stronger border
+                          borderWidth: 1.5,
+                          fontSize: FontSize.lg,
+                          fontWeight: '700'
+                        }
+                      ]}
+                      placeholder="e.g. 25"
+                      maxLength={5}
+                      placeholderTextColor="#9CA3AF"
+                      value={weightPerSack}
+                      onChangeText={setWeightPerSack}
+                      keyboardType="decimal-pad"
+                    />
+                    {/* Tiny "kg" label inside the input */}
+                    <Text style={{ position: 'absolute', right: 12, top: 18, fontSize: FontSize.xs, color: '#6B7280', fontWeight: '600' }}>kg</Text>
+                  </View>
+
+                  <View style={{
+                    flexDirection: 'row',
+                    flex: 1,
+                    marginLeft: 8,
+                    backgroundColor: '#F3F4F6',
+                    borderRadius: 24,
+                    padding: 4,
+                    borderWidth: 1,
+                    borderColor: '#E5E7EB'
+                  }}>
+                    {['20', '25', '30'].map((w) => {
+                      const isSelected = weightPerSack === w;
+                      return (
+                        <Pressable
+                          key={w}
+                          testID={`preset-weight-${w}`}
+                          onPress={() => setWeightPerSack(w)}
+                          style={{
+                            flex: 1,
+                            height: 40, // Fits nicely inside the container
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: 20,
+                            backgroundColor: isSelected ? Colors.primary : 'transparent',
+                            shadowColor: isSelected ? Colors.primary : 'transparent',
+                            shadowOffset: { width: 0, height: isSelected ? 2 : 0 },
+                            shadowOpacity: isSelected ? 0.2 : 0,
+                            shadowRadius: isSelected ? 4 : 0,
+                            elevation: isSelected ? 4 : 0,
+                          }}
+                        >
+                          <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: isSelected ? '#FFFFFF' : '#6B7280' }}>
+                            {w}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
                 </View>
               </View>
 
               {/* Calculation preview card */}
-              <Animated.View style={[calcStyle, { marginTop: Spacing.sm }]}>
-                <View
-                  style={{
-                    backgroundColor: Colors.surface,
-                    borderRadius: Radius.md,
-                    borderLeftWidth: 4,
-                    borderLeftColor: Colors.success,
-                    borderWidth: 1,
-                    borderColor: Colors.border,
-                    padding: Spacing.md,
-                  }}
-                >
-                  <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text, marginBottom: 4 }}>
-                    कुल वजन: {toIndianWeight((parseFloat(weightPerSack) || 0) * sacks)}
-                  </Text>
-                  {available > 0 ? (
-                    (parseFloat(weightPerSack) || 0) * sacks <= available ? (
-                      <Text style={{ fontSize: FontSize.xs, color: Colors.success }}>
-                        {hasBreakdown ? `उपलब्ध (${selectedGrade})` : 'Shared truck stock'}: {toIndianWeight(available)} ✅
-                      </Text>
-                    ) : (
-                      <Text style={{ fontSize: FontSize.xs, color: Colors.danger }}>
-                        ⚠ स्टॉक कम है! Only {toIndianWeight(available)} {hasBreakdown ? 'available in this grade' : 'shared stock available'}
-                      </Text>
-                    )
-                  ) : null}
-                </View>
-              </Animated.View>
+              {calc ? (
+                <Animated.View style={[calcStyle, { marginTop: Spacing.sm }]}>
+                  <View
+                    style={{
+                      backgroundColor: Colors.surface,
+                      borderRadius: Radius.md,
+                      borderLeftWidth: 4,
+                      borderLeftColor: Colors.success,
+                      borderWidth: 1,
+                      borderColor: Colors.border,
+                      padding: Spacing.md,
+                    }}
+                  >
+                    <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.text, marginBottom: 4 }}>
+                      कुल वजन: {toIndianWeight((parseFloat(weightPerSack) || 0) * sacks)}
+                    </Text>
+                    {available > 0 ? (
+                      (parseFloat(weightPerSack) || 0) * sacks <= available ? (
+                        <Text style={{ fontSize: FontSize.xs, color: Colors.success }}>
+                          {hasBreakdown ? `उपलब्ध (${selectedGrade})` : 'Shared truck stock'}: {toIndianWeight(available)} ✅
+                        </Text>
+                      ) : (
+                        <Text style={{ fontSize: FontSize.xs, color: Colors.danger }}>
+                          ⚠ स्टॉक कम है! Only {toIndianWeight(available)} {hasBreakdown ? 'available in this grade' : 'shared stock available'}
+                        </Text>
+                      )
+                    ) : null}
+                  </View>
+                </Animated.View>
+              ) : null}
             </>
           ) : null}
           {errors.sacks ? <Text style={{ color: Colors.danger, fontSize: FontSize.xs, marginTop: 4 }}>{errors.sacks}</Text> : null}
 
+
+          {/* ADDED ENTRIES */}
+          {entries.length > 0 ? (
+            <View style={{ marginBottom: Spacing.md, marginTop: Spacing.md }}>
+              <SectionHeader title="जोड़े गए आइटम / Added Items" />
+              {entries.map((entry, idx) => (
+                <View key={idx} style={{ backgroundColor: '#FFF', padding: Spacing.md, borderRadius: Radius.md, marginBottom: Spacing.sm, borderWidth: 1, borderColor: Colors.border, flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <Text style={{ fontWeight: '700', color: Colors.text }}>{entry.gradeName}</Text>
+                      <Text style={{ fontWeight: '700', color: Colors.text }}>₹{entry.netAmount.toFixed(0)}</Text>
+                    </View>
+                    <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>
+                      {entry.sacks} sacks @ {entry.weightPerSack}kg (Total {entry.totalWeight}kg)
+                      {entry.ratePerKg > 0 ? ` x ₹${entry.ratePerKg}/kg` : ''}
+                    </Text>
+                  </View>
+                  <Pressable 
+                    onPress={() => setEntries(prev => prev.filter((_, i) => i !== idx))}
+                    style={{ padding: Spacing.sm, marginLeft: Spacing.sm }}
+                  >
+                    <Trash2 size={20} color={Colors.danger} />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
           {/* SECTION 4: Rate */}
           <View onLayout={rememberSection('rate')}>
-            <SectionHeader title="रेट / Rate (optional)" />
+            <SectionHeader title="रेट / Rate (optional)" style={{ marginTop: 2 }} />
           </View>
           <TextInput
             testID="rate-per-kg-input"
@@ -936,6 +1095,24 @@ export default function NewBillScreen() {
             returnKeyType="done"
           />
 
+
+          {calc ? (
+            <Pressable
+              onPress={handleAddEntry}
+              style={{
+                marginTop: Spacing.md,
+                backgroundColor: Colors.surface,
+                borderWidth: 2,
+                borderColor: Colors.primary,
+                borderRadius: Radius.md,
+                paddingVertical: 10,
+                alignItems: 'center'
+              }}
+            >
+              <Text style={{ color: Colors.primary, fontWeight: '700', fontSize: FontSize.md }}>+ Add Another Item</Text>
+            </Pressable>
+          ) : null}
+
           {/* APMC & Bardana Toggles */}
           <View style={{ flexDirection: 'row', gap: Spacing.md, marginTop: Spacing.md }}>
             <Pressable
@@ -943,7 +1120,7 @@ export default function NewBillScreen() {
               onPress={() => setApplyApmc((prev) => !prev)}
               style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.surface, padding: Spacing.md, borderRadius: Radius.md, borderWidth: 1, borderColor: applyApmc ? Colors.primary : Colors.border }}
             >
-              <Text style={{ fontSize: FontSize.sm, color: applyApmc ? Colors.primary : Colors.textSecond, fontWeight: '700' }}>APMC</Text>
+              <Text style={{ fontSize: FontSize.md, color: applyApmc ? Colors.primary : Colors.text, fontWeight: '700' }}>APMC</Text>
               <View pointerEvents="none">
                 <Switch value={applyApmc} onValueChange={setApplyApmc} />
               </View>
@@ -953,7 +1130,7 @@ export default function NewBillScreen() {
               onPress={() => setApplyBardana((prev) => !prev)}
               style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: Colors.surface, padding: Spacing.md, borderRadius: Radius.md, borderWidth: 1, borderColor: applyBardana ? Colors.primary : Colors.border }}
             >
-              <Text style={{ fontSize: FontSize.sm, color: applyBardana ? Colors.primary : Colors.textSecond, fontWeight: '700' }}>Bardana</Text>
+              <Text style={{ fontSize: FontSize.md, color: applyBardana ? Colors.primary : Colors.text, fontWeight: '700' }}>Bardana</Text>
               <View pointerEvents="none">
                 <Switch value={applyBardana} onValueChange={setApplyBardana} />
               </View>
@@ -1021,7 +1198,7 @@ export default function NewBillScreen() {
             )}
           </Pressable>
         </View>
-      </KeyboardAvoidingView>
+      </View>
 
       {/* Truck Picker Modal */}
       <Modal
@@ -1035,236 +1212,125 @@ export default function NewBillScreen() {
           setTruckSearchText('');
         }}
       >
-        <Pressable
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }}
-          onPress={() => {
-            setTruckPickerVisible(false);
-            setTruckSearchText('');
-          }}
-        >
-          <View
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              backgroundColor: Colors.surface,
-              borderTopLeftRadius: 20,
-              borderTopRightRadius: 20,
-              maxHeight: '70%',
-              paddingTop: Spacing.md,
-              paddingBottom: Math.max(Spacing.md, insets.bottom),
-              elevation: 20,
-            }}
-            onStartShouldSetResponder={() => true}
+        {truckPickerVisible && (
+          <KeyboardAvoidingView
+            behavior="padding"
+            style={{ flex: 1 }}
           >
-            <Text
-              style={{
-                fontSize: FontSize.md,
-                fontWeight: '700',
-                color: Colors.text,
-                paddingHorizontal: Spacing.md,
-                marginBottom: Spacing.sm,
+            <Pressable
+              style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}
+              onPress={() => {
+                setTruckPickerVisible(false);
+                setTruckSearchText('');
               }}
             >
-              गाड़ी चुनें / Select Truck
-            </Text>
-            {/* Search bar for trucks */}
-            <TextInput
-              testID="truck-search-input"
-              style={{
-                height: 48,
-                borderWidth: 1,
-                borderColor: Colors.border,
-                borderRadius: Radius.sm,
-                paddingHorizontal: Spacing.md,
-                marginHorizontal: Spacing.md,
-                marginBottom: Spacing.md,
-                fontSize: FontSize.md,
-                backgroundColor: Colors.background,
-                color: Colors.text,
-              }}
-              placeholder="Search truck number or sender... / गाड़ी खोजें"
-              placeholderTextColor={Colors.textSecond}
-              value={truckSearchText}
-              onChangeText={setTruckSearchText}
-              autoCorrect={false}
-            />
-            <FlatList
-              data={trucks.filter((t) => {
-                if (!truckSearchText.trim()) return true;
-                const q = truckSearchText.trim().toLowerCase();
-                return (
-                  t.truckNumber.toLowerCase().includes(q) ||
-                  t.senderName.toLowerCase().includes(q)
-                );
-              })}
-              keyExtractor={(t) => t.id}
-              keyboardShouldPersistTaps="handled"
-              renderItem={({ item }) => {
-                const hasBreakdown = item.gradeInventory.some(g => g.totalKg > 0);
-                const totalAvail = hasBreakdown
-                  ? item.gradeInventory.reduce((s, g) => s + Math.max(0, g.totalKg - g.confirmedKg - g.provisionalKg), 0)
-                  : Math.max(0, item.totalKg - item.gradeInventory.reduce((s, g) => s + g.confirmedKg + g.provisionalKg, 0));
-                return (
-                  <Pressable
-                    testID={`truck-option-${item.id}`}
-                    onPress={() => {
-                      setSelectedTruck(item);
-                      setSelectedGrade(null);
-                      setTruckPickerVisible(false);
-                      setTruckSearchText('');
-                      setTimeout(() => scrollToSection('customer'), 120);
-                    }}
-                    style={{
-                      flexDirection: 'row',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      paddingVertical: Spacing.md,
-                      paddingHorizontal: Spacing.md,
-                      borderBottomWidth: 1,
-                      borderBottomColor: Colors.border,
-                    }}
-                  >
-                    <View>
-                      <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: Colors.text }}>
-                        {item.truckNumber}
-                      </Text>
-                      <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>
-                        {item.senderName}
-                      </Text>
-                    </View>
-                    <Text style={{ fontSize: FontSize.sm, color: Colors.success, fontWeight: '600' }}>
-                      {toIndianWeight(totalAvail)}
-                    </Text>
-                  </Pressable>
-                );
-              }}
-              ListEmptyComponent={
-                <Text style={{ textAlign: 'center', color: Colors.textSecond, padding: Spacing.lg }}>
-                  {truckSearchText.trim() ? 'No trucks matching search' : 'No trucks today'}
+              <View
+                style={{
+                  backgroundColor: Colors.surface,
+                  borderTopLeftRadius: 20,
+                  borderTopRightRadius: 20,
+                  maxHeight: '70%',
+                  paddingTop: Spacing.md,
+                  paddingBottom: Math.max(Spacing.md, insets.bottom),
+                  elevation: 20,
+                }}
+                onStartShouldSetResponder={() => true}
+              >
+                <Text
+                  style={{
+                    fontSize: FontSize.md,
+                    fontWeight: '700',
+                    color: Colors.text,
+                    paddingHorizontal: Spacing.md,
+                    marginBottom: Spacing.sm,
+                  }}
+                >
+                  गाड़ी चुनें / Select Truck
                 </Text>
-              }
-            />
-          </View>
-        </Pressable>
+                {/* Search bar for trucks */}
+                <TextInput
+                  testID="truck-search-input"
+                  style={{
+                    height: 48,
+                    borderWidth: 1,
+                    borderColor: Colors.border,
+                    borderRadius: Radius.sm,
+                    paddingHorizontal: Spacing.md,
+                    marginHorizontal: Spacing.md,
+                    marginBottom: Spacing.md,
+                    fontSize: FontSize.md,
+                    backgroundColor: Colors.background,
+                    color: Colors.text,
+                  }}
+                  placeholder="Search truck number or sender... / गाड़ी खोजें"
+                  placeholderTextColor={Colors.textSecond}
+                  value={truckSearchText}
+                  onChangeText={setTruckSearchText}
+                  autoCorrect={false}
+                />
+                <FlatList
+                  data={trucks.filter((t) => {
+                    if (!truckSearchText.trim()) return true;
+                    const q = truckSearchText.trim().toLowerCase();
+                    return (
+                      t.truckNumber.toLowerCase().includes(q) ||
+                      t.senderName.toLowerCase().includes(q)
+                    );
+                  })}
+                  keyExtractor={(t) => t.id}
+                  keyboardShouldPersistTaps="handled"
+                  renderItem={({ item }) => {
+                    const hasBreakdown = item.gradeInventory.some(g => g.totalKg > 0);
+                    const totalAvail = hasBreakdown
+                      ? item.gradeInventory.reduce((s, g) => s + Math.max(0, g.totalKg - g.confirmedKg - g.provisionalKg), 0)
+                      : Math.max(0, item.totalKg - item.gradeInventory.reduce((s, g) => s + g.confirmedKg + g.provisionalKg, 0));
+                    return (
+                      <Pressable
+                        testID={`truck-option-${item.id}`}
+                        onPress={() => {
+                          setSelectedTruck(item);
+                          setSelectedGrade(null);
+                          setTruckPickerVisible(false);
+                          setTruckSearchText('');
+                          setTimeout(() => scrollToSection('customer'), 120);
+                        }}
+                        style={{
+                          flexDirection: 'row',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          paddingVertical: Spacing.md,
+                          paddingHorizontal: Spacing.md,
+                          borderBottomWidth: 1,
+                          borderBottomColor: Colors.border,
+                        }}
+                      >
+                        <View>
+                          <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: Colors.text }}>
+                            {item.truckNumber}
+                          </Text>
+                          <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>
+                            {item.senderName}
+                          </Text>
+                        </View>
+                        <Text style={{ fontSize: FontSize.sm, color: Colors.success, fontWeight: '600' }}>
+                          {toIndianWeight(totalAvail)}
+                        </Text>
+                      </Pressable>
+                    );
+                  }}
+                  ListEmptyComponent={
+                    <Text style={{ textAlign: 'center', color: Colors.textSecond, padding: Spacing.lg }}>
+                      {truckSearchText.trim() ? 'No trucks matching search' : 'No trucks today'}
+                    </Text>
+                  }
+                />
+              </View>
+            </Pressable>
+          </KeyboardAvoidingView>
+        )}
       </Modal>
 
-      {/* Contact Picker Modal */}
-      <Modal
-        visible={contactPickerVisible}
-        transparent
-        animationType="slide"
-        hardwareAccelerated={true}
-        statusBarTranslucent={true}
-        onRequestClose={() => {
-          setContactPickerVisible(false);
-          setContactSearchText('');
-        }}
-      >
-        <Pressable
-          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }}
-          onPress={() => {
-            setContactPickerVisible(false);
-            setContactSearchText('');
-          }}
-        >
-          <View
-            style={{
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              backgroundColor: Colors.surface,
-              borderTopLeftRadius: 20,
-              borderTopRightRadius: 20,
-              maxHeight: '80%',
-              paddingTop: Spacing.md,
-              paddingBottom: Math.max(Spacing.md, insets.bottom),
-              elevation: 20,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: FontSize.md,
-                fontWeight: '700',
-                color: Colors.text,
-                paddingHorizontal: Spacing.md,
-                marginBottom: Spacing.sm,
-              }}
-            >
-              📞 Select Contact
-            </Text>
-            <TextInput
-              testID="contact-search-input"
-              style={{
-                height: 48,
-                borderWidth: 1,
-                borderColor: Colors.border,
-                borderRadius: Radius.sm,
-                paddingHorizontal: Spacing.md,
-                marginHorizontal: Spacing.md,
-                marginBottom: Spacing.md,
-                fontSize: FontSize.md,
-                backgroundColor: Colors.background,
-                color: Colors.text,
-              }}
-              placeholder="Search contacts..."
-              placeholderTextColor={Colors.textSecond}
-              value={contactSearchText}
-              onChangeText={setContactSearchText}
-            />
-            {contactsLoading ? (
-              <View style={{ padding: Spacing.lg, alignItems: 'center' }}>
-                <ActivityIndicator color={Colors.primary} size="large" />
-              </View>
-            ) : (
-              <FlatList
-                data={phoneContacts.filter((c) => {
-                  const searchLower = contactSearchText.toLowerCase();
-                  return (
-                    c.name?.toLowerCase().includes(searchLower) ||
-                    c.phoneNumbers?.[0]?.number?.includes(contactSearchText)
-                  );
-                })}
-                keyExtractor={(c, idx) => `${c.id || idx}`}
-                renderItem={({ item }) => (
-                  <Pressable
-                    testID={`contact-option-${item.id}`}
-                    onPress={() => selectPhoneContact(item)}
-                    style={{
-                      flexDirection: 'row',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      paddingVertical: Spacing.md,
-                      paddingHorizontal: Spacing.md,
-                      borderBottomWidth: 1,
-                      borderBottomColor: Colors.border,
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: Colors.text }}>
-                        {item.name || 'Unknown'}
-                      </Text>
-                      <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 4 }}>
-                        {item.phoneNumbers?.[0]?.number || 'No phone'}
-                      </Text>
-                    </View>
-                    <Text style={{ fontSize: FontSize.xs, color: Colors.primary, fontWeight: '600' }}>
-                      Select
-                    </Text>
-                  </Pressable>
-                )}
-                ListEmptyComponent={
-                  <Text style={{ textAlign: 'center', color: Colors.textSecond, padding: Spacing.lg }}>
-                    No contacts found
-                  </Text>
-                }
-              />
-            )}
-          </View>
-        </Pressable>
-      </Modal>
+      {/* Removed Contact Picker Modal */}
 
       {/* Success bottom sheet */}
       {success ? (
@@ -1312,34 +1378,77 @@ export default function NewBillScreen() {
             >
               <Text style={{ fontSize: FontSize.sm, color: Colors.text, fontWeight: '700' }}>➕ नया बिल</Text>
             </Pressable>
-            <Pressable
-              testID="view-bill-button"
-              onPress={() => router.back()}
-              style={{
-                flex: 1,
-                height: 52,
-                borderRadius: Radius.md,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: Colors.info,
-              }}
-            >
-              <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>🔍 देखें</Text>
-            </Pressable>
-            <Pressable
-              testID="home-after-bill"
-              onPress={() => router.replace('/')}
-              style={{
-                flex: 1,
-                height: 52,
-                borderRadius: Radius.md,
-                alignItems: 'center',
-                justifyContent: 'center',
-                backgroundColor: Colors.primary,
-              }}
-            >
-              <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>🏠 Home</Text>
-            </Pressable>
+            {isMemberMode === false ? (
+              <>
+                <Pressable
+                  testID="edit-bill-button"
+                  onPress={() => router.push(`/bills/edit/${savedInquiryId}` as any)}
+                  style={{
+                    flex: 1,
+                    height: 52,
+                    borderRadius: Radius.md,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: Colors.info,
+                  }}
+                >
+                  <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>✏️ एडिट</Text>
+                </Pressable>
+                <Pressable
+                  testID="authorize-bill"
+                  onPress={() => {
+                    successY.value = 400; // hide bottom sheet visually
+                    router.push({ pathname: '/authorization', params: { id: savedInquiryId } } as any);
+                  }}
+                  style={{
+                    flex: 1,
+                    height: 52,
+                    borderRadius: Radius.md,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: Colors.primary,
+                  }}
+                >
+                  <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>🔐 Auth</Text>
+                </Pressable>
+              </>
+            ) : (
+              <>
+                <Pressable
+                  testID="edit-bill-button"
+                  onPress={() => router.push(`/bills/edit/${savedInquiryId}` as any)}
+                  style={{
+                    flex: 1,
+                    height: 52,
+                    borderRadius: Radius.md,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: Colors.info,
+                  }}
+                >
+                  <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>✏️ एडिट</Text>
+                </Pressable>
+                <Pressable
+                  testID="mark-delivered-bill"
+                  onPress={() => markDeliveredMutation.mutate()}
+                  disabled={markDeliveredMutation.isPending}
+                  style={{
+                    flex: 1,
+                    height: 52,
+                    borderRadius: Radius.md,
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: Colors.success,
+                  }}
+                >
+                  {markDeliveredMutation.isPending ? (
+                    <ActivityIndicator color="#FFF" size="small" />
+                  ) : (
+                    <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>🚚 Deliver</Text>
+                  )}
+                </Pressable>
+              </>
+            )}
           </View>
         </Animated.View>
       ) : null}

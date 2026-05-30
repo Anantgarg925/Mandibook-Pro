@@ -33,12 +33,14 @@ import { resetToRoute } from '@/utils/navigation';
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: '#604100',
+  DELIVERED: '#1D4ED8',
   CONFIRMED: '#0C5216',
   CANCELLED: Colors.danger,
 };
 
 const STATUS_BG: Record<string, string> = {
   PENDING: '#FFDEAC',
+  DELIVERED: '#DBEAFE',
   CONFIRMED: '#ACF4A4',
   CANCELLED: '#FFEBEE',
   UDHAARI: '#FFEBEE',
@@ -340,7 +342,7 @@ const BillRow = memo(function BillRow({
               style={{ fontSize: FontSize.sm, fontWeight: '800', color: UI.text }}
               numberOfLines={1}
             >
-              {item.customerName}
+              {item.customerName || item.paymentMode || 'CASH'}
             </Text>
             <Text
               style={{ fontSize: FontSize.xs, color: UI.muted, marginTop: 2 }}

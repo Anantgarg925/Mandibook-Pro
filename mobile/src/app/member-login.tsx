@@ -14,6 +14,7 @@ import { useShop, type TeamMember } from '@/context/ShopContext';
 import { useLaunch } from '@/context/LaunchContext';
 import { mapShop, supabase } from '@/lib/supabase';
 import { APP_SESSION_KEY, MEMBER_SESSION_KEY } from '@/lib/session';
+import { resetToRoute } from '@/utils/navigation';
 export { APP_SESSION_KEY, MEMBER_SESSION_KEY };
 
 const normalizePhone = (value: string) => value.replace(/\D/g, '');
@@ -30,13 +31,16 @@ export default function MemberLoginScreen() {
 
   const goBack = () => {
     setLaunchComplete(false);
-    router.replace({ pathname: '/', params: { access: 'choose' } } as any);
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace({ pathname: '/', params: { access: 'choose' } } as any);
+    }
   };
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      setLaunchComplete(false);
-      router.replace({ pathname: '/', params: { access: 'choose' } } as any);
+      goBack();
       return true;
     });
     return () => subscription.remove();
@@ -103,10 +107,10 @@ export default function MemberLoginScreen() {
         AsyncStorage.setItem(APP_SESSION_KEY, JSON.stringify(session)).catch(() => {});
         if (isAdmin) {
           AsyncStorage.removeItem(MEMBER_SESSION_KEY).catch(() => {});
-          router.replace('/');
+          resetToRoute(router, '/');
         } else {
           AsyncStorage.setItem(MEMBER_SESSION_KEY, JSON.stringify(session)).catch(() => {});
-          router.replace('/member-dashboard');
+          resetToRoute(router, '/member-dashboard');
         }
         return;
       }

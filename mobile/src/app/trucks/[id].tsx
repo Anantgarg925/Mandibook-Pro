@@ -83,17 +83,21 @@ export default function TruckDetailScreen() {
   };
 
   const goBack = () => {
-    if (isMemberMode) {
-      router.replace('/member-trucks' as any);
-      return;
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      if (isMemberMode) {
+        router.replace('/member-trucks' as any);
+      } else {
+        router.replace('/trucks' as any);
+      }
     }
-    router.replace('/trucks' as any);
   };
 
   useEffect(() => {
     if (isMemberMode === undefined) return undefined;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      router.replace((isMemberMode ? '/member-trucks' : '/trucks') as any);
+      goBack();
       return true;
     });
     return () => subscription.remove();

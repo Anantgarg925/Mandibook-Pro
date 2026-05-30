@@ -15,12 +15,16 @@ export default function MemberTrucksScreen() {
   const insets = useSafeAreaInsets();
   const { trucks, loading } = useTodayTrucks();
   const goBack = () => {
-    router.replace('/member-dashboard' as any);
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/member-dashboard' as any);
+    }
   };
 
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
-      router.replace('/member-dashboard' as any);
+      goBack();
       return true;
     });
     return () => subscription.remove();
