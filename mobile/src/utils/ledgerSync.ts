@@ -94,6 +94,7 @@ export const adjustLedgerForBillEdit = async (
       .eq('type', 'SALE')
       .eq('slip_number', slipNumber)
       .maybeSingle();
+    if (txFetchErr) throw new Error(txFetchErr.message);
 
     if (oldTx) {
       // Subtract old amount from old buyer
@@ -138,29 +139,32 @@ export const deleteConfirmedBill = async (
   inquiry: Pick<Inquiry, 'id' | 'slipNumber' | 'status' | 'paymentMode' | 'netAmount'>
 ) => {
   if (inquiry.status === 'CONFIRMED' && inquiry.paymentMode === 'UDHAARI') {
-    const { data: tx } = await supabase
+    const { data: tx, error: txErr } = await supabase
       .from('transactions')
       .select('*')
       .eq('shop_id', shopId)
       .eq('type', 'SALE')
       .eq('slip_number', inquiry.slipNumber)
       .maybeSingle();
+    if (txErr) throw new Error(txErr.message);
 
     if (tx) {
-      const { data: buyer } = await supabase
+      const { data: buyer, error: buyerErr } = await supabase
         .from('buyers')
         .select('outstanding_balance, id')
         .eq('shop_id', shopId)
         .eq('code', tx.buyer_code)
         .single();
+      if (buyerErr) throw new Error(buyerErr.message);
 
-      if (buyer) {
-        await supabase
-          .from('buyers')
-          .update({ outstanding_balance: Number(buyer.outstanding_balance) - Number(tx.amount) })
-          .eq('id', buyer.id);
-      }
-      await supabase.from('transactions').delete().eq('id', tx.id);
+      const { error: buyerUpdateErr } = await supabase
+        .from('buyers')
+        .update({ outstanding_balance: Number(buyer.outstanding_balance) - Number(tx.amount) })
+        .eq('id', buyer.id);
+      if (buyerUpdateErr) throw new Error(buyerUpdateErr.message);
+
+      const { error: txDeleteErr } = await supabase.from('transactions').delete().eq('id', tx.id);
+      if (txDeleteErr) throw new Error(txDeleteErr.message);
     }
   }
 

@@ -23,6 +23,7 @@ import { toIndianCurrency, toIndianDate } from '@/lib/formatters';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { computeRunningBalances, type EnrichedTransaction } from '@/lib/ledger';
 import type { PaymentMethod, Transaction } from '@/types/inquiry';
+import { downloadElementAsJpeg, printHtmlOnWeb } from '@/utils/webExport';
 
 export default function BuyerLedgerScreen() {
   const router = useRouter();
@@ -249,6 +250,10 @@ export default function BuyerLedgerScreen() {
   const handleShareReminderImage = async () => {
     if (!reminderCardRef.current) return;
     try {
+      if (Platform.OS === 'web') {
+        await downloadElementAsJpeg(reminderCardRef.current as unknown as HTMLElement, `balance-reminder-${buyer!.code}.jpg`);
+        return;
+      }
       const available = await Sharing.isAvailableAsync();
       if (!available) {
         Alert.alert('Sharing unavailable', 'Image sharing is not available on this device.');
@@ -270,6 +275,10 @@ export default function BuyerLedgerScreen() {
         group: activeDailyGroup,
         balance,
       });
+      if (Platform.OS === 'web') {
+        await printHtmlOnWeb(html, `Daily bill ${buyer.name}`);
+        return;
+      }
       const { uri } = await Print.printToFileAsync({ html });
       await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: `Daily bill ${buyer.name}` });
     } catch {
@@ -280,6 +289,10 @@ export default function BuyerLedgerScreen() {
   const handleShareDailyCombinedImage = async () => {
     if (!combinedBillRef.current) return;
     try {
+      if (Platform.OS === 'web') {
+        await downloadElementAsJpeg(combinedBillRef.current as unknown as HTMLElement, `daily-bill-${buyer!.code}.jpg`);
+        return;
+      }
       const available = await Sharing.isAvailableAsync();
       if (!available) {
         Alert.alert('Sharing unavailable', 'Image sharing is not available on this device.');

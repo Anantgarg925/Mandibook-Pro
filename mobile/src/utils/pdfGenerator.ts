@@ -4,6 +4,7 @@ import { toIndianCurrency, toIndianDate } from '@/lib/formatters';
 import type { Inquiry } from '@/types/inquiry';
 import type { ShopData } from '@/context/ShopContext';
 import type { Truck } from '@/types/truck';
+import { printHtmlOnWeb } from '@/utils/webExport';
 
 export type GradeSummaryRow = {
   grade: string;
@@ -478,6 +479,10 @@ export function generateDayReportHTML(params: {
 
 export async function exportAndShareReport(params: Parameters<typeof generateDayReportHTML>[0]): Promise<void> {
   const html = generateDayReportHTML(params);
+  if (typeof window !== 'undefined') {
+    await printHtmlOnWeb(html, 'Share Day Report');
+    return;
+  }
   const { uri } = await Print.printToFileAsync({ html, base64: false });
   await Sharing.shareAsync(uri, { mimeType: 'application/pdf', dialogTitle: 'Share Day Report' });
 }

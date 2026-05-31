@@ -148,7 +148,7 @@ export default function EditBillScreen() {
   const rateNum = parseFloat(rate) || 0;
   const totalWeight = sacksNum * weightPerSackNum;
 
-  const selectedTruck = inquiry ? trucks.find(t => t.id === inquiry.truckId) : null;
+  const selectedTruck = trucks.find(t => t.id === selectedTruckId) ?? null;
   const gradeOptions = selectedTruck?.gradeInventory.length
     ? selectedTruck.gradeInventory
     : (shop?.grades ?? []).map(g => ({
@@ -171,8 +171,8 @@ export default function EditBillScreen() {
           bardanaPerSack: shop.charges.bardanaPerSack,
           cartagePerKg: shop.charges.cartagePerKg,
         },
-        applyApmc: inquiry?.applyApmc ?? true,
-        applyBardana: inquiry?.applyBardana ?? false,
+        applyApmc,
+        applyBardana,
         bardanaSacks: inquiry?.bardanaSacks ?? sacksNum,
         bardanaRate: inquiry?.bardanaRate ?? shop.charges.bardanaPerSack ?? 0,
       })
@@ -194,50 +194,79 @@ export default function EditBillScreen() {
 
       const newNetAmount = manualTotal ? (parseFloat(manualTotal) || calc.net) : calc.net;
 
-      // Adjust ledger before updating the inquiry
-      await adjustLedgerForBillEdit(
-        shop.shopId,
-        inquiry.slipNumber,
-        inquiry.status,
-        inquiry.paymentMode,
-        inquiry.netAmount,
-        inquiry.customerName,
-        inquiry.customerPhone,
-        inquiry.status,
-        paymentMode,
-        newNetAmount,
-        customerName,
-        customerPhone
-      );
+      const nextInquiryUpdate = {
+        truck_id: boughtFromAgent ? null : selectedTruckId,
+        truck_number: boughtFromAgent ? 'Agent Stock' : (selectedTruck?.truckNumber ?? inquiry.truckNumber),
+        source_agent_name: boughtFromAgent ? sourceAgentName.trim() : '',
+        source_agent_phone: boughtFromAgent ? sourceAgentPhone.trim() : '',
+        customer_name: customerName.trim(),
+        customer_phone: customerPhone.trim(),
+        grade,
+        grade_name: gradeName,
+        sacks: sacksNum,
+        weight_per_sack: weightPerSackNum,
+        total_weight: calc.totalWeight,
+        rate_per_kg: rateNum,
+        gross_amount: calc.gross,
+        apmc_amount: calc.apmc,
+        bardana_amount: calc.bardana,
+        cartage_amount: calc.cartage,
+        net_amount: newNetAmount,
+        payment_mode: paymentMode,
+        upi_ref: upiRef,
+        apply_apmc: applyApmc,
+        apply_bardana: applyBardana,
+        charge_snapshot: inquiry.chargeSnapshot,
+      };
 
-      const { error } = await supabase
-        .from('inquiries')
-        .update({
-          truck_id: boughtFromAgent ? null : selectedTruckId,
-          truck_number: boughtFromAgent ? 'Agent Stock' : (trucks.find(t => t.id === selectedTruckId)?.truckNumber ?? inquiry.truckNumber),
-          source_agent_name: boughtFromAgent ? sourceAgentName.trim() : '',
-          source_agent_phone: boughtFromAgent ? sourceAgentPhone.trim() : '',
-          customer_name: customerName.trim(),
-          customer_phone: customerPhone.trim(),
-          grade,
-          grade_name: gradeName,
-          sacks: sacksNum,
-          weight_per_sack: weightPerSackNum,
-          total_weight: calc.totalWeight,
-          rate_per_kg: rateNum,
-          gross_amount: calc.gross,
-          apmc_amount: calc.apmc,
-          bardana_amount: calc.bardana,
-          cartage_amount: calc.cartage,
-          net_amount: newNetAmount,
-          payment_mode: paymentMode,
-          upi_ref: upiRef,
-          apply_apmc: applyApmc,
-          apply_bardana: applyBardana,
-          charge_snapshot: inquiry.chargeSnapshot,
-        })
-        .eq('id', inquiry.id);
+      const { error } = await supabase.from('inquiries').update(nextInquiryUpdate).eq('id', inquiry.id);
       if (error) throw new Error(error.message);
+
+      try {
+        await adjustLedgerForBillEdit(
+          shop.shopId,
+          inquiry.slipNumber,
+          inquiry.status,
+          inquiry.paymentMode,
+          inquiry.netAmount,
+          inquiry.customerName,
+          inquiry.customerPhone,
+          inquiry.status,
+          paymentMode,
+          newNetAmount,
+          customerName,
+          customerPhone
+        );
+      } catch (ledgerError) {
+        const { error: revertError } = await supabase.from('inquiries').update({
+          truck_id: inquiry.truckId,
+          truck_number: inquiry.truckNumber,
+          source_agent_name: inquiry.sourceAgentName ?? '',
+          source_agent_phone: inquiry.sourceAgentPhone ?? '',
+          customer_name: inquiry.customerName,
+          customer_phone: inquiry.customerPhone,
+          grade: inquiry.grade,
+          grade_name: inquiry.gradeName,
+          sacks: inquiry.sacks,
+          weight_per_sack: inquiry.weightPerSack,
+          total_weight: inquiry.totalWeight,
+          rate_per_kg: inquiry.ratePerKg,
+          gross_amount: inquiry.grossAmount,
+          apmc_amount: inquiry.apmcAmount,
+          bardana_amount: inquiry.bardanaAmount,
+          cartage_amount: inquiry.cartageAmount,
+          net_amount: inquiry.netAmount,
+          payment_mode: inquiry.paymentMode,
+          upi_ref: inquiry.upiRef,
+          apply_apmc: inquiry.applyApmc,
+          apply_bardana: inquiry.applyBardana,
+          charge_snapshot: inquiry.chargeSnapshot,
+        }).eq('id', inquiry.id);
+        if (revertError) {
+          throw new Error(`${(ledgerError as Error).message}; rollback failed: ${revertError.message}`);
+        }
+        throw ledgerError;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inquiries', shop?.shopId] });

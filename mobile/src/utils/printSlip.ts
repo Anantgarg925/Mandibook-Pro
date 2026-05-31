@@ -3,6 +3,7 @@ import * as Sharing from 'expo-sharing';
 import { Platform } from 'react-native';
 import type { Inquiry } from '@/types/inquiry';
 import type { ShopData } from '@/context/ShopContext';
+import { printHtmlOnWeb } from '@/utils/webExport';
 
 export function generateSlipHTML(inquiry: Inquiry, shop: ShopData): string {
   const upiInfo = shop.upiId ? `GPay/Paytm: ${shop.upiId}` : shop.upiApps.join('/');
@@ -228,6 +229,10 @@ export async function printSlip(inquiry: Inquiry, shop: ShopData): Promise<void>
 
 export async function shareSlipAsPDF(inquiry: Inquiry, shop: ShopData): Promise<void> {
   const html = generateSlipHTML(inquiry, shop);
+  if (Platform.OS === 'web') {
+    await printHtmlOnWeb(html, `Slip #${inquiry.slipNumber}`);
+    return;
+  }
   const { uri } = await Print.printToFileAsync({ html, width: 302 });
   await Sharing.shareAsync(uri, {
     mimeType: 'application/pdf',

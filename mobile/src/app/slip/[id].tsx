@@ -23,6 +23,7 @@ import { printSlip, shareSlipAsPDF } from '@/utils/printSlip';
 import { useMemberMode } from '@/hooks/useMemberMode';
 import { archiveQueryOptions } from '@/lib/queryOptions';
 import { deleteConfirmedBill } from '@/utils/ledgerSync';
+import { downloadElementAsJpeg } from '@/utils/webExport';
 import {
   generateCustomerMessage,
   generateThekedaarMessage,
@@ -107,6 +108,10 @@ export default function SlipPreviewScreen() {
     if (!slipCardRef.current) return;
     setPrinting(true);
     try {
+      if (Platform.OS === 'web') {
+        await downloadElementAsJpeg(slipCardRef.current as unknown as HTMLElement, `slip-${inquiry!.slipNumber}.jpg`);
+        return;
+      }
       const available = await Sharing.isAvailableAsync();
       if (!available) {
         Alert.alert('Sharing unavailable', 'Image sharing is not available on this device.');

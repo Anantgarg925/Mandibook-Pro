@@ -27,6 +27,7 @@ import { toIndianWeight, toIndianDate, toIndianCurrency } from '@/lib/formatters
 import { useMemberMode } from '@/hooks/useMemberMode';
 import { archiveQueryOptions } from '@/lib/queryOptions';
 import { makeReferenceSlipNumber, mapEntriesToSlipRows, ReferenceSlipCard } from '@/utils/referenceSlip';
+import { downloadElementAsJpeg } from '@/utils/webExport';
 import type { Inquiry } from '@/types/inquiry';
 import type { TruckGradeEntry } from '@/types/truck';
 
@@ -319,6 +320,10 @@ export default function TruckDetailScreen() {
   const shareReferenceSlip = async () => {
     if (!referenceSlipRef.current) return;
     try {
+      if (Platform.OS === 'web') {
+        await downloadElementAsJpeg(referenceSlipRef.current as unknown as HTMLElement, `reference-slip-${truck!.truckNumber}.jpg`);
+        return;
+      }
       const available = await Sharing.isAvailableAsync();
       if (!available) {
         Alert.alert('Sharing unavailable', 'Reference slip sharing is not available on this device.');

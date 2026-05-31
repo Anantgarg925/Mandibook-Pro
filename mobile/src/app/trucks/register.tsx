@@ -23,6 +23,7 @@ import { toIndianWeight } from '@/lib/formatters';
 import { useMemberMode } from '@/hooks/useMemberMode';
 import { getCurrentBusinessDate } from '@/lib/businessDay';
 import { makeReferenceSlipNumber, normalizeGradeRows, ReferenceSlipCard } from '@/utils/referenceSlip';
+import { downloadElementAsJpeg } from '@/utils/webExport';
 import type { GradeInventory } from '@/types/truck';
 
 // ─── field input style ───────────────────────────────────────────────────────
@@ -391,6 +392,10 @@ export default function RegisterTruckScreen() {
   const shareReferenceSlip = async () => {
     if (!referenceSlipReady || !referenceSlipRef.current) return;
     try {
+      if (Platform.OS === 'web') {
+        await downloadElementAsJpeg(referenceSlipRef.current as unknown as HTMLElement, `reference-slip-${referenceSlipNumber}.jpg`);
+        return;
+      }
       const available = await Sharing.isAvailableAsync();
       if (!available) {
         Alert.alert('Sharing unavailable', 'Reference slip sharing is not available on this device.');
