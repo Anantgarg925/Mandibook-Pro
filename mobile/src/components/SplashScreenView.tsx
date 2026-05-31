@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Animated, {
   useAnimatedStyle,
@@ -31,11 +31,15 @@ export function SplashScreenView({ visible, onHide }: Props) {
     if (!visible && !animationStarted.current) {
       animationStarted.current = true;
       const hideCallback = onHide;
-      progressWidth.value = withTiming(192, { duration: 250 }, () => {
-        opacity.value = withTiming(0, { duration: 650 }, () => {
-          runOnJS(hideCallback)();
+      if (Platform.OS === 'web') {
+        hideCallback();
+      } else {
+        progressWidth.value = withTiming(192, { duration: 250 }, () => {
+          opacity.value = withTiming(0, { duration: 650 }, () => {
+            runOnJS(hideCallback)();
+          });
         });
-      });
+      }
     }
   }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 

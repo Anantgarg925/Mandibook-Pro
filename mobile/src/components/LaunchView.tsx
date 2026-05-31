@@ -62,6 +62,11 @@ export function LaunchView({ visible, onHide, onAdminPress, onMemberPress, shopN
   const dismiss = (callback: () => void) => {
     if (animationStarted.current) return;
     animationStarted.current = true;
+    if (Platform.OS === 'web') {
+      onHide();
+      callback();
+      return;
+    }
     opacity.value = withTiming(0, { duration: 380 }, () => {
       runOnJS(onHide)();
       runOnJS(callback)();

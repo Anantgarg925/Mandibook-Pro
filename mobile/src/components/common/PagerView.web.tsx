@@ -1,5 +1,5 @@
 import React, { forwardRef, useImperativeHandle, useRef, useState, useEffect } from 'react';
-import { ScrollView, View, StyleSheet, Dimensions, LayoutChangeEvent, PanResponder, Animated } from 'react-native';
+import { ScrollView, View, Dimensions, LayoutChangeEvent } from 'react-native';
 
 const PagerView = forwardRef((props: any, ref) => {
   const { initialPage = 0, onPageSelected, children, style } = props;
@@ -7,6 +7,7 @@ const PagerView = forwardRef((props: any, ref) => {
   const [width, setWidth] = useState(Dimensions.get('window').width);
   const [hasScrolledInit, setHasScrolledInit] = useState(false);
   const currentPage = useRef(initialPage);
+  const scrollTimeout = useRef<any>(null);
 
   useImperativeHandle(ref, () => ({
     setPage: (page: number) => {
@@ -19,12 +20,33 @@ const PagerView = forwardRef((props: any, ref) => {
     }
   }));
 
+  const handleScroll = (e: any) => {
+    const offsetX = e.nativeEvent.contentOffset.x;
+    if (scrollTimeout.current) {
+      clearTimeout(scrollTimeout.current);
+    }
+    scrollTimeout.current = setTimeout(() => {
+      const page = Math.round(offsetX / width);
+      if (page !== currentPage.current) {
+        currentPage.current = page;
+        if (onPageSelected) {
+          onPageSelected({ nativeEvent: { position: page } });
+        }
+      }
+    }, 100);
+  };
+
   const onMomentumScrollEnd = (e: any) => {
+    if (scrollTimeout.current) {
+      clearTimeout(scrollTimeout.current);
+    }
     const offsetX = e.nativeEvent.contentOffset.x;
     const page = Math.round(offsetX / width);
-    currentPage.current = page;
-    if (onPageSelected) {
-      onPageSelected({ nativeEvent: { position: page } });
+    if (page !== currentPage.current) {
+      currentPage.current = page;
+      if (onPageSelected) {
+        onPageSelected({ nativeEvent: { position: page } });
+      }
     }
   };
 
@@ -43,42 +65,19 @@ const PagerView = forwardRef((props: any, ref) => {
   const childrenArray = React.Children.toArray(children);
   const numPages = childrenArray.length;
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (evt, gestureState) => {
-        // Only respond to horizontal swipes
-        return Math.abs(gestureState.dx) > 20 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy);
-      },
-      onPanResponderRelease: (evt, gestureState) => {
-        if (gestureState.dx > 50 && currentPage.current > 0) {
-          // Swipe Right (Go to previous page)
-          const newPage = currentPage.current - 1;
-          currentPage.current = newPage;
-          scrollViewRef.current?.scrollTo({ x: newPage * width, animated: true });
-          if (onPageSelected) onPageSelected({ nativeEvent: { position: newPage } });
-        } else if (gestureState.dx < -50 && currentPage.current < numPages - 1) {
-          // Swipe Left (Go to next page)
-          const newPage = currentPage.current + 1;
-          currentPage.current = newPage;
-          scrollViewRef.current?.scrollTo({ x: newPage * width, animated: true });
-          if (onPageSelected) onPageSelected({ nativeEvent: { position: newPage } });
-        }
-      },
-    })
-  ).current;
-
   return (
-    <View style={[style, { flex: 1, overflow: 'hidden' }]} onLayout={onLayout} {...panResponder.panHandlers}>
+    <View style={[style, { flex: 1, overflow: 'hidden' }]} onLayout={onLayout}>
       <ScrollView
         ref={scrollViewRef}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
+        onScroll={handleScroll}
         onMomentumScrollEnd={onMomentumScrollEnd}
         scrollEventThrottle={16}
         style={{ flex: 1 }}
         contentContainerStyle={{ minWidth: width * numPages, height: '100%' }}
-        scrollEnabled={false} // Disable native scroll so PanResponder takes full control for mouse/touch
+        scrollEnabled={true}
       >
         {childrenArray.map((child, index) => (
           <View key={index} style={{ width, height: '100%' }}>

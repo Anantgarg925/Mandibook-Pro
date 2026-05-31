@@ -57,9 +57,13 @@ export function AdminPinView({ visible, onHide, onSuccess, onCancel, correctPin,
     } else if (wasVisible.current && !animRef.current) {
       animRef.current = true;
       const hide = onHide;
-      opacity.value = withTiming(0, { duration: 300 }, (finished) => {
-        if (finished) runOnJS(hide)();
-      });
+      if (Platform.OS === 'web') {
+        hide();
+      } else {
+        opacity.value = withTiming(0, { duration: 300 }, (finished) => {
+          if (finished) runOnJS(hide)();
+        });
+      }
     }
   }, [visible]); // eslint-disable-line react-hooks/exhaustive-deps
 
