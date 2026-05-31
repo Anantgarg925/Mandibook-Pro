@@ -539,6 +539,91 @@ export default function HomeScreen() {
 
   const visibleTrucks = useMemo(() => trucks.slice(0, 3), [trucks]);
 
+  if (!launchComplete) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: UI.background }} edges={['top', 'left', 'right']}>
+        {!splashGone && (
+          <SplashScreenView
+            visible={shopLoading || !minTimeElapsed}
+            onHide={() => {
+              setSplashGone(true);
+              if (shop) {
+                setTimeout(() => setLaunchVisible(true), 0);
+              } else {
+                router.replace('/onboarding');
+              }
+            }}
+          />
+        )}
+
+        {!launchGone && launchVisible ? (
+          <LaunchView
+            visible={launchVisible}
+            shopName={shop?.firmName ?? ''}
+            shopCity={shop?.city ?? ''}
+            onHide={() => setLaunchGone(true)}
+            onAdminPress={() => {
+              setLaunchGone(true);
+              if (shop?.shopId) {
+                setPinGone(false);
+                setPinVisible(true);
+              } else {
+                router.push('/admin-login' as any);
+              }
+            }}
+            onMemberPress={() => {
+              setLaunchGone(true);
+              router.push('/member-login' as any);
+            }}
+          />
+        ) : null}
+
+        {!pinGone ? (
+          <AdminPinView
+            visible={pinVisible}
+            onVerifyPin={async (pin) => {
+              if (!shop?.phone1) return false;
+              const { data, error } = await supabase.rpc('verify_member_login', {
+                p_phone: shop.phone1.replace(/\D/g, ''),
+                p_pin: pin,
+              });
+              if (error || !data) return false;
+              const payload = data as {
+                shop?: Record<string, unknown>;
+                member?: { id?: string; name?: string; phone?: string; role?: string };
+                is_admin?: boolean;
+                session_token?: string;
+              };
+              if (payload.is_admin !== true || !payload.shop || !payload.session_token) return false;
+              await cacheShop(mapShop(payload.shop));
+              await AsyncStorage.removeItem(MEMBER_SESSION_KEY);
+              await AsyncStorage.setItem(APP_SESSION_KEY, JSON.stringify({
+                id: payload.member?.id ?? 'admin-member',
+                name: payload.member?.name ?? shop.ownerName,
+                phone: payload.member?.phone ?? shop.phone1,
+                role: payload.member?.role ?? 'ADMIN',
+                sessionToken: payload.session_token,
+              }));
+              return true;
+            }}
+            onHide={() => setPinGone(true)}
+            onSuccess={() => {
+              setLaunchGone(true);
+              setLaunchComplete(true);
+              setPinVisible(false);
+            }}
+            onCancel={() => {
+              setPinVisible(false);
+              setLaunchVisible(true);
+              setLaunchGone(false);
+              setLaunchComplete(false);
+            }}
+          />
+        ) : null}
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: UI.background }} edges={['top', 'left', 'right']}>
       <FlatList

@@ -71,8 +71,14 @@ export default function MemberDashboardScreen() {
   const { inquiries } = useInquiries();
   const { trucks } = useTodayTrucks();
   const { unreadCount } = useBillNotifications();
-  const { setLaunchComplete } = useLaunch();
+  const { launchComplete, setLaunchComplete, sessionHydrated } = useLaunch();
   const [member, setMember] = useState<MemberSession | null>(null);
+
+  useEffect(() => {
+    if (sessionHydrated && !launchComplete) {
+      router.replace('/?access=choose');
+    }
+  }, [sessionHydrated, launchComplete]);
 
   useEffect(() => {
     AsyncStorage.getItem(MEMBER_SESSION_KEY)
@@ -96,6 +102,10 @@ export default function MemberDashboardScreen() {
 
   const recentBills = inquiries.slice(0, 5);
   const liveTrucks = trucks.slice(0, 3);
+
+  if (!launchComplete) {
+    return <View style={{ flex: 1, backgroundColor: '#F3FAFF' }} />;
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: '#F3FAFF' }}>
