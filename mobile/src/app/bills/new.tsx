@@ -79,6 +79,7 @@ export default function NewBillScreen() {
   const isMemberMode = useMemberMode();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
+  const isWeb = (Platform.OS as string) === 'web';
 
   const [slipNumber, setSlipNumber] = useState<number | null>(null);
   const [selectedTruckId, setSelectedTruckId] = useState<string | null>(null);
@@ -218,7 +219,7 @@ export default function NewBillScreen() {
 
   const calcStyle = useAnimatedStyle(() => ({ opacity: calcOpacity.value }));
   const successStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: successY.value }],
+    transform: [{ translateY: isWeb ? 0 : successY.value }],
   }));
 
   const markDeliveredMutation = useMutation({
@@ -433,59 +434,71 @@ export default function NewBillScreen() {
       }
     }
 
-    const createdInquiry = await saveMutation.mutateAsync({
-      inquiry: {
-        shopId: shop!.shopId,
-        slipNumber: slip,
-        truckId: boughtFromAgent ? null : selectedTruck?.id,
-        truckNumber: boughtFromAgent ? 'Agent Stock' : selectedTruck?.truckNumber,
-        sourceAgentName: boughtFromAgent ? sourceAgentName.trim() : '',
-        sourceAgentPhone: boughtFromAgent ? sourceAgentPhone.trim() : '',
-        customerName: customerName.trim(),
-        customerPhone: customerPhone.trim(),
-        grade: mainGrade,
-        gradeName: mainGradeName,
-        sacks: totalSacks,
-        weightPerSack: allEntries.length === 1 ? allEntries[0].weightPerSack : 0, // 0 means mixed or N/A
-        totalWeight,
-        ratePerKg: allEntries.length === 1 ? allEntries[0].ratePerKg : 0, // 0 means mixed
-        grossAmount: totalGross,
-        apmcAmount: totalApmc,
-        bardanaAmount: totalBardana,
-        cartageAmount: totalCartage,
-        bardanaSacks: applyBardana ? totalSacks : 0,
-        bardanaRate: shop!.charges?.bardanaPerSack ?? 0,
-        applyBardana,
-        applyApmc,
-        chargeSnapshot: {
-          apmcCommission: shop!.charges?.apmcCommission ?? 0,
-          bardanaPerSack: shop!.charges?.bardanaPerSack ?? 0,
-          cartagePerKg: shop!.charges?.cartagePerKg ?? 0,
-          applyApmc,
-          applyBardana,
-          entries: allEntries
-        },
-        netAmount: finalNet,
-        paymentMode,
-        upiRef: upiRef.trim(),
-        status: 'PENDING',
-        date: getCurrentBusinessDate().getTime(),
-        createdAt: Date.now(),
-      },
-      truckUpdate: selectedTruck ? {
-        id: selectedTruckId!,
-        gradeInventory: newInventory,
-      } : undefined,
-      buyerUpsert: customerName.trim()
-        ? { name: customerName.trim(), phone: customerPhone.trim() }
-        : null,
-    });
+    try {
+      setErrors((prev) => {
+        const { save, ...rest } = prev;
+        return rest;
+      });
 
-    setSavedSlip(createdInquiry?.slip_number ?? slip);
-    if (createdInquiry?.id) {
-      setSavedInquiryId(createdInquiry.id);
+      const createdInquiry = await saveMutation.mutateAsync({
+        inquiry: {
+          shopId: shop!.shopId,
+          slipNumber: slip,
+          truckId: boughtFromAgent ? null : selectedTruck?.id,
+          truckNumber: boughtFromAgent ? 'Agent Stock' : selectedTruck?.truckNumber,
+          sourceAgentName: boughtFromAgent ? sourceAgentName.trim() : '',
+          sourceAgentPhone: boughtFromAgent ? sourceAgentPhone.trim() : '',
+          customerName: customerName.trim(),
+          customerPhone: customerPhone.trim(),
+          grade: mainGrade,
+          gradeName: mainGradeName,
+          sacks: totalSacks,
+          weightPerSack: allEntries.length === 1 ? allEntries[0].weightPerSack : 0, // 0 means mixed or N/A
+          totalWeight,
+          ratePerKg: allEntries.length === 1 ? allEntries[0].ratePerKg : 0, // 0 means mixed
+          grossAmount: totalGross,
+          apmcAmount: totalApmc,
+          bardanaAmount: totalBardana,
+          cartageAmount: totalCartage,
+          bardanaSacks: applyBardana ? totalSacks : 0,
+          bardanaRate: shop!.charges?.bardanaPerSack ?? 0,
+          applyBardana,
+          applyApmc,
+          chargeSnapshot: {
+            apmcCommission: shop!.charges?.apmcCommission ?? 0,
+            bardanaPerSack: shop!.charges?.bardanaPerSack ?? 0,
+            cartagePerKg: shop!.charges?.cartagePerKg ?? 0,
+            applyApmc,
+            applyBardana,
+            entries: allEntries
+          },
+          netAmount: finalNet,
+          paymentMode,
+          upiRef: upiRef.trim(),
+          status: 'PENDING',
+          date: getCurrentBusinessDate().getTime(),
+          createdAt: Date.now(),
+        },
+        truckUpdate: selectedTruck ? {
+          id: selectedTruckId!,
+          gradeInventory: newInventory,
+        } : undefined,
+        buyerUpsert: customerName.trim()
+          ? { name: customerName.trim(), phone: customerPhone.trim() }
+          : null,
+      });
+
+      setSavedSlip(createdInquiry?.slip_number ?? slip);
+      if (createdInquiry?.id) {
+        setSavedInquiryId(createdInquiry.id);
+      }
+      setSuccess(true);
+    } catch (error) {
+      setErrors((prev) => ({
+        ...prev,
+        save: error instanceof Error ? error.message : 'Could not save bill. Try again.',
+      }));
     }
-    setSuccess(true);
   };
 
   const resetForm = async () => {
@@ -534,6 +547,110 @@ export default function NewBillScreen() {
     (boughtFromAgent ? sourceAgentName.trim() : selectedTruckId) &&
     (entries.length > 0 || (selectedGrade && sacks > 0))
   );
+  const apmcRateLabel = `${shop?.charges?.apmcCommission ?? 0}%`;
+  const bardanaRateLabel = `${toIndianCurrency(shop?.charges?.bardanaPerSack ?? 0)}/sack`;
+  const apmcDisplayValue = applyApmc ? `Applied (${apmcRateLabel})` : `Not Applied (${apmcRateLabel})`;
+  const bardanaDisplayValue = applyBardana ? `Applied (${bardanaRateLabel})` : `Not Applied (${bardanaRateLabel})`;
+
+  const successActions = (
+    <>
+      <Text style={{ fontSize: 48, marginBottom: Spacing.xs }}>✅</Text>
+      <Text style={{ fontSize: FontSize.lg, fontWeight: '700', color: Colors.text, marginBottom: 4 }}>
+        बिल सेव हो गया!
+      </Text>
+      <Text style={{ fontSize: FontSize.xxl, fontWeight: '900', color: Colors.primary, marginBottom: Spacing.xl }}>
+        Slip #{savedSlip}
+      </Text>
+      <View style={{ flexDirection: 'row', gap: Spacing.sm, width: '100%' }}>
+        <Pressable
+          testID="new-bill-button"
+          onPress={resetForm}
+          style={{
+            flex: 1,
+            height: 52,
+            borderRadius: Radius.md,
+            alignItems: 'center',
+            justifyContent: 'center',
+            borderWidth: 1,
+            borderColor: Colors.border,
+          }}
+        >
+          <Text style={{ fontSize: FontSize.sm, color: Colors.text, fontWeight: '700' }}>➕ नया बिल</Text>
+        </Pressable>
+        {isMemberMode === false ? (
+          <>
+            <Pressable
+              testID="edit-bill-button"
+              onPress={() => router.push(`/bills/edit/${savedInquiryId}` as any)}
+              style={{
+                flex: 1,
+                height: 52,
+                borderRadius: Radius.md,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: Colors.info,
+              }}
+            >
+              <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>✏️ एडिट</Text>
+            </Pressable>
+            <Pressable
+              testID="authorize-bill"
+              onPress={() => {
+                successY.value = 400; // hide bottom sheet visually
+                router.push({ pathname: '/authorization', params: { id: savedInquiryId } } as any);
+              }}
+              style={{
+                flex: 1,
+                height: 52,
+                borderRadius: Radius.md,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: Colors.primary,
+              }}
+            >
+              <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>🔐 Auth</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <Pressable
+              testID="edit-bill-button"
+              onPress={() => router.push(`/bills/edit/${savedInquiryId}` as any)}
+              style={{
+                flex: 1,
+                height: 52,
+                borderRadius: Radius.md,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: Colors.info,
+              }}
+            >
+              <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>✏️ एडिट</Text>
+            </Pressable>
+            <Pressable
+              testID="mark-delivered-bill"
+              onPress={() => markDeliveredMutation.mutate()}
+              disabled={markDeliveredMutation.isPending}
+              style={{
+                flex: 1,
+                height: 52,
+                borderRadius: Radius.md,
+                alignItems: 'center',
+                justifyContent: 'center',
+                backgroundColor: Colors.success,
+              }}
+            >
+              {markDeliveredMutation.isPending ? (
+                <ActivityIndicator color="#FFF" size="small" />
+              ) : (
+                <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>🚚 Deliver</Text>
+              )}
+            </Pressable>
+          </>
+        )}
+      </View>
+    </>
+  );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#00450D' }} edges={['top']}>
@@ -560,6 +677,29 @@ export default function NewBillScreen() {
         </View>
       </View>
 
+      {success && isWeb ? (
+        <View style={{ flex: 1, backgroundColor: Colors.background, padding: Spacing.md, justifyContent: 'center' }}>
+          <View
+            style={{
+              alignSelf: 'center',
+              width: '100%',
+              maxWidth: 520,
+              backgroundColor: Colors.surface,
+              borderRadius: Radius.lg,
+              padding: Spacing.xl,
+              alignItems: 'center',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.12,
+              shadowRadius: 16,
+              elevation: 8,
+            }}
+          >
+            {successActions}
+          </View>
+        </View>
+      ) : (
+      <>
       {isMemberMode ? (
       <KeyboardAvoidingView
         style={{ flex: 1, backgroundColor: '#f3faff' }}
@@ -795,12 +935,18 @@ export default function NewBillScreen() {
             <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: Spacing.md }} />
             
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.md }}>
-              <Text style={{ fontSize: 15, color: '#111827', fontWeight: '700' }}>Apply APMC Charges</Text>
+              <View style={{ flex: 1, paddingRight: Spacing.sm }}>
+                <Text style={{ fontSize: 15, color: '#111827', fontWeight: '700' }}>Apply APMC Charges</Text>
+                <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 2 }}>Rate: {apmcRateLabel}</Text>
+              </View>
               <Switch value={applyApmc} onValueChange={setApplyApmc} />
             </View>
             
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 15, color: '#111827', fontWeight: '700' }}>Apply Bardana Charges</Text>
+              <View style={{ flex: 1, paddingRight: Spacing.sm }}>
+                <Text style={{ fontSize: 15, color: '#111827', fontWeight: '700' }}>Apply Bardana Charges</Text>
+                <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 2 }}>Rate: {bardanaRateLabel}</Text>
+              </View>
               <Switch value={applyBardana} onValueChange={setApplyBardana} />
             </View>
           </View>
@@ -1006,6 +1152,19 @@ export default function NewBillScreen() {
                       <TextInput style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }} placeholder="Qty" keyboardType="number-pad" value={sacksText} onChangeText={(v) => { setSacksText(v); setSacks(parseInt(v.replace(/[^\d]/g, ''), 10) || 0); if(errors.sacks) setErrors(p => ({...p, sacks: ''})) }} />
                     </View>
                     <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 12, color: '#4B5563', marginBottom: 4, fontWeight: '600' }}>Wt/Sack</Text>
+                      <TextInput
+                        style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }}
+                        placeholder="Wt/Sack"
+                        keyboardType="decimal-pad"
+                        value={weightPerSack}
+                        onChangeText={(v) => { setWeightPerSack(v.replace(/[^0-9.]/g, '')); if(errors.weight) setErrors(p => ({...p, weight: ''})) }}
+                      />
+                    </View>
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <View style={{ flex: 1 }} />
+                    <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 12, color: '#4B5563', marginBottom: 4, fontWeight: '600' }}>Total Wt (kg)</Text>
                       <TextInput
                         style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }}
@@ -1023,16 +1182,6 @@ export default function NewBillScreen() {
                         }}
                       />
                     </View>
-                  </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={{ fontSize: 13, color: '#6B7280', flex: 1 }}>Or enter Wt/Sack:</Text>
-                    <TextInput
-                      style={{ width: 120, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 8, fontSize: 14, color: '#111827' }}
-                      placeholder="Wt/Sack"
-                      keyboardType="decimal-pad"
-                      value={weightPerSack}
-                      onChangeText={(v) => { setWeightPerSack(v.replace(/[^0-9.]/g, '')); if(errors.weight) setErrors(p => ({...p, weight: ''})) }}
-                    />
                   </View>
                 </View>
               )}
@@ -1060,18 +1209,24 @@ export default function NewBillScreen() {
                 </View>
               )}
 
-              <EditableSlipRow label="APMC" value={applyApmc ? 'Applied' : 'Not Applied'} isEditing={editingField === 'apmc'} onToggle={() => setEditingField(editingField === 'apmc' ? null : 'apmc')} />
+              <EditableSlipRow label="APMC" value={apmcDisplayValue} isEditing={editingField === 'apmc'} onToggle={() => setEditingField(editingField === 'apmc' ? null : 'apmc')} />
               {editingField === 'apmc' && (
                 <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Text style={{ fontSize: 16, color: '#111827', fontWeight: '700' }}>Apply APMC Charges</Text>
+                  <View style={{ flex: 1, paddingRight: Spacing.sm }}>
+                    <Text style={{ fontSize: 16, color: '#111827', fontWeight: '700' }}>Apply APMC Charges</Text>
+                    <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>Rate: {apmcRateLabel}</Text>
+                  </View>
                   <Switch value={applyApmc} onValueChange={setApplyApmc} />
                 </View>
               )}
 
-              <EditableSlipRow label="Bardana" value={applyBardana ? 'Applied' : 'Not Applied'} isEditing={editingField === 'bardana'} onToggle={() => setEditingField(editingField === 'bardana' ? null : 'bardana')} />
+              <EditableSlipRow label="Bardana" value={bardanaDisplayValue} isEditing={editingField === 'bardana'} onToggle={() => setEditingField(editingField === 'bardana' ? null : 'bardana')} />
               {editingField === 'bardana' && (
                 <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Text style={{ fontSize: 16, color: '#111827', fontWeight: '700' }}>Apply Bardana Charges</Text>
+                  <View style={{ flex: 1, paddingRight: Spacing.sm }}>
+                    <Text style={{ fontSize: 16, color: '#111827', fontWeight: '700' }}>Apply Bardana Charges</Text>
+                    <Text style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>Rate: {bardanaRateLabel}</Text>
+                  </View>
                   <Switch value={applyBardana} onValueChange={setApplyBardana} />
                 </View>
               )}
@@ -1100,6 +1255,8 @@ export default function NewBillScreen() {
         </KeyboardAwareScrollView>
       </View>
       )}
+      </>
+      )}
       {/* Truck Picker Modal */}
       <Modal
         visible={truckPickerVisible}
@@ -1112,7 +1269,7 @@ export default function NewBillScreen() {
           setTruckSearchText('');
         }}
       >
-        {truckPickerVisible && (
+        {truckPickerVisible ? (
           <KeyboardAvoidingView
             behavior="padding"
             style={{ flex: 1 }}
@@ -1227,17 +1384,17 @@ export default function NewBillScreen() {
               </View>
             </Pressable>
           </KeyboardAvoidingView>
-        )}
+        ) : null}
       </Modal>
 
       {/* Removed Contact Picker Modal */}
 
       {/* Success bottom sheet */}
-      {success ? (
+      {success && !isWeb ? (
         <Animated.View
           style={[
             {
-              position: Platform.OS === 'web' ? ('fixed' as any) : 'absolute',
+              position: isWeb ? ('fixed' as any) : 'absolute',
               bottom: 0,
               left: 0,
               right: 0,
@@ -1256,101 +1413,7 @@ export default function NewBillScreen() {
             successStyle,
           ]}
         >
-          <Text style={{ fontSize: 48, marginBottom: Spacing.xs }}>✅</Text>
-          <Text style={{ fontSize: FontSize.lg, fontWeight: '700', color: Colors.text, marginBottom: 4 }}>
-            बिल सेव हो गया!
-          </Text>
-          <Text style={{ fontSize: FontSize.xxl, fontWeight: '900', color: Colors.primary, marginBottom: Spacing.xl }}>
-            Slip #{savedSlip}
-          </Text>
-          <View style={{ flexDirection: 'row', gap: Spacing.sm, width: '100%' }}>
-            <Pressable
-              testID="new-bill-button"
-              onPress={resetForm}
-              style={{
-                flex: 1,
-                height: 52,
-                borderRadius: Radius.md,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderWidth: 1,
-                borderColor: Colors.border,
-              }}
-            >
-              <Text style={{ fontSize: FontSize.sm, color: Colors.text, fontWeight: '700' }}>➕ नया बिल</Text>
-            </Pressable>
-            {isMemberMode === false ? (
-              <>
-                <Pressable
-                  testID="edit-bill-button"
-                  onPress={() => router.push(`/bills/edit/${savedInquiryId}` as any)}
-                  style={{
-                    flex: 1,
-                    height: 52,
-                    borderRadius: Radius.md,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: Colors.info,
-                  }}
-                >
-                  <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>✏️ एडिट</Text>
-                </Pressable>
-                <Pressable
-                  testID="authorize-bill"
-                  onPress={() => {
-                    successY.value = 400; // hide bottom sheet visually
-                    router.push({ pathname: '/authorization', params: { id: savedInquiryId } } as any);
-                  }}
-                  style={{
-                    flex: 1,
-                    height: 52,
-                    borderRadius: Radius.md,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: Colors.primary,
-                  }}
-                >
-                  <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>🔐 Auth</Text>
-                </Pressable>
-              </>
-            ) : (
-              <>
-                <Pressable
-                  testID="edit-bill-button"
-                  onPress={() => router.push(`/bills/edit/${savedInquiryId}` as any)}
-                  style={{
-                    flex: 1,
-                    height: 52,
-                    borderRadius: Radius.md,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: Colors.info,
-                  }}
-                >
-                  <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>✏️ एडिट</Text>
-                </Pressable>
-                <Pressable
-                  testID="mark-delivered-bill"
-                  onPress={() => markDeliveredMutation.mutate()}
-                  disabled={markDeliveredMutation.isPending}
-                  style={{
-                    flex: 1,
-                    height: 52,
-                    borderRadius: Radius.md,
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: Colors.success,
-                  }}
-                >
-                  {markDeliveredMutation.isPending ? (
-                    <ActivityIndicator color="#FFF" size="small" />
-                  ) : (
-                    <Text style={{ fontSize: FontSize.sm, color: '#FFF', fontWeight: '700' }}>🚚 Deliver</Text>
-                  )}
-                </Pressable>
-              </>
-            )}
-          </View>
+          {successActions}
         </Animated.View>
       ) : null}
     </SafeAreaView>

@@ -60,7 +60,7 @@ export default function MemberProfileScreen() {
     await AsyncStorage.removeItem(APP_SESSION_KEY);
     await AsyncStorage.removeItem(MEMBER_SESSION_KEY);
     setLaunchComplete(false);
-    resetToRoute(router, { pathname: '/', params: { access: 'choose' } } as any);
+    resetToRoute(router, '/access-choice' as any);
   };
 
   const displayName = member?.name || 'Member';

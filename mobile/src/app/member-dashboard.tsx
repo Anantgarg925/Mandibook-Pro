@@ -76,9 +76,9 @@ export default function MemberDashboardScreen() {
 
   useEffect(() => {
     if (sessionHydrated && !launchComplete) {
-      router.replace('/?access=choose');
+      router.replace('/access-choice' as any);
     }
-  }, [sessionHydrated, launchComplete]);
+  }, [sessionHydrated, launchComplete, router]);
 
   useEffect(() => {
     AsyncStorage.getItem(MEMBER_SESSION_KEY)
@@ -97,7 +97,7 @@ export default function MemberDashboardScreen() {
     await AsyncStorage.removeItem(APP_SESSION_KEY);
     await AsyncStorage.removeItem(MEMBER_SESSION_KEY);
     setLaunchComplete(false);
-    resetToRoute(router, { pathname: '/', params: { access: 'choose' } } as any);
+    resetToRoute(router, '/access-choice' as any);
   };
 
   const recentBills = inquiries.slice(0, 5);

@@ -205,7 +205,7 @@ export default function SettingsContent() {
     if (wasImpersonating === 'true') {
       resetToRoute(router, { pathname: '/owner/subscriptions' } as any);
     } else {
-      resetToRoute(router, { pathname: '/', params: { access: 'choose' } } as any);
+      resetToRoute(router, '/access-choice' as any);
     }
   };
 

@@ -188,6 +188,11 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
   }
 
   const totalWeight = calc?.totalWeight ?? (sacksNum * weightPerSackNum);
+  const calculatedNetAmount = calc?.net ?? 0;
+  const finalNetAmount =
+    Math.abs((inquiry.netAmount ?? 0) - calculatedNetAmount) > 0.1
+      ? inquiry.netAmount
+      : calculatedNetAmount;
 
   const cleanDecimal = (value: string) => value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
   const formatMoneyInput = (value: number) =>
@@ -253,9 +258,13 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
         cartagePerKg: shop?.charges?.cartagePerKg ?? 0,
         applyApmc,
         applyBardana,
+        manualNetAmount:
+          Math.abs(finalNetAmount - calc.net) > 0.1
+            ? finalNetAmount
+            : undefined,
         ...(isMultipleItems ? { entries: finalEntries } : {}),
       },
-      net_amount: calc.net,
+      net_amount: finalNetAmount,
       payment_mode: paymentMode,
       upi_ref: upiRef.trim(),
       ...(status
@@ -345,7 +354,7 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
           const { error: buyerUpdateError } = await supabase
             .from('buyers')
             .update({
-              outstanding_balance: Number(existing.outstanding_balance ?? 0) + calc.net,
+              outstanding_balance: Number(existing.outstanding_balance ?? 0) + finalNetAmount,
               last_transaction_date: now,
             })
             .eq('id', existing.id);
@@ -356,7 +365,7 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
             code: buyerCode,
             name: customerName.trim(),
             phone: customerPhone.trim(),
-            outstanding_balance: calc.net,
+            outstanding_balance: finalNetAmount,
             last_transaction_date: now,
             created_at: now,
           });
@@ -367,7 +376,7 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
           shop_id: shop.shopId,
           buyer_code: buyerCode,
           type: 'SALE',
-          amount: calc.net,
+          amount: finalNetAmount,
           date: now,
           note: `Bill #${inquiry.slipNumber}`,
           slip_number: inquiry.slipNumber,
@@ -384,7 +393,7 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
       queryClient.invalidateQueries({ queryKey: ['trucks', shop?.shopId] });
       queryClient.invalidateQueries({ queryKey: ['buyers', shop?.shopId] });
       
-      router.push(`/slip/${inquiry.id}`);
+      router.replace(`/slip/${inquiry.id}`);
     },
     onError: (error: Error) => {
       console.error('Authorize error:', error);
@@ -682,7 +691,7 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
       )}
 
       {/* Multiple Items Display */}
-      {isMultipleItems && (
+      {isMultipleItems ? (
         <View style={{ padding: Spacing.md, backgroundColor: '#F8FAFC', borderBottomWidth: 1, borderBottomColor: '#CBD5E1' }}>
           <Text style={{ fontSize: 12, fontWeight: '800', color: '#64748B', textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.5 }}>
             Multiple Items (Edit inline)
@@ -753,7 +762,7 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
             </View>
           ))}
         </View>
-      )}
+      ) : null}
 
       {/* Payment */}
       <EditableSlipRow label="Payment Mode" value={paymentMode} isEditing={editingField === "payment"} onToggle={() => setEditingField(editingField === "payment" ? null : "payment")} isError={!!errors.payment} />
@@ -790,7 +799,7 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
               if (val && (!bardanaRate || bardanaRate === '0')) setBardanaRate(String(shop?.charges?.bardanaPerSack ?? 0));
             }} />
           </View>
-          {applyBardana && (
+          {applyBardana ? (
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <TextInput
                 style={{ flex: 1, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }}
@@ -807,7 +816,7 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
                 onChangeText={(v) => setBardanaRate(v.replace(/[^0-9.]/g, ''))}
               />
             </View>
-          )}
+          ) : null}
         </View>
       )}
 
@@ -840,7 +849,7 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
         <View style={{ flexDirection: 'row', backgroundColor: '#E8F5E9' }}>
           <Text style={{ flex: 1, fontSize: 15, fontWeight: '900', color: '#166534', padding: 8 }}>Net Amount</Text>
           <Text style={{ width: 150, fontSize: 15, fontWeight: '900', color: '#166534', padding: 8, textAlign: 'right' }}>
-            ₹{Math.round(calc?.net || 0).toLocaleString('en-IN')}
+            ₹{Math.round(finalNetAmount || 0).toLocaleString('en-IN')}
           </Text>
         </View>
       </View>
