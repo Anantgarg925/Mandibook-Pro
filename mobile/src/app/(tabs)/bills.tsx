@@ -102,6 +102,7 @@ export default function BillsScreen() {
   const { inquiries, pending, confirmed, udhaari, loading } = useInquiries();
 
   const [activeFilter, setActiveFilter] = useState<FilterTab>('ALL');
+  const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>({ ALL: true });
   const [query, setQuery] = useState('');
   const [expandedGrades, setExpandedGrades] = useState<Record<string, boolean>>({});
   const pagerRef = React.useRef<PagerView>(null);
@@ -114,6 +115,7 @@ export default function BillsScreen() {
   useEffect(() => {
     if (filter === 'PENDING' || filter === 'CONFIRMED' || filter === 'UDHAARI' || filter === 'ALL') {
       setActiveFilter(filter);
+      setVisitedTabs((prev) => ({ ...prev, [filter]: true }));
       requestAnimationFrame(() => {
         pagerRef.current?.setPage(filterIndex(filter));
       });
@@ -249,6 +251,7 @@ export default function BillsScreen() {
                 key={tab.id}
                 onPress={() => {
                   setActiveFilter(tab.id);
+                  setVisitedTabs((prev) => ({ ...prev, [tab.id]: true }));
                   pagerRef.current?.setPage(index);
                 }}
                 style={{
@@ -357,9 +360,18 @@ export default function BillsScreen() {
             ref={pagerRef}
             style={{ flex: 1 }}
             initialPage={filterIndex(activeFilter)}
-            onPageSelected={(e) => setActiveFilter(FILTER_TABS[e.nativeEvent.position])}
+            onPageSelected={(e) => {
+              const tab = FILTER_TABS[e.nativeEvent.position];
+              setActiveFilter(tab);
+              setVisitedTabs((prev) => ({ ...prev, [tab]: true }));
+            }}
           >
             {FILTER_TABS.map((tabStatus, index) => {
+              const isVisited = visitedTabs[tabStatus];
+              if (!isVisited) {
+                return <View key={index} style={{ flex: 1 }} />;
+              }
+
               if (tabStatus === 'GRADE') {
                 return (
                   <View key={index} style={{ flex: 1 }}>

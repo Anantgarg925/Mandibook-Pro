@@ -26,6 +26,7 @@ export default function TrucksScreen() {
   const { contentHPad, isSmall } = useResponsive();
   const { trucks, loading } = useTodayTrucks();
   const [filter, setFilter] = useState('ALL');
+  const [visitedTabs, setVisitedTabs] = useState<Record<string, boolean>>({ ALL: true });
   const [query, setQuery] = useState('');
   const searchInputRef = useRef<TextInput>(null);
   const pagerRef = React.useRef<PagerView>(null);
@@ -95,29 +96,30 @@ export default function TrucksScreen() {
           />
         </View>
       </View>
-
-      {/* Filter Tabs */}
-      <View style={{ paddingBottom: Spacing.md }}>
-        <View style={{
-          backgroundColor: '#e6f6ff',
-          borderRadius: 14,
-          padding: 4,
-          flexDirection: 'row',
-          overflow: 'visible',
-        }}>
-          {[
-            { id: 'ALL', label: 'All' },
-            { id: 'ARRIVED', label: 'Arrived' },
-            { id: 'UNLOADING', label: 'Unloading' }
-          ].map((tab, index) => {
-            const active = filter === tab.id;
-            return (
-              <Pressable
-                key={tab.id}
-                onPress={() => {
-                  setFilter(tab.id);
-                  pagerRef.current?.setPage(index);
-                }}
+ 
+       {/* Filter Tabs */}
+       <View style={{ paddingBottom: Spacing.md }}>
+         <View style={{
+           backgroundColor: '#e6f6ff',
+           borderRadius: 14,
+           padding: 4,
+           flexDirection: 'row',
+           overflow: 'visible',
+         }}>
+           {[
+             { id: 'ALL', label: 'All' },
+             { id: 'ARRIVED', label: 'Arrived' },
+             { id: 'UNLOADING', label: 'Unloading' }
+           ].map((tab, index) => {
+             const active = filter === tab.id;
+             return (
+               <Pressable
+                 key={tab.id}
+                 onPress={() => {
+                   setFilter(tab.id);
+                   setVisitedTabs((prev) => ({ ...prev, [tab.id]: true }));
+                   pagerRef.current?.setPage(index);
+                 }}
                 style={{
                   flex: 1,
                   height: 44,
@@ -229,9 +231,18 @@ export default function TrucksScreen() {
             ref={pagerRef}
             style={{ flex: 1 }}
             initialPage={0}
-            onPageSelected={(e) => setFilter(FILTER_TABS[e.nativeEvent.position])}
+            onPageSelected={(e) => {
+              const tab = FILTER_TABS[e.nativeEvent.position];
+              setFilter(tab);
+              setVisitedTabs((prev) => ({ ...prev, [tab]: true }));
+            }}
           >
             {FILTER_TABS.map((tabStatus, index) => {
+              const isVisited = visitedTabs[tabStatus];
+              if (!isVisited) {
+                return <View key={index} style={{ flex: 1 }} />;
+              }
+
               const pageTrucks = trucks.filter((truck) => {
                 const sold = truck.gradeInventory.reduce((s, g) => s + g.confirmedKg + g.provisionalKg, 0);
                 const status =

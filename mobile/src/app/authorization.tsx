@@ -21,7 +21,10 @@ export default function AuthorizationScreen() {
   const { pending, loading } = useInquiries();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
+  const [currentPage, setCurrentPage] = React.useState(0);
   const visiblePending = id ? pending.filter((bill) => bill.id === id) : pending;
+
+  const activePage = Math.min(currentPage, Math.max(0, visiblePending.length - 1));
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F5F8FA' }} edges={['top', 'bottom']}>
@@ -78,18 +81,31 @@ export default function AuthorizationScreen() {
           </Text>
         </View>
       ) : (
-        <PagerView style={{ flex: 1 }} initialPage={0}>
-          {visiblePending.map((item) => (
-            <View key={item.id}>
-              <ScrollView
-                contentContainerStyle={{ paddingBottom: Spacing.xl }}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-              >
-                <PendingInquiryCard inquiry={item} />
-              </ScrollView>
-            </View>
-          ))}
+        <PagerView
+          style={{ flex: 1 }}
+          initialPage={0}
+          onPageSelected={(e) => setCurrentPage(e.nativeEvent.position)}
+        >
+          {visiblePending.map((item, idx) => {
+            const isVisible = Math.abs(idx - activePage) <= 1;
+            return (
+              <View key={item.id} style={{ flex: 1 }}>
+                {isVisible ? (
+                  <ScrollView
+                    contentContainerStyle={{ paddingBottom: Spacing.xl }}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                  >
+                    <PendingInquiryCard inquiry={item} />
+                  </ScrollView>
+                ) : (
+                  <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+                    <ActivityIndicator color={Colors.primary} size="large" />
+                  </View>
+                )}
+              </View>
+            );
+          })}
         </PagerView>
       )}
     </SafeAreaView>

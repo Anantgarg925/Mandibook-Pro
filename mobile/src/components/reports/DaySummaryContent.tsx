@@ -61,6 +61,13 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
   const insets = useSafeAreaInsets();
   const [date, setDate] = useState<Date>(getCurrentBusinessDate());
   const [activeTab, setActiveTab] = useState<TabKey>('sale');
+  const [visitedTabs, setVisitedTabs] = useState<Record<TabKey, boolean>>({
+    sale: true,
+    bills: false,
+    accounts: false,
+    payments: false,
+    cashbook: false,
+  });
   const [exporting, setExporting] = useState(false);
   const pagerRef = React.useRef<PagerView>(null);
 
@@ -456,6 +463,7 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
                   testID={`tab-${key === 'cashbook' ? 'cashbook' : key}`}
                   onPress={() => {
                     setActiveTab(key);
+                    setVisitedTabs(prev => ({ ...prev, [key]: true }));
                     pagerRef.current?.setPage(TAB_ORDER.indexOf(key));
                   }}
                   style={{
@@ -490,14 +498,19 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
             ref={pagerRef}
             style={{ flex: 1 }}
             initialPage={TAB_ORDER.indexOf(activeTab) !== -1 ? TAB_ORDER.indexOf(activeTab) : 0}
-            onPageSelected={(e) => setActiveTab(TAB_ORDER[e.nativeEvent.position])}
+            onPageSelected={(e) => {
+              const key = TAB_ORDER[e.nativeEvent.position];
+              setActiveTab(key);
+              setVisitedTabs(prev => ({ ...prev, [key]: true }));
+            }}
           >
             {/* TAB 1: Sale */}
             <View key="sale" style={{ flex: 1 }}>
-              <ScrollView
-                showsVerticalScrollIndicator={false}
-                contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 }}
-              >
+              {visitedTabs.sale ? (
+                <ScrollView
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 }}
+                >
                 {/* Truck-wise reports */}
                 <View style={{ marginBottom: 16 }}>
                   <Text style={{ fontSize: 17, fontWeight: '800', color: '#00450d', marginBottom: 10 }}>
@@ -879,11 +892,13 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
                   </Pressable>
                 </View>
               </ScrollView>
+              ) : null}
             </View>
 
             {/* TAB 2: Generated Bills */}
             <View key="bills" style={{ flex: 1 }}>
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 }}>
+              {visitedTabs.bills ? (
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 }}>
                 <View style={{
                   backgroundColor: '#ffffff',
                   borderWidth: 1,
@@ -990,11 +1005,13 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
                   </View>
                 ))}
               </ScrollView>
+              ) : null}
             </View>
 
             {/* TAB 3: Accounts */}
             <View key="accounts" style={{ flex: 1 }}>
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 }}>
+              {visitedTabs.accounts ? (
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 }}>
                 {pendingCount > 0 ? (
                   <View
                     testID="pending-warning-banner"
@@ -1110,11 +1127,13 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
                   </View>
                 </Pressable>
               </ScrollView>
+              ) : null}
             </View>
 
             {/* TAB 4: Payments */}
             <View key="payments" style={{ flex: 1 }}>
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 }}>
+              {visitedTabs.payments ? (
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 }}>
                 {/* Summary cards */}
                 <View style={{ flexDirection: 'row', gap: 10, marginBottom: 14 }}>
                   {[
@@ -1178,11 +1197,13 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
                   </View>
                 ) : null}
               </ScrollView>
+              ) : null}
             </View>
 
             {/* TAB 5: Cash Book */}
             <View key="cashbook" style={{ flex: 1 }}>
-              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 }}>
+              {visitedTabs.cashbook ? (
+                <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 120 }}>
                
                 {/* Receipts */}
                 <View style={{
@@ -1323,6 +1344,7 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
                   </Text>
                 </View>
               </ScrollView>
+              ) : null}
             </View>
           </PagerView>
         )}

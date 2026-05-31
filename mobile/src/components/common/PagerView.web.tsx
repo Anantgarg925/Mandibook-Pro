@@ -77,11 +77,11 @@ const PagerView = forwardRef((props: any, ref) => {
         onMomentumScrollEnd={onMomentumScrollEnd}
         scrollEventThrottle={16}
         style={{ flex: 1 }}
-        contentContainerStyle={{ minWidth: width * numPages }}
+        contentContainerStyle={{ minWidth: width * numPages, height: '100%' }}
         scrollEnabled={false} // Disable native scroll so PanResponder takes full control for mouse/touch
       >
         {childrenArray.map((child, index) => (
-          <View key={index} style={{ width, flex: 1 }}>
+          <View key={index} style={{ width, height: '100%' }}>
             {child}
           </View>
         ))}
