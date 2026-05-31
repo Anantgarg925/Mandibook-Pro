@@ -51,6 +51,27 @@ const TAB_LABELS: Record<TabKey, string> = {
 
 const TAB_ORDER: TabKey[] = ['sale', 'bills', 'accounts', 'payments', 'cashbook'];
 
+const GRADE_ORDER = ['I', 'II', 'III', 'IV', 'V', 'PILA', 'PEELA', 'CHURAA', 'CHURA', 'KP'];
+
+const compareGrades = (a: string, b: string) => {
+  const normA = a.toUpperCase().trim();
+  const normB = b.toUpperCase().trim();
+  let indexA = GRADE_ORDER.indexOf(normA);
+  let indexB = GRADE_ORDER.indexOf(normB);
+
+  if (normA.startsWith('CHUR')) indexA = GRADE_ORDER.indexOf('CHURA');
+  if (normB.startsWith('CHUR')) indexB = GRADE_ORDER.indexOf('CHURA');
+  if (normA.startsWith('PEEL') || normA === 'PILA') indexA = GRADE_ORDER.indexOf('PILA');
+  if (normB.startsWith('PEEL') || normB === 'PILA') indexB = GRADE_ORDER.indexOf('PILA');
+
+  if (indexA !== -1 && indexB !== -1) {
+    return indexA - indexB;
+  }
+  if (indexA !== -1) return -1;
+  if (indexB !== -1) return 1;
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+};
+
 type DaySummaryContentProps = {
   showBottomNav?: boolean;
 };
@@ -229,7 +250,7 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
       }
     }
     return Array.from(map.values()).sort((a, b) =>
-      a.grade.localeCompare(b.grade, undefined, { numeric: true, sensitivity: 'base' })
+      compareGrades(a.grade, b.grade)
     );
   }, [inquiries]);
 
@@ -316,7 +337,7 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
         telePost: telePostShare,
         net,
         grades: Array.from(gradeMap.values()).sort((a, b) =>
-          a.grade.localeCompare(b.grade, undefined, { numeric: true, sensitivity: 'base' })
+          compareGrades(a.grade, b.grade)
         ),
       };
     });

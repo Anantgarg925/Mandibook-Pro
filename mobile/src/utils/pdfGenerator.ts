@@ -55,6 +55,27 @@ function formatPlainAmount(value: number): string {
   });
 }
 
+const GRADE_ORDER = ['I', 'II', 'III', 'IV', 'V', 'PILA', 'PEELA', 'CHURAA', 'CHURA', 'KP'];
+
+const compareGrades = (a: string, b: string) => {
+  const normA = a.toUpperCase().trim();
+  const normB = b.toUpperCase().trim();
+  let indexA = GRADE_ORDER.indexOf(normA);
+  let indexB = GRADE_ORDER.indexOf(normB);
+
+  if (normA.startsWith('CHUR')) indexA = GRADE_ORDER.indexOf('CHURA');
+  if (normB.startsWith('CHUR')) indexB = GRADE_ORDER.indexOf('CHURA');
+  if (normA.startsWith('PEEL') || normA === 'PILA') indexA = GRADE_ORDER.indexOf('PILA');
+  if (normB.startsWith('PEEL') || normB === 'PILA') indexB = GRADE_ORDER.indexOf('PILA');
+
+  if (indexA !== -1 && indexB !== -1) {
+    return indexA - indexB;
+  }
+  if (indexA !== -1) return -1;
+  if (indexB !== -1) return 1;
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+};
+
 function buildGradeSummary(inquiries: Inquiry[]): GradeSummaryRow[] {
   const map = new Map<string, GradeSummaryRow>();
   for (const inq of inquiries) {
@@ -97,7 +118,7 @@ function buildGradeSummary(inquiries: Inquiry[]): GradeSummaryRow[] {
     }
   }
   return Array.from(map.values()).sort((a, b) =>
-    a.grade.localeCompare(b.grade, undefined, { numeric: true, sensitivity: 'base' })
+    compareGrades(a.grade, b.grade)
   );
 }
 
