@@ -11,6 +11,7 @@ import { ArrowLeft } from 'lucide-react-native';
 import { useShop } from '@/context/ShopContext';
 import { useLaunch } from '@/context/LaunchContext';
 import { mapShop, supabase } from '@/lib/supabase';
+import { isFirmUnlocked } from '@/lib/firmAccess';
 import { Colors, Spacing, FontSize, Radius } from '@/lib/theme';
 import { APP_SESSION_KEY } from '@/lib/session';
 import { resetToRoute } from '@/utils/navigation';
@@ -85,6 +86,7 @@ export default function AdminLoginScreen() {
       // Success! Load shop and create session
       const shop = mapShop(loginResult.shop as Record<string, unknown>);
       await cacheShop(shop);
+      const unlocked = await isFirmUnlocked(shop.shopId);
 
       const session = {
         id: shop.shopId,
@@ -95,6 +97,14 @@ export default function AdminLoginScreen() {
       };
 
       await AsyncStorage.setItem(APP_SESSION_KEY, JSON.stringify(session));
+      if (!unlocked) {
+        setLaunchComplete(false);
+        router.push({
+          pathname: '/firm-password',
+          params: { shopId: shop.shopId, mode: loginResult.firm_password_set ? 'unlock' : 'setup' },
+        } as any);
+        return;
+      }
       setLaunchComplete(true);
       resetToRoute(router, '/');
     } catch (err) {

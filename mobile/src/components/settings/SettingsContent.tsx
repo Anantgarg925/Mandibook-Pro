@@ -11,6 +11,7 @@ import {
   RefreshCw,
   Download,
   LogOut,
+  Lock,
   TriangleAlert,
   ChevronRight,
   ArrowLeft,
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react-native';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { useResponsive } from '@/hooks/useResponsive';
+import { useShop } from '@/context/ShopContext';
 import { useLaunch } from '@/context/LaunchContext';
 import { APP_SESSION_KEY, MEMBER_SESSION_KEY, IMPERSONATION_KEY } from '@/lib/session';
 import { resetToRoute } from '@/utils/navigation';
@@ -188,6 +190,7 @@ function Section({ title, items }: { title: string; items: SettingsItem[] }) {
 
 export default function SettingsContent() {
   const router = useRouter();
+  const { shop } = useShop();
   const { setLaunchComplete } = useLaunch();
   const { contentHPad } = useResponsive();
   const [showResetModal, setShowResetModal] = useState(false);
@@ -331,6 +334,16 @@ export default function SettingsContent() {
               subtitle: 'पिन बदलें',
               actionLabel: 'Change',
               onPress: () => router.push('/settings/change-pin' as any),
+            },
+            {
+              icon: Lock,
+              label: 'Firm Password',
+              subtitle: 'फर्म का एक-बार वाला लॉक',
+              actionLabel: shop?.firmName ? 'Set' : 'Open',
+              onPress: () => router.push({
+                pathname: '/firm-password',
+                params: { mode: 'setup', shopId: shop?.shopId ?? '' },
+              } as any),
             },
           ]}
         />

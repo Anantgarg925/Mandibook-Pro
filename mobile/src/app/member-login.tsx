@@ -13,6 +13,7 @@ import { ArrowLeft, User } from 'lucide-react-native';
 import { useShop, type TeamMember } from '@/context/ShopContext';
 import { useLaunch } from '@/context/LaunchContext';
 import { mapShop, supabase } from '@/lib/supabase';
+import { isFirmUnlocked } from '@/lib/firmAccess';
 import { APP_SESSION_KEY, MEMBER_SESSION_KEY } from '@/lib/session';
 import { resetToRoute } from '@/utils/navigation';
 export { APP_SESSION_KEY, MEMBER_SESSION_KEY };
@@ -59,6 +60,7 @@ export default function MemberLoginScreen() {
       member?: TeamMember;
       is_admin?: boolean;
       session_token?: string;
+      firm_password_set?: boolean;
     };
     if (!payload.shop || !payload.member || !payload.session_token) return null;
 
@@ -66,6 +68,7 @@ export default function MemberLoginScreen() {
       shop: mapShop(payload.shop),
       member: payload.member,
       isAdmin: payload.is_admin === true,
+      firmPasswordSet: payload.firm_password_set === true,
       sessionToken: payload.session_token,
     };
   };
@@ -95,8 +98,8 @@ export default function MemberLoginScreen() {
       }
 
       if (activeShop && (isAdmin || member)) {
+        const unlocked = await isFirmUnlocked(activeShop.shopId);
         setPinError(false);
-        setLaunchComplete(true);
         const session = {
           id: member?.id ?? 'admin-member',
           name: member?.name ?? activeShop.ownerName,
@@ -107,8 +110,26 @@ export default function MemberLoginScreen() {
         AsyncStorage.setItem(APP_SESSION_KEY, JSON.stringify(session)).catch(() => {});
         if (isAdmin) {
           AsyncStorage.removeItem(MEMBER_SESSION_KEY).catch(() => {});
+          if (!unlocked) {
+            setLaunchComplete(false);
+            router.push({
+              pathname: '/firm-password',
+              params: { shopId: activeShop.shopId, mode: remoteMatch.firmPasswordSet ? 'unlock' : 'setup' },
+            } as any);
+            return;
+          }
+          setLaunchComplete(true);
           resetToRoute(router, '/');
         } else {
+          if (!unlocked) {
+            setLaunchComplete(false);
+            router.push({
+              pathname: '/firm-password',
+              params: { shopId: activeShop.shopId, mode: remoteMatch.firmPasswordSet ? 'unlock' : 'setup' },
+            } as any);
+            return;
+          }
+          setLaunchComplete(true);
           AsyncStorage.setItem(MEMBER_SESSION_KEY, JSON.stringify(session)).catch(() => {});
           resetToRoute(router, '/member-dashboard');
         }

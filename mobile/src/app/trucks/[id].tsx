@@ -27,7 +27,7 @@ import { toIndianWeight, toIndianDate, toIndianCurrency } from '@/lib/formatters
 import { useMemberMode } from '@/hooks/useMemberMode';
 import { archiveQueryOptions } from '@/lib/queryOptions';
 import { makeReferenceSlipNumber, mapEntriesToSlipRows, ReferenceSlipCard } from '@/utils/referenceSlip';
-import { downloadElementAsJpeg } from '@/utils/webExport';
+import { downloadTestIdAsJpeg } from '@/utils/webExport';
 import type { Inquiry } from '@/types/inquiry';
 import type { TruckGradeEntry } from '@/types/truck';
 
@@ -321,7 +321,7 @@ export default function TruckDetailScreen() {
     if (!referenceSlipRef.current) return;
     try {
       if (Platform.OS === 'web') {
-        await downloadElementAsJpeg(referenceSlipRef.current as unknown as HTMLElement, `reference-slip-${truck!.truckNumber}.jpg`);
+        await downloadTestIdAsJpeg('reference-slip-web', `reference-slip-${truck!.truckNumber}.jpg`);
         return;
       }
       const available = await Sharing.isAvailableAsync();
@@ -869,7 +869,7 @@ export default function TruckDetailScreen() {
         <Plus size={28} color="#FFF" strokeWidth={2.5} />
       </Pressable>
       <View style={{ position: 'absolute', left: -1200, top: 0 }}>
-        <View ref={referenceSlipRef} collapsable={false}>
+        <View ref={referenceSlipRef} testID="reference-slip-web" collapsable={false}>
           <ReferenceSlipCard
             shop={shop}
             slipNumber={referenceSlipNumber}

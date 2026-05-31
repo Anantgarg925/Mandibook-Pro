@@ -23,7 +23,7 @@ import { printSlip, shareSlipAsPDF } from '@/utils/printSlip';
 import { useMemberMode } from '@/hooks/useMemberMode';
 import { archiveQueryOptions } from '@/lib/queryOptions';
 import { deleteConfirmedBill } from '@/utils/ledgerSync';
-import { downloadElementAsJpeg } from '@/utils/webExport';
+import { downloadTestIdAsJpeg } from '@/utils/webExport';
 import {
   generateCustomerMessage,
   generateThekedaarMessage,
@@ -109,7 +109,7 @@ export default function SlipPreviewScreen() {
     setPrinting(true);
     try {
       if (Platform.OS === 'web') {
-        await downloadElementAsJpeg(slipCardRef.current as unknown as HTMLElement, `slip-${inquiry!.slipNumber}.jpg`);
+        await downloadTestIdAsJpeg('slip-card-web', `slip-${inquiry!.slipNumber}.jpg`);
         return;
       }
       const available = await Sharing.isAvailableAsync();
@@ -235,7 +235,7 @@ export default function SlipPreviewScreen() {
         {/* Thermal Receipt Card */}
         <View
           ref={slipCardRef}
-          testID="slip-card"
+          testID="slip-card-web"
           collapsable={false}
           style={{
             backgroundColor: '#FFFFFF',

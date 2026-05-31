@@ -23,7 +23,7 @@ import { toIndianWeight } from '@/lib/formatters';
 import { useMemberMode } from '@/hooks/useMemberMode';
 import { getCurrentBusinessDate } from '@/lib/businessDay';
 import { makeReferenceSlipNumber, normalizeGradeRows, ReferenceSlipCard } from '@/utils/referenceSlip';
-import { downloadElementAsJpeg } from '@/utils/webExport';
+import { downloadTestIdAsJpeg } from '@/utils/webExport';
 import type { GradeInventory } from '@/types/truck';
 
 // ─── field input style ───────────────────────────────────────────────────────
@@ -393,7 +393,7 @@ export default function RegisterTruckScreen() {
     if (!referenceSlipReady || !referenceSlipRef.current) return;
     try {
       if (Platform.OS === 'web') {
-        await downloadElementAsJpeg(referenceSlipRef.current as unknown as HTMLElement, `reference-slip-${referenceSlipNumber}.jpg`);
+        await downloadTestIdAsJpeg('reference-slip-web', `reference-slip-${referenceSlipNumber}.jpg`);
         return;
       }
       const available = await Sharing.isAvailableAsync();
@@ -811,7 +811,7 @@ export default function RegisterTruckScreen() {
       </KeyboardAvoidingView>
 
       <View style={{ position: 'absolute', left: -1200, top: 0 }}>
-        <View ref={referenceSlipRef} collapsable={false}>
+        <View ref={referenceSlipRef} testID="reference-slip-web" collapsable={false}>
           <ReferenceSlipCard
             shop={shop}
             slipNumber={referenceSlipNumber}

@@ -90,3 +90,10 @@ export async function downloadElementAsJpeg(element: HTMLElement, filename: stri
   link.click();
   link.remove();
 }
+
+export async function downloadTestIdAsJpeg(testId: string, filename: string): Promise<void> {
+  if (Platform.OS !== 'web') return;
+  const element = document.querySelector(`[data-testid="${testId}"]`) as HTMLElement | null;
+  if (!element) throw new Error(`Could not find element ${testId}`);
+  await downloadElementAsJpeg(element, filename);
+}

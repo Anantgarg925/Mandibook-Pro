@@ -10,6 +10,7 @@ import {
   Modal,
   Alert,
   KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -949,7 +950,7 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
                         : <FileText size={22} color="#ffffff" />}
                       <View>
                         <Text style={{ fontSize: 16, fontWeight: '800', color: '#ffffff' }}>
-                          Export &amp; Share PDF
+                          {Platform.OS === 'web' ? 'Print / Save PDF' : 'Export &amp; Share PDF'}
                         </Text>
                         <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)' }}>
                           पीडीएफ निर्यात करें
