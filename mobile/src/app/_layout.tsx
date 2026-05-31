@@ -58,6 +58,7 @@ function RootLayoutNav({ colorScheme }: { colorScheme: 'light' | 'dark' | null |
         <Stack.Screen name="member-login" options={{ headerShown: false }} />
         <Stack.Screen name="access-choice" options={{ headerShown: false }} />
         <Stack.Screen name="admin-login" options={{ headerShown: false }} />
+        <Stack.Screen name="firm-password" options={{ headerShown: false }} />
         <Stack.Screen name="member-dashboard" options={{ headerShown: false }} />
         <Stack.Screen name="member-trucks" options={{ headerShown: false }} />
         <Stack.Screen name="member-profile" options={{ headerShown: false }} />

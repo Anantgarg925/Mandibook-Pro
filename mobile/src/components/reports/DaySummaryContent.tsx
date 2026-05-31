@@ -950,7 +950,7 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
                         : <FileText size={22} color="#ffffff" />}
                       <View>
                         <Text style={{ fontSize: 16, fontWeight: '800', color: '#ffffff' }}>
-                          {Platform.OS === 'web' ? 'Print / Save PDF' : 'Export &amp; Share PDF'}
+                          {Platform.OS === 'web' ? 'Print / Save PDF' : 'Export & Share PDF'}
                         </Text>
                         <Text style={{ fontSize: 11, color: 'rgba(255,255,255,0.8)' }}>
                           पीडीएफ निर्यात करें

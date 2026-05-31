@@ -18,6 +18,7 @@ import { CheckCircle2, Clock3, Copy, RefreshCw, X } from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import { usePathname } from 'expo-router';
 import { useShop } from '@/context/ShopContext';
+import { useLaunch } from '@/context/LaunchContext';
 import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus';
 import { Colors, FontSize, Radius, Spacing } from '@/lib/theme';
 
@@ -447,16 +448,22 @@ function Paywall({
 
 export function SubscriptionGate({ children }: { children: ReactNode }) {
   const { shop, loading: shopLoading } = useShop();
+  const { launchComplete, sessionHydrated } = useLaunch();
   const pathname = usePathname();
-  const { data, isLoading, isFetching, refetch, submitPayment, submittingPayment } = useSubscriptionStatus();
+  const { data, error, isLoading, isFetching, refetch, submitPayment, submittingPayment } = useSubscriptionStatus();
   const insets = useSafeAreaInsets();
   const [dismissed, setDismissed] = useState(false);
 
   const bypass =
     !shop?.shopId ||
     shopLoading ||
+    !sessionHydrated ||
+    !launchComplete ||
     pathname === '/onboarding' ||
+    pathname === '/access-choice' ||
+    pathname === '/admin-login' ||
     pathname === '/member-login' ||
+    pathname === '/firm-password' ||
     pathname === '/owner/subscriptions';
 
   if (bypass) return <>{children}</>;
@@ -472,8 +479,23 @@ export function SubscriptionGate({ children }: { children: ReactNode }) {
     );
   }
 
+  if (error) {
+    return <>{children}</>;
+  }
+
+  if (!data) {
+    return (
+      <SafeAreaView style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background }}>
+        <ActivityIndicator color={Colors.primary} />
+        <Text style={{ marginTop: Spacing.sm, color: Colors.textSecond, fontWeight: '700' }}>
+          Loading subscription...
+        </Text>
+      </SafeAreaView>
+    );
+  }
+
   // DEV ONLY: Force show paywall to test UI
-  if  (!data?.is_allowed){
+  if (!data.is_allowed){
     return (
       <Paywall
         status={data}
