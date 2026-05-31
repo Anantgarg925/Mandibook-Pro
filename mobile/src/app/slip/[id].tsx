@@ -377,19 +377,6 @@ export default function SlipPreviewScreen() {
               </Text>
               <Text
                 style={{
-                  width: 50,
-                  fontSize: 10,
-                  fontWeight: '700',
-                  color: '#64748B',
-                  textTransform: 'uppercase',
-                  letterSpacing: Platform.OS === 'android' ? 0 : 0.5,
-                  textAlign: 'center',
-                }}
-              >
-                Pack
-              </Text>
-              <Text
-                style={{
                   width: 44,
                   fontSize: 10,
                   fontWeight: '700',
@@ -400,6 +387,19 @@ export default function SlipPreviewScreen() {
                 }}
               >
                 Grade
+              </Text>
+              <Text
+                style={{
+                  width: 50,
+                  fontSize: 10,
+                  fontWeight: '700',
+                  color: '#64748B',
+                  textTransform: 'uppercase',
+                  letterSpacing: Platform.OS === 'android' ? 0 : 0.5,
+                  textAlign: 'center',
+                }}
+              >
+                Pack
               </Text>
               <Text
                 style={{
@@ -453,11 +453,11 @@ export default function SlipPreviewScreen() {
                     {shop.commodity}
                   </Text>
                 </View>
-                <Text style={{ width: 50, fontSize: 12, color: '#071e27', textAlign: 'center' }}>
-                  {entry.sacks}x{entry.weightPerSack}
-                </Text>
                 <Text style={{ width: 44, fontSize: 12, color: '#071e27', textAlign: 'center' }}>
                   {entry.grade}
+                </Text>
+                <Text style={{ width: 50, fontSize: 12, color: '#071e27', textAlign: 'center' }}>
+                  {entry.sacks}x{entry.weightPerSack}
                 </Text>
                 <Text style={{ width: 46, fontSize: 12, color: '#071e27', textAlign: 'right' }}>
                   {entry.totalWeight}kg
