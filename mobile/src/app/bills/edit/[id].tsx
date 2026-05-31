@@ -16,6 +16,7 @@ import PaymentSelector from '@/components/bills/PaymentSelector';
 import GradeSelector from '@/components/bills/GradeSelector';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { toIndianCurrency, toIndianWeight } from '@/lib/formatters';
+import { adjustLedgerForBillEdit } from '@/utils/ledgerSync';
 
 const inputStyle = {
   height: 52,
@@ -190,9 +191,27 @@ export default function EditBillScreen() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!shop?.shopId || !calc || !inquiry) throw new Error('Missing data');
+
+      const newNetAmount = manualTotal ? (parseFloat(manualTotal) || calc.net) : calc.net;
+
+      // Adjust ledger before updating the inquiry
+      await adjustLedgerForBillEdit(
+        shop.shopId,
+        inquiry.slipNumber,
+        inquiry.status,
+        inquiry.paymentMode,
+        inquiry.netAmount,
+        inquiry.customerName,
+        inquiry.customerPhone,
+        inquiry.status,
+        paymentMode,
+        newNetAmount,
+        customerName,
+        customerPhone
+      );
+
       const { error } = await supabase
         .from('inquiries')
-        
         .update({
           truck_id: boughtFromAgent ? null : selectedTruckId,
           truck_number: boughtFromAgent ? 'Agent Stock' : (trucks.find(t => t.id === selectedTruckId)?.truckNumber ?? inquiry.truckNumber),
@@ -210,14 +229,13 @@ export default function EditBillScreen() {
           apmc_amount: calc.apmc,
           bardana_amount: calc.bardana,
           cartage_amount: calc.cartage,
-          net_amount: manualTotal ? (parseFloat(manualTotal) || calc.net) : calc.net,
+          net_amount: newNetAmount,
           payment_mode: paymentMode,
           upi_ref: upiRef,
           apply_apmc: applyApmc,
           apply_bardana: applyBardana,
           charge_snapshot: inquiry.chargeSnapshot,
         })
-
         .eq('id', inquiry.id);
       if (error) throw new Error(error.message);
     },
@@ -225,6 +243,8 @@ export default function EditBillScreen() {
       queryClient.invalidateQueries({ queryKey: ['inquiries', shop?.shopId] });
       queryClient.invalidateQueries({ queryKey: ['inquiry', shop?.shopId, id] });
       queryClient.invalidateQueries({ queryKey: ['trucks', shop?.shopId] });
+      queryClient.invalidateQueries({ queryKey: ['buyers', shop?.shopId] });
+      queryClient.invalidateQueries({ queryKey: ['transactions', shop?.shopId] });
       Alert.alert(
         'Bill Updated ✅',
         'बिल अपडेट हो गया',
@@ -310,7 +330,7 @@ export default function EditBillScreen() {
     );
   }
 
-  if (inquiry.status !== 'PENDING') {
+  if (inquiry.status !== 'PENDING' && inquiry.status !== 'CONFIRMED') {
     return (
       <>
         <Stack.Screen options={{ headerShown: false }} />
