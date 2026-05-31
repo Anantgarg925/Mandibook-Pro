@@ -58,24 +58,47 @@ function formatPlainAmount(value: number): string {
 function buildGradeSummary(inquiries: Inquiry[]): GradeSummaryRow[] {
   const map = new Map<string, GradeSummaryRow>();
   for (const inq of inquiries) {
-    const existing = map.get(inq.grade);
-    if (existing) {
-      existing.sacks += inq.sacks;
-      existing.weight += inq.totalWeight;
-      existing.gross += inq.grossAmount;
-      existing.avgRate = existing.gross / existing.weight;
-    } else {
-      map.set(inq.grade, {
-        grade: inq.grade,
-        gradeName: inq.gradeName,
-        sacks: inq.sacks,
-        weight: inq.totalWeight,
-        avgRate: inq.ratePerKg,
-        gross: inq.grossAmount,
-      });
+    const entries = (inq.chargeSnapshot as any)?.entries;
+    const subEntries = Array.isArray(entries) && entries.length > 0
+      ? entries
+      : [{
+          grade: inq.grade,
+          gradeName: inq.gradeName || inq.grade,
+          sacks: inq.sacks,
+          totalWeight: inq.totalWeight,
+          grossAmount: inq.grossAmount,
+          ratePerKg: inq.ratePerKg,
+        }];
+
+    for (const entry of subEntries) {
+      const gradeKey = entry.grade || 'MIXED';
+      const gradeName = entry.gradeName || gradeKey;
+      const sacks = Number(entry.sacks) || 0;
+      const weight = Number(entry.totalWeight) || 0;
+      const gross = Number(entry.grossAmount) || 0;
+      const rate = Number(entry.ratePerKg) || 0;
+
+      const existing = map.get(gradeKey);
+      if (existing) {
+        existing.sacks += sacks;
+        existing.weight += weight;
+        existing.gross += gross;
+        existing.avgRate = existing.weight > 0 ? existing.gross / existing.weight : 0;
+      } else {
+        map.set(gradeKey, {
+          grade: gradeKey,
+          gradeName,
+          sacks,
+          weight,
+          avgRate: rate,
+          gross,
+        });
+      }
     }
   }
-  return Array.from(map.values());
+  return Array.from(map.values()).sort((a, b) =>
+    a.grade.localeCompare(b.grade, undefined, { numeric: true, sensitivity: 'base' })
+  );
 }
 
 function buildBuyerSummary(inquiries: Inquiry[]): BuyerSummaryRow[] {

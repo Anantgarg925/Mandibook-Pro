@@ -145,7 +145,9 @@ export default function SlipPreviewScreen() {
       ? `GPay/Paytm: ${shop.upiId || shop.upiApps.join('/')}`
       : null;
   const showAdminSlipActions = isMemberMode === false;
-  const footerHeight = showAdminSlipActions ? 56 + 16 + 16 + insets.bottom : 0;
+  const isWeb = Platform.OS === 'web';
+  const footerBottomInset = isWeb ? 0 : insets.bottom;
+  const footerHeight = showAdminSlipActions ? 56 + 16 + 16 + footerBottomInset : 0;
   const isReferenceSlip = inquiry.status !== 'CONFIRMED';
   const showFinalAmounts = !isReferenceSlip;
 
@@ -706,7 +708,7 @@ export default function SlipPreviewScreen() {
       {showAdminSlipActions ? (
         <View
         style={{
-          position: 'absolute',
+          position: isWeb ? ('fixed' as any) : 'absolute',
           bottom: 0,
           left: 0,
           right: 0,
@@ -714,8 +716,9 @@ export default function SlipPreviewScreen() {
           borderTopWidth: 1,
           borderTopColor: '#CBD5E1',
           padding: 16,
-          paddingBottom: insets.bottom + 16,
-          zIndex: 50,
+          paddingBottom: footerBottomInset + 16,
+          zIndex: 9999,
+          elevation: 50,
         }}
       >
         <Pressable
