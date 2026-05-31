@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import type { Inquiry } from '@/types/inquiry';
 
 /**
  * Adjusts the buyer's ledger and balance when a bill is edited or deleted.
@@ -125,4 +126,44 @@ export const adjustLedgerForBillEdit = async (
     // Add new amount to new buyer
     await adjustBuyerBalance(newBuyerCode, newNetAmount);
   }
+};
+
+/**
+ * Fully deletes a bill and reverses any ledger impact.
+ * - CONFIRMED + UDHAARI: removes the SALE transaction and reduces buyer balance.
+ * - Then deletes the inquiry row itself.
+ */
+export const deleteConfirmedBill = async (
+  shopId: string,
+  inquiry: Pick<Inquiry, 'id' | 'slipNumber' | 'status' | 'paymentMode' | 'netAmount'>
+) => {
+  if (inquiry.status === 'CONFIRMED' && inquiry.paymentMode === 'UDHAARI') {
+    const { data: tx } = await supabase
+      .from('transactions')
+      .select('*')
+      .eq('shop_id', shopId)
+      .eq('type', 'SALE')
+      .eq('slip_number', inquiry.slipNumber)
+      .maybeSingle();
+
+    if (tx) {
+      const { data: buyer } = await supabase
+        .from('buyers')
+        .select('outstanding_balance, id')
+        .eq('shop_id', shopId)
+        .eq('code', tx.buyer_code)
+        .single();
+
+      if (buyer) {
+        await supabase
+          .from('buyers')
+          .update({ outstanding_balance: Number(buyer.outstanding_balance) - Number(tx.amount) })
+          .eq('id', buyer.id);
+      }
+      await supabase.from('transactions').delete().eq('id', tx.id);
+    }
+  }
+
+  const { error } = await supabase.from('inquiries').delete().eq('id', inquiry.id);
+  if (error) throw new Error(error.message);
 };

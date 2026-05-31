@@ -11,8 +11,8 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Share2, CheckCircle, MessageCircle, Users, Printer, ArrowLeft, Settings, Image as ImageIcon } from 'lucide-react-native';
-import { useQuery } from '@tanstack/react-query';
+import { Share2, CheckCircle, MessageCircle, Users, Printer, ArrowLeft, Settings, Image as ImageIcon, Pencil, Trash2 } from 'lucide-react-native';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
 import { supabase, mapInquiry } from '@/lib/supabase';
@@ -22,6 +22,7 @@ import { toIndianCurrency, toIndianDate } from '@/lib/formatters';
 import { printSlip, shareSlipAsPDF } from '@/utils/printSlip';
 import { useMemberMode } from '@/hooks/useMemberMode';
 import { archiveQueryOptions } from '@/lib/queryOptions';
+import { deleteConfirmedBill } from '@/utils/ledgerSync';
 import {
   generateCustomerMessage,
   generateThekedaarMessage,
@@ -39,6 +40,7 @@ export default function SlipPreviewScreen() {
   const slipCardRef = useRef<View>(null);
   const insets = useSafeAreaInsets();
   const isMemberMode = useMemberMode();
+  const queryClient = useQueryClient();
 
   const goBack = () => {
     if (router.canGoBack()) {
@@ -127,6 +129,31 @@ export default function SlipPreviewScreen() {
     } finally {
       setPrinting(false);
     }
+  };
+
+  const deleteBillMutation = useMutation({
+    mutationFn: async () => {
+      if (!inquiry || !shop) throw new Error('Missing data');
+      await deleteConfirmedBill(shop.shopId, inquiry);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inquiries', shop?.shopId] });
+      queryClient.invalidateQueries({ queryKey: ['buyers', shop?.shopId] });
+      queryClient.invalidateQueries({ queryKey: ['transactions', shop?.shopId] });
+      goBack();
+    },
+    onError: (err: Error) => Alert.alert('Delete Error', err.message),
+  });
+
+  const handleDeleteBill = () => {
+    Alert.alert(
+      'Delete Bill?',
+      `Slip #${inquiry?.slipNumber} will be permanently deleted. This cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => deleteBillMutation.mutate() },
+      ]
+    );
   };
 
   if (!inquiry || !shop) {
@@ -699,6 +726,28 @@ export default function SlipPreviewScreen() {
               subtitle="रसीद प्रिंट करें"
               disabled={printing}
               onPress={handlePrint}
+            />
+          ) : null}
+
+          {showAdminSlipActions ? (
+            <SlipActionButton
+              testID="edit-bill"
+              icon={<Pencil size={22} color={printing ? '#6B7280' : '#1D4ED8'} />}
+              title="Edit Bill"
+              subtitle="बिल संपादित करें"
+              disabled={printing || deleteBillMutation.isPending}
+              onPress={() => router.push(`/bills/edit/${id}` as any)}
+            />
+          ) : null}
+
+          {showAdminSlipActions ? (
+            <SlipActionButton
+              testID="delete-bill"
+              icon={<Trash2 size={22} color={printing || deleteBillMutation.isPending ? '#6B7280' : '#DC2626'} />}
+              title={deleteBillMutation.isPending ? 'Deleting...' : 'Delete Bill'}
+              subtitle="बिल हटाएं"
+              disabled={printing || deleteBillMutation.isPending}
+              onPress={handleDeleteBill}
             />
           ) : null}
         </View>

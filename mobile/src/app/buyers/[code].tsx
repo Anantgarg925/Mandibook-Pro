@@ -52,6 +52,14 @@ export default function BuyerLedgerScreen() {
   const editPhoneRef = useRef<TextInput>(null);
   const editNotesRef = useRef<TextInput>(null);
 
+  // Transaction edit state
+  const [txEditVisible, setTxEditVisible] = useState(false);
+  const [txEditId, setTxEditId] = useState<string | null>(null);
+  const [txEditAmount, setTxEditAmount] = useState('');
+  const [txEditMethod, setTxEditMethod] = useState<PaymentMethod>('CASH');
+  const [txEditNote, setTxEditNote] = useState('');
+  const [txEditOriginalAmount, setTxEditOriginalAmount] = useState(0);
+
   const enrichedTransactions = useMemo(
     () => computeRunningBalances(transactions),
     [transactions],
@@ -98,6 +106,81 @@ export default function BuyerLedgerScreen() {
     },
     onError: (err) => Alert.alert('Error', (err as Error).message),
   });
+
+  const deleteTransactionMutation = useMutation({
+    mutationFn: async (tx: EnrichedTransaction) => {
+      if (!shop?.shopId || !buyer) throw new Error('Missing data');
+      // Reverse balance effect: payment was CR, so removing it increases outstanding
+      const { data: buyerRow, error: fetchErr } = await supabase
+        .from('buyers')
+        .select('outstanding_balance, id')
+        .eq('shop_id', shop.shopId)
+        .eq('code', buyer.code)
+        .single();
+      if (fetchErr) throw new Error(fetchErr.message);
+      await supabase.from('buyers').update({
+        outstanding_balance: Number(buyerRow.outstanding_balance) + tx.amount,
+      }).eq('id', buyerRow.id);
+      const { error } = await supabase.from('transactions').delete().eq('id', tx.id);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions', shop?.shopId, code] });
+      queryClient.invalidateQueries({ queryKey: ['buyers', shop?.shopId] });
+    },
+    onError: (err) => Alert.alert('Error', (err as Error).message),
+  });
+
+  const editTransactionMutation = useMutation({
+    mutationFn: async () => {
+      if (!shop?.shopId || !buyer || !txEditId) throw new Error('Missing data');
+      const newAmount = parseFloat(txEditAmount);
+      if (!newAmount || newAmount <= 0) throw new Error('Enter a valid amount');
+      const delta = txEditOriginalAmount - newAmount; // positive = outstanding goes up
+      const { data: buyerRow, error: fetchErr } = await supabase
+        .from('buyers')
+        .select('outstanding_balance, id')
+        .eq('shop_id', shop.shopId)
+        .eq('code', buyer.code)
+        .single();
+      if (fetchErr) throw new Error(fetchErr.message);
+      await supabase.from('buyers').update({
+        outstanding_balance: Number(buyerRow.outstanding_balance) + delta,
+      }).eq('id', buyerRow.id);
+      const { error } = await supabase.from('transactions').update({
+        amount: newAmount,
+        payment_method: txEditMethod,
+        note: txEditNote.trim() || null,
+      }).eq('id', txEditId);
+      if (error) throw new Error(error.message);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['transactions', shop?.shopId, code] });
+      queryClient.invalidateQueries({ queryKey: ['buyers', shop?.shopId] });
+      setTxEditVisible(false);
+    },
+    onError: (err) => Alert.alert('Error', (err as Error).message),
+  });
+
+  const openTxEdit = (tx: EnrichedTransaction) => {
+    setTxEditId(tx.id);
+    setTxEditAmount(String(tx.amount));
+    setTxEditMethod((tx.paymentMethod as PaymentMethod) ?? 'CASH');
+    setTxEditNote(tx.note ?? '');
+    setTxEditOriginalAmount(tx.amount);
+    setTxEditVisible(true);
+  };
+
+  const handleDeleteTransaction = (tx: EnrichedTransaction) => {
+    Alert.alert(
+      'Delete Payment?',
+      `Delete payment of ${tx.amount.toLocaleString('en-IN')}? This will increase the outstanding balance.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => deleteTransactionMutation.mutate(tx) },
+      ]
+    );
+  };
 
   const openEditModal = () => {
     if (!buyer) return;
@@ -673,6 +756,7 @@ export default function BuyerLedgerScreen() {
         }
         renderItem={({ item }: { item: EnrichedTransaction }) => {
           const isSale = item.type === 'SALE';
+          const isPayment = item.type === 'PAYMENT';
           const borderColor = isSale ? Colors.danger : Colors.success;
           const amountColor = isSale ? Colors.danger : Colors.success;
 
@@ -682,13 +766,15 @@ export default function BuyerLedgerScreen() {
           if (isSale) {
             description = `Sale #${item.slipNumber ?? ''}`;
             if (item.note) description += ` — ${item.note}`;
-          } else {
+          } else if (isPayment) {
             description = `Payment — ${item.paymentMethod ?? 'Cash'}`;
             if (item.upiRef) {
               secondLine = `Ref: ${item.upiRef}`;
             } else if (item.note) {
               secondLine = item.note;
             }
+          } else {
+            description = item.note ?? 'Opening Balance';
           }
 
           return (
@@ -717,14 +803,43 @@ export default function BuyerLedgerScreen() {
                 </Text>
               ) : null}
 
-              {/* Bottom line: DR/CR + BAL */}
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: Spacing.sm }}>
+              {/* Bottom line: DR/CR + BAL + action buttons */}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: Spacing.sm }}>
                 <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: amountColor }}>
                   {isSale ? 'DR' : 'CR'} {toIndianCurrency(item.amount)}
                 </Text>
-                <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.textSecond }}>
-                  BAL {toIndianCurrency(item.balanceAfter)}
-                </Text>
+                <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                  <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.textSecond }}>
+                    BAL {toIndianCurrency(item.balanceAfter)}
+                  </Text>
+                  {isSale && item.slipNumber ? (
+                    <Pressable
+                      testID={`view-bill-${item.id}`}
+                      onPress={() => router.push(`/slip/${item.id}` as any)}
+                      style={{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 8 }}
+                    >
+                      <Eye size={15} color={Colors.primary} />
+                    </Pressable>
+                  ) : null}
+                  {isPayment ? (
+                    <>
+                      <Pressable
+                        testID={`edit-tx-${item.id}`}
+                        onPress={() => openTxEdit(item)}
+                        style={{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 8 }}
+                      >
+                        <Pencil size={15} color={Colors.primary} />
+                      </Pressable>
+                      <Pressable
+                        testID={`delete-tx-${item.id}`}
+                        onPress={() => handleDeleteTransaction(item)}
+                        style={{ padding: 6, backgroundColor: '#FEE2E2', borderRadius: 8 }}
+                      >
+                        <Trash2 size={15} color={Colors.danger} />
+                      </Pressable>
+                    </>
+                  ) : null}
+                </View>
               </View>
             </View>
           );
@@ -1072,6 +1187,77 @@ export default function BuyerLedgerScreen() {
                 </Text>
               </Pressable>
             </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Edit Transaction Modal */}
+      <Modal visible={txEditVisible} transparent animationType="slide" onRequestClose={() => setTxEditVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <Pressable style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.35)' }} onPress={() => setTxEditVisible(false)} />
+          <View
+            style={{
+              position: 'absolute', left: 0, right: 0, bottom: 0,
+              backgroundColor: '#FFFFFF',
+              borderTopLeftRadius: 20, borderTopRightRadius: 20,
+              padding: 20, paddingBottom: 20 + insets.bottom,
+            }}
+          >
+            <Text style={{ fontSize: 18, fontWeight: '800', color: '#071e27', marginBottom: 14 }}>
+              Edit Payment
+            </Text>
+
+            <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: Colors.textSecond, marginBottom: 6 }}>AMOUNT (₹)</Text>
+            <TextInput
+              value={txEditAmount}
+              onChangeText={setTxEditAmount}
+              keyboardType="numeric"
+              placeholder="0"
+              placeholderTextColor="#94A3B8"
+              style={modalInputStyle}
+            />
+
+            <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: Colors.textSecond, marginBottom: 6 }}>METHOD</Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: Spacing.sm }}>
+              {(['CASH', 'UPI', 'CHEQUE'] as PaymentMethod[]).map(m => (
+                <Pressable
+                  key={m}
+                  onPress={() => setTxEditMethod(m)}
+                  style={{
+                    flex: 1, height: 40, borderRadius: Radius.sm,
+                    alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: txEditMethod === m ? Colors.info : Colors.background,
+                    borderWidth: 1, borderColor: txEditMethod === m ? Colors.info : Colors.border,
+                  }}
+                >
+                  <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: txEditMethod === m ? '#FFF' : Colors.textSecond }}>{m}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: Colors.textSecond, marginBottom: 6 }}>NOTE (optional)</Text>
+            <TextInput
+              value={txEditNote}
+              onChangeText={setTxEditNote}
+              placeholder="Any remark..."
+              placeholderTextColor="#94A3B8"
+              returnKeyType="done"
+              style={modalInputStyle}
+            />
+
+            <Pressable
+              onPress={() => editTransactionMutation.mutate()}
+              disabled={editTransactionMutation.isPending}
+              style={{
+                height: 52, borderRadius: 8,
+                backgroundColor: editTransactionMutation.isPending ? '#C8E6C9' : '#1b5e20',
+                alignItems: 'center', justifyContent: 'center', marginTop: 4,
+              }}
+            >
+              <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '800' }}>
+                {editTransactionMutation.isPending ? 'Saving...' : 'Save Changes'}
+              </Text>
+            </Pressable>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
