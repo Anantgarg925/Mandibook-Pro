@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import {
   View, Text, TextInput, Pressable, FlatList, Alert,
-  ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView
+  ActivityIndicator, Platform, ScrollView
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, UserPlus, Trash2, Edit2, Info, User, Eye, EyeOff } from 'lucide-react-native';
@@ -141,7 +142,7 @@ export default function TeamScreen() {
   if (isAdding) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#F8FAF9' }} edges={['top', 'bottom']}>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <>
           <View style={{
             flexDirection: 'row', alignItems: 'center', padding: Spacing.md,
             backgroundColor: Colors.primary, borderBottomWidth: 0
@@ -157,7 +158,14 @@ export default function TeamScreen() {
             </View>
           </View>
 
-          <ScrollView contentContainerStyle={{ padding: Spacing.md, gap: Spacing.md }}>
+          <KeyboardAwareScrollView
+            contentContainerStyle={{ padding: Spacing.md, gap: Spacing.md, paddingBottom: 112 }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            bottomOffset={112}
+            extraKeyboardSpace={16}
+            disableScrollOnKeyboardHide
+          >
             <View style={{ alignItems: 'center', marginVertical: Spacing.md }}>
               <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: '#E8F5E9', alignItems: 'center', justifyContent: 'center' }}>
                 <User size={36} color="#1A5C1F" />
@@ -253,10 +261,9 @@ export default function TeamScreen() {
               </View>
 
             </View>
-            <View style={{ height: 100 }} />
-          </ScrollView>
+          </KeyboardAwareScrollView>
 
-          <View style={{ padding: Spacing.md, backgroundColor: '#F8FAF9' }}>
+          <View style={{ padding: Spacing.md, backgroundColor: '#F8FAF9', borderTopWidth: 1, borderTopColor: '#EAEAEC' }}>
             <Pressable
               onPress={saveMember}
               disabled={saving}
@@ -272,7 +279,7 @@ export default function TeamScreen() {
               )}
             </Pressable>
           </View>
-        </KeyboardAvoidingView>
+        </>
       </SafeAreaView>
     );
   }

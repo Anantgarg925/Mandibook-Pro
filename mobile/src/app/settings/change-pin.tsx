@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, Pressable, Alert, ActivityIndicator } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
@@ -116,7 +117,13 @@ export default function ChangePinScreen() {
         </Text>
       </View>
 
-      <View style={{ padding: Spacing.md }}>
+      <KeyboardAwareScrollView
+        contentContainerStyle={{ padding: Spacing.md, paddingBottom: 112 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        extraKeyboardSpace={16}
+        disableScrollOnKeyboardHide
+      >
         <PinInput
           testID="current-pin"
           label="CURRENT PIN"
@@ -142,6 +149,7 @@ export default function ChangePinScreen() {
             alignItems: 'center',
             justifyContent: 'center',
             marginHorizontal: Spacing.md,
+            marginTop: Spacing.md,
           })}
         >
           {saving ? (
@@ -152,7 +160,7 @@ export default function ChangePinScreen() {
             </Text>
           )}
         </Pressable>
-      </View>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

@@ -351,7 +351,7 @@ export default function TruckDetailScreen() {
     .filter((bill) => bill.status === 'CONFIRMED')
     .reduce((s, bill) => s + bill.totalWeight, 0);
   const totalProvisional = billRows
-    .filter((bill) => bill.status === 'PENDING')
+    .filter((bill) => bill.status !== 'CONFIRMED')
     .reduce((s, bill) => s + bill.totalWeight, 0);
   const totalKg = truck.totalKg;
   const isActive = truck.status === 'ACTIVE';
@@ -364,20 +364,41 @@ export default function TruckDetailScreen() {
   const availableKg = Math.max(0, totalKg - totalConfirmed - totalProvisional - wastageTotal);
   const wastagePct = totalKg > 0 ? Math.min(wastageTotal / totalKg, 1 - confirmedPct - provisionalPct) : 0;
   const availablePct = totalKg > 0 ? Math.max(0, 1 - confirmedPct - provisionalPct - wastagePct) : 0;
-  const gradeRows = (shop?.grades ?? truck.gradeInventory).map((grade) => {
-    const rows = billRows.filter((bill) => bill.grade === grade.code);
-    return {
-      code: grade.code,
-      name: grade.name,
-      sacks: rows.reduce((s, bill) => s + bill.sacks, 0),
-      confirmedKg: rows
-        .filter((bill) => bill.status === 'CONFIRMED')
-        .reduce((s, bill) => s + bill.totalWeight, 0),
-      provisionalKg: rows
-        .filter((bill) => bill.status === 'PENDING')
-        .reduce((s, bill) => s + bill.totalWeight, 0),
-    };
-  }).filter((row) => row.sacks > 0 || row.confirmedKg > 0 || row.provisionalKg > 0);
+  const gradeMap = new Map<string, { code: string; name: string; sacks: number; confirmedKg: number; provisionalKg: number }>();
+  
+  // Initialize map with shop grades or truck inventory grades
+  (shop?.grades ?? truck.gradeInventory).forEach(g => {
+    gradeMap.set(g.code, { code: g.code, name: g.name, sacks: 0, confirmedKg: 0, provisionalKg: 0 });
+  });
+
+  // Aggregate bill data
+  billRows.forEach(bill => {
+    const entries = (bill.chargeSnapshot as any)?.entries;
+    const itemsToProcess = (entries && entries.length > 0) ? entries : [bill];
+
+    itemsToProcess.forEach((item: any) => {
+      // Use grade code directly or fallback to bill grade
+      const gradeCode = item.grade || bill.grade;
+      const weight = item.totalWeight || 0;
+      const sacks = item.sacks || 0;
+      
+      if (!gradeMap.has(gradeCode)) {
+        gradeMap.set(gradeCode, { code: gradeCode, name: item.gradeName || bill.gradeName || gradeCode, sacks: 0, confirmedKg: 0, provisionalKg: 0 });
+      }
+      
+      const g = gradeMap.get(gradeCode)!;
+      g.sacks += sacks;
+      
+      if (bill.status === 'CONFIRMED') {
+        g.confirmedKg += weight;
+      } else {
+        // PENDING, DELIVERED, UDHAARI etc (CANCELLED is already filtered out)
+        g.provisionalKg += weight;
+      }
+    });
+  });
+
+  const gradeRows = Array.from(gradeMap.values()).filter((row) => row.sacks > 0 || row.confirmedKg > 0 || row.provisionalKg > 0);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#f3faff' }} edges={['top', 'left', 'right']}>

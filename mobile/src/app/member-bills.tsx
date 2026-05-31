@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, FlatList, Pressable, ActivityIndicator, ScrollView, TextInput } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ChevronDown, ChevronRight, Plus, Menu, Search, TrendingUp, ClipboardList, Clock, FileText } from 'lucide-react-native';
+import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { ChevronDown, ChevronRight, Plus, Search, TrendingUp, ClipboardList, Clock, FileText, User } from 'lucide-react-native';
 import PagerView from '@/components/common/PagerView';
 import { useInquiries } from '@/hooks/useInquiries';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
@@ -12,7 +12,7 @@ import { useResponsive } from '@/hooks/useResponsive';
 import { DraggableFAB } from '@/components/common/DraggableFAB';
 
 import { useShop } from '@/context/ShopContext';
-type FilterTab = 'ALL' | 'PENDING' | 'CONFIRMED' | 'UDHAARI' | 'GRADE';
+type FilterTab = 'ALL' | 'DELIVERED' | 'PENDING';
 
 const BG = '#F3FAFF';
 const GREEN = '#00450D';
@@ -105,14 +105,14 @@ export default function BillsScreen() {
   const [query, setQuery] = useState('');
   const [expandedGrades, setExpandedGrades] = useState<Record<string, boolean>>({});
   const pagerRef = React.useRef<PagerView>(null);
-  const FILTER_TABS: FilterTab[] = ['ALL', 'PENDING', 'CONFIRMED', 'UDHAARI', 'GRADE'];
+  const FILTER_TABS: FilterTab[] = ['ALL', 'DELIVERED', 'PENDING'];
   const filterIndex = (tab: FilterTab) => {
     const index = FILTER_TABS.indexOf(tab);
     return index >= 0 ? index : 0;
   };
 
   useEffect(() => {
-    if (filter === 'PENDING' || filter === 'CONFIRMED' || filter === 'UDHAARI' || filter === 'ALL') {
+    if (filter === 'PENDING' || filter === 'DELIVERED' || filter === 'ALL') {
       setActiveFilter(filter);
       requestAnimationFrame(() => {
         pagerRef.current?.setPage(filterIndex(filter));
@@ -134,10 +134,8 @@ export default function BillsScreen() {
 
   const filteredBills =
     activeFilter === 'ALL' ? searchedBills
-      : activeFilter === 'PENDING' ? searchedBills.filter(b => b.status === 'PENDING' || b.status === 'DELIVERED')
-        : activeFilter === 'CONFIRMED' ? searchedBills.filter(b => b.status === 'CONFIRMED')
-          : activeFilter === 'GRADE' ? searchedBills
-            : searchedBills.filter(b => b.paymentMode === 'UDHAARI');
+      : activeFilter === 'DELIVERED' ? searchedBills.filter(b => b.status === 'DELIVERED')
+        : searchedBills.filter(b => b.status === 'PENDING');
 
   const gradeGroups = Object.values(
     filteredBills.reduce<Record<string, { grade: string; totalQty: number; totalAmount: number; rows: any[] }>>((acc, bill) => {
@@ -175,14 +173,6 @@ export default function BillsScreen() {
   );
 
   const openBillById = useCallback((id: string, status: string) => {
-    if (status === 'CONFIRMED') {
-      router.push(`/slip/${id}` as any);
-      return;
-    }
-    if (status === 'PENDING') {
-      router.push({ pathname: '/authorization', params: { id } } as any);
-      return;
-    }
     router.push(`/bills/${id}` as any);
   }, [router]);
 
@@ -238,10 +228,8 @@ export default function BillsScreen() {
         }}>
           {([
             { id: 'ALL', label: 'All', count: inquiries.length },
-            { id: 'PENDING', label: 'Pending', count: pending.length },
-            { id: 'CONFIRMED', label: 'Auth\'d', count: confirmed.length },
-            { id: 'UDHAARI', label: 'Udhaari', count: udhaari.length },
-            { id: 'GRADE', label: 'Grade', count: 0 }
+            { id: 'DELIVERED', label: 'Delivered', count: inquiries.filter(i => i.status === 'DELIVERED').length },
+            { id: 'PENDING', label: 'Pending', count: inquiries.filter(i => i.status === 'PENDING').length }
           ] satisfies { id: FilterTab; label: string; count: number }[]).map((tab, index) => {
             const active = activeFilter === tab.id;
             return (
@@ -280,48 +268,14 @@ export default function BillsScreen() {
         </View>
       </View>
 
-      {/* Summary Cards */}
-      <View style={{ flexDirection: 'row', gap: isSmall ? 8 : Spacing.md, marginBottom: Spacing.lg }}>
-        <View style={{
-          flex: 1,
-          backgroundColor: '#FFFFFF',
-          borderRadius: 14,
-          padding: isSmall ? Spacing.sm : Spacing.md,
-          borderWidth: 1,
-          borderColor: BORDER,
-          minHeight: isSmall ? 102 : 122,
-          overflow: 'hidden',
-        }}>
-          <Text numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: isSmall ? FontSize.sm : FontSize.md, color: '#1F2937', marginBottom: isSmall ? Spacing.md : Spacing.lg }}>Total Sales / कुल बिक्री</Text>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={{ fontSize: isSmall ? 20 : 24, fontWeight: '800', color: GREEN }}>₹{toIndianCurrency(totalSales).replace('₹', '')}</Text>
-            <TrendingUp size={isSmall ? 20 : 22} color={GREEN} />
-          </View>
-        </View>
-
-        <View style={{
-          flex: 1,
-          backgroundColor: '#FFFFFF',
-          borderRadius: 14,
-          padding: isSmall ? Spacing.sm : Spacing.md,
-          borderWidth: 1,
-          borderColor: BORDER,
-          minHeight: isSmall ? 102 : 122,
-          overflow: 'hidden',
-        }}>
-          <Text numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: isSmall ? FontSize.sm : FontSize.md, color: '#1F2937', marginBottom: isSmall ? Spacing.md : Spacing.lg }}>Pending / शेष</Text>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Text style={{ fontSize: isSmall ? 26 : 30, fontWeight: '800', color: '#8A5A00' }}>{String(pending.length).padStart(2, '0')}</Text>
-            <ClipboardList size={isSmall ? 20 : 22} color={AMBER} />
-          </View>
-        </View>
-      </View>
       </View>
     </View>
   );
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: BG }} edges={['top', 'left', 'right']}>
+    <View style={{ flex: 1, backgroundColor: BG }}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <SafeAreaView style={{ backgroundColor: GREEN }} edges={['top']} />
       {/* Top App Bar */}
       <View style={{
         flexDirection: 'row',
@@ -333,8 +287,8 @@ export default function BillsScreen() {
         backgroundColor: GREEN,
         borderBottomWidth: 0,
       }}>
-        <Pressable hitSlop={10} onPress={() => router.push('/settings' as any)}>
-          <Menu size={24} color="#FFFFFF" />
+        <Pressable hitSlop={10} onPress={() => router.push('/member-profile' as any)}>
+          <User size={24} color="#FFFFFF" />
         </Pressable>
         <Text numberOfLines={1} adjustsFontSizeToFit style={{ flex: 1, textAlign: 'center', fontSize: isSmall ? FontSize.md : FontSize.lg, fontWeight: '800', color: '#FFFFFF' }}>
           Bills / बिल
@@ -360,79 +314,12 @@ export default function BillsScreen() {
             onPageSelected={(e) => setActiveFilter(FILTER_TABS[e.nativeEvent.position])}
           >
             {FILTER_TABS.map((tabStatus, index) => {
-              if (tabStatus === 'GRADE') {
-                return (
-                  <View key={index} style={{ flex: 1 }}>
-                    <FlatList
-                      testID="grade-wise-bills-list"
-                      data={gradeGroups}
-                      keyExtractor={(group) => group.grade}
-                      contentContainerStyle={{ paddingBottom: 100 }}
-                      showsVerticalScrollIndicator={false}
-                      renderItem={({ item }) => {
-                        const expanded = expandedGrades[item.grade] ?? false;
-                        return (
-                          <View style={{
-                            marginHorizontal: Math.max(16, contentHPad),
-                            marginBottom: Spacing.sm,
-                            backgroundColor: '#FFFFFF',
-                            borderWidth: 1,
-                            borderColor: BORDER,
-                            borderRadius: Radius.sm,
-                            padding: Spacing.sm,
-                          }}>
-                            <Pressable
-                              testID={`grade-group-${item.grade}`}
-                              onPress={() => setExpandedGrades((prev) => ({ ...prev, [item.grade]: !expanded }))}
-                              style={{ minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: Spacing.sm }}
-                            >
-                              {expanded ? <ChevronDown size={18} color="#111827" /> : <ChevronRight size={18} color="#111827" />}
-                              <View style={{ flex: 1 }}>
-                                <Text style={{ fontSize: FontSize.md, fontWeight: '900', color: '#111827' }}>{item.grade}</Text>
-                                <Text style={{ fontSize: FontSize.xs, color: '#4B5563' }}>
-                                  {item.rows.length} bills · {item.totalQty.toFixed(0)} kg
-                                </Text>
-                              </View>
-                              <Text style={{ fontSize: FontSize.sm, fontWeight: '900', color: GREEN }}>
-                                {toIndianCurrency(item.totalAmount)}
-                              </Text>
-                            </Pressable>
-                            {expanded ? (
-                              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm, marginTop: Spacing.sm }}>
-                                {item.rows.map((bill) => (
-                                  <Pressable
-                                    key={bill.id}
-                                    onPress={() => openBillById(bill.billId, bill.status)}
-                                    style={{
-                                      width: '48%',
-                                      minHeight: 72,
-                                      borderWidth: 1,
-                                      borderColor: BORDER,
-                                      borderRadius: Radius.sm,
-                                      padding: 10,
-                                      backgroundColor: '#F8FAFC'
-                                    }}
-                                  >
-                                    <Text style={{ fontSize: FontSize.xs, fontWeight: '800', color: '#111827' }}>#{bill.slipNumber} {bill.customerName || bill.paymentMode || 'Cash'}</Text>
-                                    <Text style={{ fontSize: FontSize.xs, color: '#4B5563', marginTop: 4 }}>{bill.totalWeight} kg · ₹{bill.ratePerKg}/kg</Text>
-                                    <Text style={{ fontSize: FontSize.xs, fontWeight: '900', color: GREEN, marginTop: 4 }}>{toIndianCurrency(bill.netAmount)}</Text>
-                                  </Pressable>
-                                ))}
-                              </View>
-                            ) : null}
-                          </View>
-                        );
-                      }}
-                    />
-                  </View>
-                );
-              }
+
 
               const pageBills =
                 tabStatus === 'ALL' ? searchedBills
-                  : tabStatus === 'PENDING' ? searchedBills.filter(b => b.status === 'PENDING' || b.status === 'DELIVERED')
-                    : tabStatus === 'CONFIRMED' ? searchedBills.filter(b => b.status === 'CONFIRMED')
-                      : searchedBills.filter(b => b.paymentMode === 'UDHAARI');
+                  : tabStatus === 'DELIVERED' ? searchedBills.filter(b => b.status === 'DELIVERED')
+                    : searchedBills.filter(b => b.status === 'PENDING');
 
               return (
                 <View key={index} style={{ flex: 1 }}>
@@ -483,6 +370,6 @@ export default function BillsScreen() {
           </View>
         </View>
       </DraggableFAB>
-    </SafeAreaView>
+    </View>
   );
 }

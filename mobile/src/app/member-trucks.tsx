@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { View, Text, FlatList, Pressable, StyleSheet, ActivityIndicator, BackHandler } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -22,6 +22,12 @@ export default function MemberTrucksScreen() {
     }
   };
 
+  const handlePress = useCallback((truck: any) => router.push(`/trucks/${truck.id}` as any), [router]);
+
+  const renderItem = useCallback(({ item }: { item: any }) => (
+    <TruckCard truck={item} onPress={() => handlePress(item)} />
+  ), [handlePress]);
+
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       goBack();
@@ -31,14 +37,37 @@ export default function MemberTrucksScreen() {
   }, [router]);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top']}>
-      <View style={styles.header}>
-        <Pressable onPress={goBack} style={styles.headerIcon}>
-          <MaterialIcons name="arrow-back" size={24} color={Colors.primary} />
-        </Pressable>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.headerTitle}>Today's Trucks</Text>
-          <Text style={styles.headerSub}>आज की गाड़ियाँ</Text>
+    <View style={styles.safe}>
+      <SafeAreaView style={{ backgroundColor: '#00450D' }} edges={['top']} />
+      <View style={{
+        backgroundColor: '#00450D',
+        paddingHorizontal: Math.max(16, Spacing.md),
+        paddingVertical: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{
+            width: 48,
+            height: 48,
+            borderRadius: 24,
+            backgroundColor: '#FFFFFF',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: '#00450D' }}>
+              M
+            </Text>
+          </View>
+          <View>
+            <Text style={{ fontSize: 20, fontWeight: '800', color: '#FFFFFF' }}>
+              Trucks Directory
+            </Text>
+            <Text style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.8)', fontWeight: '700', marginTop: 2 }}>
+              ट्रक निर्देशिका
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -49,7 +78,7 @@ export default function MemberTrucksScreen() {
           testID="member-truck-list"
           data={trucks}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => <TruckCard truck={item} onPress={() => router.push(`/trucks/${item.id}` as any)} />}
+          renderItem={renderItem}
           contentContainerStyle={{ paddingTop: Spacing.md, paddingBottom: 100 }}
           ListEmptyComponent={
             <View style={styles.empty}>
@@ -85,7 +114,7 @@ export default function MemberTrucksScreen() {
           </View>
         </View>
       </DraggableFAB>
-    </SafeAreaView>
+    </View>
   );
 }
 

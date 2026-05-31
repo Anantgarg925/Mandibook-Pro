@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, TextInput, Pressable,
-  KeyboardAvoidingView, Platform, Alert, ActivityIndicator,
+  KeyboardAvoidingView, Platform, Alert, ActivityIndicator, Switch, Modal,
 } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,6 +12,7 @@ import { supabase, mapInquiry } from '@/lib/supabase';
 import { useShop } from '@/context/ShopContext';
 import { useDateTrucks } from '@/hooks/useDateTrucks';
 import { calculateCharges } from '@/utils/calculations';
+import PaymentSelector from '@/components/bills/PaymentSelector';
 import GradeSelector from '@/components/bills/GradeSelector';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { toIndianCurrency, toIndianWeight } from '@/lib/formatters';
@@ -69,7 +70,18 @@ export default function EditBillScreen() {
     enabled: !!shop?.shopId && !!id,
   });
 
+  
   // Form state
+  const [boughtFromAgent, setBoughtFromAgent] = useState(false);
+  const [selectedTruckId, setSelectedTruckId] = useState<string | null>(null);
+  const [sourceAgentName, setSourceAgentName] = useState('');
+  const [sourceAgentPhone, setSourceAgentPhone] = useState('');
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('CASH');
+  const [upiRef, setUpiRef] = useState('');
+  const [applyApmc, setApplyApmc] = useState(true);
+  const [applyBardana, setApplyBardana] = useState(true);
+  const [manualTotal, setManualTotal] = useState('');
+  const [truckPickerVisible, setTruckPickerVisible] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [grade, setGrade] = useState<string | null>(null);
@@ -103,12 +115,28 @@ export default function EditBillScreen() {
   // Pre-populate once
   useEffect(() => {
     if (inquiry && !initialized) {
+      
       setCustomerName(inquiry.customerName);
       setCustomerPhone(inquiry.customerPhone);
       setGrade(inquiry.grade);
       setSacks(String(inquiry.sacks));
       setWeightPerSack(String(inquiry.weightPerSack));
       setRate(inquiry.ratePerKg > 0 ? String(inquiry.ratePerKg) : '');
+
+      setBoughtFromAgent(!inquiry.truckId);
+      setSelectedTruckId(inquiry.truckId);
+      setSourceAgentName(inquiry.truckId ? '' : (inquiry.sourceAgentName || ''));
+      setSourceAgentPhone(inquiry.truckId ? '' : (inquiry.sourceAgentPhone || ''));
+      setPaymentMode((inquiry.paymentMode as PaymentMode) ?? 'CASH');
+      setUpiRef(inquiry.upiRef ?? '');
+      setApplyApmc(inquiry.applyApmc ?? true);
+      setApplyBardana(inquiry.applyBardana ?? false);
+      
+      const calcNet = inquiry.grossAmount + inquiry.apmcAmount + inquiry.bardanaAmount + inquiry.cartageAmount;
+      if (Math.abs(inquiry.netAmount - calcNet) > 0.1) {
+        setManualTotal(String(inquiry.netAmount));
+      }
+
       setInitialized(true);
     }
   }, [inquiry, initialized]);
@@ -164,7 +192,12 @@ export default function EditBillScreen() {
       if (!shop?.shopId || !calc || !inquiry) throw new Error('Missing data');
       const { error } = await supabase
         .from('inquiries')
+        
         .update({
+          truck_id: boughtFromAgent ? null : selectedTruckId,
+          truck_number: boughtFromAgent ? 'Agent Stock' : (trucks.find(t => t.id === selectedTruckId)?.truckNumber ?? inquiry.truckNumber),
+          source_agent_name: boughtFromAgent ? sourceAgentName.trim() : '',
+          source_agent_phone: boughtFromAgent ? sourceAgentPhone.trim() : '',
           customer_name: customerName.trim(),
           customer_phone: customerPhone.trim(),
           grade,
@@ -177,8 +210,14 @@ export default function EditBillScreen() {
           apmc_amount: calc.apmc,
           bardana_amount: calc.bardana,
           cartage_amount: calc.cartage,
-          net_amount: calc.net,
+          net_amount: manualTotal ? (parseFloat(manualTotal) || calc.net) : calc.net,
+          payment_mode: paymentMode,
+          upi_ref: upiRef,
+          apply_apmc: applyApmc,
+          apply_bardana: applyBardana,
+          charge_snapshot: inquiry.chargeSnapshot,
         })
+
         .eq('id', inquiry.id);
       if (error) throw new Error(error.message);
     },
@@ -209,7 +248,64 @@ export default function EditBillScreen() {
         <Stack.Screen options={{ headerShown: false }} />
         <SafeAreaView style={{ flex: 1, backgroundColor: '#f3faff', alignItems: 'center', justifyContent: 'center' }} edges={['top', 'bottom']}>
           <ActivityIndicator color={Colors.primary} size="large" />
-        </SafeAreaView>
+        
+      {/* Truck Picker Modal */}
+      <Modal
+        visible={truckPickerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setTruckPickerVisible(false)}
+      >
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={{ flex: 1 }}>
+          <Pressable
+            style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' }}
+            onPress={() => setTruckPickerVisible(false)}
+          >
+            <View
+              style={{
+                backgroundColor: Colors.surface,
+                borderTopLeftRadius: Radius.lg,
+                borderTopRightRadius: Radius.lg,
+                maxHeight: '80%',
+              }}
+              onStartShouldSetResponder={() => true}
+            >
+              <View style={{ padding: Spacing.lg, borderBottomWidth: 1, borderBottomColor: Colors.border }}>
+                <Text style={{ fontSize: FontSize.lg, fontWeight: '700', color: Colors.text, marginBottom: Spacing.md }}>
+                  गाड़ी चुनें / Select Truck
+                </Text>
+              </View>
+              <View style={{ maxHeight: 400 }}>
+                {trucks.map(truck => (
+                  <Pressable
+                    key={truck.id}
+                    onPress={() => {
+                      setSelectedTruckId(truck.id);
+                      setGrade(null);
+                      setTruckPickerVisible(false);
+                    }}
+                    style={{
+                      paddingVertical: Spacing.md,
+                      paddingHorizontal: Spacing.md,
+                      borderBottomWidth: 1,
+                      borderBottomColor: Colors.border,
+                    }}
+                  >
+                    <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: Colors.text }}>
+                      {truck.truckNumber}
+                    </Text>
+                    <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond }}>
+                      {truck.senderName}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
+    </SafeAreaView>
+
       </>
     );
   }
@@ -283,7 +379,54 @@ export default function EditBillScreen() {
           extraKeyboardSpace={16}
           disableScrollOnKeyboardHide
         >
+          
+          {/* Source Section */}
+          <View onLayout={rememberSection('source')}>
+            <SectionHeader title="गाड़ी / Source" />
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.sm }}>
+            <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>Bought from agent?</Text>
+            <Switch
+              value={boughtFromAgent}
+              onValueChange={(v) => {
+                setBoughtFromAgent(v);
+                setSelectedTruckId(null);
+                setGrade(null);
+                if (!v) { setSourceAgentName(''); setSourceAgentPhone(''); }
+              }}
+            />
+          </View>
+          {boughtFromAgent ? (
+            <View style={{ gap: Spacing.sm, marginBottom: Spacing.sm }}>
+              <TextInput
+                style={inputStyle}
+                placeholder="Agent name *"
+                placeholderTextColor={Colors.textSecond}
+                value={sourceAgentName}
+                onChangeText={setSourceAgentName}
+              />
+              <TextInput
+                style={inputStyle}
+                placeholder="Agent phone (optional)"
+                placeholderTextColor={Colors.textSecond}
+                value={sourceAgentPhone}
+                onChangeText={setSourceAgentPhone}
+                keyboardType="phone-pad"
+              />
+            </View>
+          ) : (
+            <Pressable 
+              onPress={() => setTruckPickerVisible(true)} 
+              style={[inputStyle, { justifyContent: 'center', marginBottom: Spacing.sm }]}
+            >
+              <Text style={{ color: selectedTruckId ? Colors.text : Colors.textSecond, fontSize: FontSize.md }}>
+                {trucks.find(t => t.id === selectedTruckId)?.truckNumber || (selectedTruckId === inquiry?.truckId ? inquiry?.truckNumber : 'Select Truck / गाड़ी चुनें')}
+              </Text>
+            </Pressable>
+          )}
+
           {/* Customer Section */}
+
           <View onLayout={rememberSection('customer')}>
             <SectionHeader title="ग्राहक / Customer (Optional)" />
           </View>
@@ -337,7 +480,7 @@ export default function EditBillScreen() {
           <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginBottom: 4 }}>
-                बोरे / Sacks
+                बोरे / Qty
               </Text>
               <TextInput
                 testID="edit-sacks"
@@ -353,7 +496,7 @@ export default function EditBillScreen() {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginBottom: 4 }}>
-                वजन/बोरा / Wt/Sack (kg)
+                वजन/बोरा / Weight/kg
               </Text>
               <TextInput
                 testID="edit-weight"
@@ -402,7 +545,31 @@ export default function EditBillScreen() {
             </View>
           </View>
 
+          
+          {/* Bill Settings (Payment, APMC, Bardana) */}
+          <View onLayout={rememberSection('settings')}>
+            <SectionHeader title="बिल सेटिंग्स / Bill Settings" />
+          </View>
+          
+          <View style={{ backgroundColor: '#FFF', borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, padding: Spacing.md }}>
+            <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: Colors.textSecond, marginBottom: 8 }}>PAYMENT MODE</Text>
+            <PaymentSelector selected={paymentMode} onSelect={setPaymentMode} upiRef={upiRef} onUpiRefChange={setUpiRef} />
+            
+            <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: Spacing.md }} />
+            
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.md }}>
+              <Text style={{ fontSize: 15, color: '#111827', fontWeight: '700' }}>Apply APMC Charges</Text>
+              <Switch value={applyApmc} onValueChange={setApplyApmc} />
+            </View>
+            
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 15, color: '#111827', fontWeight: '700' }}>Apply Bardana Charges</Text>
+              <Switch value={applyBardana} onValueChange={setApplyBardana} />
+            </View>
+          </View>
+
           {/* Calculation Preview */}
+
           {calc ? (
             <View
               style={{
@@ -425,8 +592,23 @@ export default function EditBillScreen() {
               {calc.bardana > 0 ? <CalcRow label="Bardana" value={`+${toIndianCurrency(calc.bardana)}`} color={Colors.text} /> : null}
               {calc.cartage > 0 ? <CalcRow label="Cartage" value={`+${toIndianCurrency(calc.cartage)}`} color={Colors.text} /> : null}
               <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: Spacing.xs }} />
-              <CalcRow label="Net Amount" value={toIndianCurrency(calc.net)} bold />
+              
+              <CalcRow label="Calculated Net Amount" value={toIndianCurrency(calc.net)} bold />
+              
+              <View style={{ marginTop: Spacing.sm }}>
+                <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginBottom: 4 }}>
+                  Manual Override Total (Optional)
+                </Text>
+                <TextInput
+                  style={inputStyle}
+                  placeholder="Override Total (₹)"
+                  keyboardType="decimal-pad"
+                  value={manualTotal}
+                  onChangeText={(v) => setManualTotal(v.replace(/[^0-9.]/g, ''))}
+                />
+              </View>
             </View>
+
           ) : null}
         </KeyboardAwareScrollView>
 
@@ -491,3 +673,5 @@ function CalcRow({ label, value, color, bold }: { label: string; value: string; 
     </View>
   );
 }
+
+import type { PaymentMode } from '@/types/inquiry';

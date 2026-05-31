@@ -353,19 +353,28 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
           alignItems: 'center',
           justifyContent: 'space-between',
         }}>
-          {/* Left: title block */}
-          <View style={{ flex: 1, marginRight: 12 }}>
-            <Text style={{
-              fontSize: 26,
-              fontWeight: '700',
-              color: '#ffffff',
-              letterSpacing: -0.5,
+          {/* Left: avatar + firm info */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
+            <View style={{
+              width: 48,
+              height: 48,
+              borderRadius: 24,
+              backgroundColor: '#FFFFFF',
+              alignItems: 'center',
+              justifyContent: 'center',
             }}>
-              Day Report / आज की रिपोर्ट
-            </Text>
-            <Text style={{ fontSize: 12, color: '#DFF4FF', marginTop: 2 }}>
-              Daily Business Summary
-            </Text>
+              <Text style={{ fontSize: 18, fontWeight: '800', color: '#00450d' }}>
+                {shop?.firmName ? shop.firmName.charAt(0).toUpperCase() : 'M'}
+              </Text>
+            </View>
+            <View style={{ flex: 1, marginRight: 12 }}>
+              <Text style={{ fontSize: 20, fontWeight: '800', color: '#ffffff' }}>
+                Day Report
+              </Text>
+              <Text style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.8)', fontWeight: '700', marginTop: 2 }}>
+                आज की रिपोर्ट
+              </Text>
+            </View>
           </View>
 
           {/* Right: date pill */}

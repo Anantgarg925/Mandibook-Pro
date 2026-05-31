@@ -17,6 +17,7 @@ import {
 import { useShop } from '@/context/ShopContext';
 import { Colors, FontSize, Radius, Spacing } from '@/lib/theme';
 import { APP_SESSION_KEY, MEMBER_SESSION_KEY } from '@/lib/session';
+import { useLaunch } from '@/context/LaunchContext';
 import { resetToRoute } from '@/utils/navigation';
 
 type MemberSession = {
@@ -29,6 +30,7 @@ type MemberSession = {
 export default function MemberProfileScreen() {
   const router = useRouter();
   const { shop } = useShop();
+  const { setLaunchComplete } = useLaunch();
   const [member, setMember] = useState<MemberSession | null>(null);
   const goBack = () => {
     if (router.canGoBack()) {
@@ -57,7 +59,8 @@ export default function MemberProfileScreen() {
   const logout = async () => {
     await AsyncStorage.removeItem(APP_SESSION_KEY);
     await AsyncStorage.removeItem(MEMBER_SESSION_KEY);
-    resetToRoute(router, '/member-login');
+    setLaunchComplete(false);
+    resetToRoute(router, { pathname: '/', params: { access: 'choose' } } as any);
   };
 
   const displayName = member?.name || 'Member';
@@ -65,13 +68,39 @@ export default function MemberProfileScreen() {
   const phone = member?.phone || shop?.phone1 || '';
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
-      <View style={styles.header}>
-        <Pressable onPress={goBack} style={styles.headerIcon}>
-          <MaterialIcons name="arrow-back" size={24} color={Colors.primary} />
-        </Pressable>
-        <Text style={styles.headerTitle}>My Profile / मेरी प्रोफाइल</Text>
-        <Bell size={22} color={Colors.text} />
+    <View style={styles.safe}>
+      <SafeAreaView style={{ backgroundColor: '#00450D' }} edges={['top']} />
+      <View style={{
+        backgroundColor: '#00450D',
+        paddingHorizontal: Math.max(16, Spacing.md),
+        paddingVertical: 14,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+      }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <View style={{
+            width: 48,
+            height: 48,
+            borderRadius: 24,
+            backgroundColor: '#FFFFFF',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: '#00450D' }}>
+              {member?.name ? member.name.charAt(0).toUpperCase() : 'M'}
+            </Text>
+          </View>
+          <View>
+            <Text style={{ fontSize: 20, fontWeight: '800', color: '#FFFFFF' }}>
+              My Profile
+            </Text>
+            <Text style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.8)', fontWeight: '700', marginTop: 2 }}>
+              मेरी प्रोफाइल
+            </Text>
+          </View>
+        </View>
+        <Bell size={24} color="#FFFFFF" />
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }} showsVerticalScrollIndicator={false}>
@@ -141,7 +170,7 @@ export default function MemberProfileScreen() {
           <Text style={styles.powered}>Powered by Institutional Trust</Text>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 

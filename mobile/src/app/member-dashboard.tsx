@@ -11,7 +11,8 @@ import { useShop } from '@/context/ShopContext';
 import { useInquiries } from '@/hooks/useInquiries';
 import { useTodayTrucks } from '@/hooks/useTodayTrucks';
 import { useResponsive } from '@/hooks/useResponsive';
-import { toIndianCurrency } from '@/lib/formatters';
+import { useLaunch } from '@/context/LaunchContext';
+import { toIndianCurrency, toIndianDate } from '@/lib/formatters';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import type { Inquiry } from '@/types/inquiry';
 import { APP_SESSION_KEY, MEMBER_SESSION_KEY } from '@/lib/session';
@@ -70,6 +71,7 @@ export default function MemberDashboardScreen() {
   const { inquiries } = useInquiries();
   const { trucks } = useTodayTrucks();
   const { unreadCount } = useBillNotifications();
+  const { setLaunchComplete } = useLaunch();
   const [member, setMember] = useState<MemberSession | null>(null);
 
   useEffect(() => {
@@ -88,14 +90,77 @@ export default function MemberDashboardScreen() {
   const logout = async () => {
     await AsyncStorage.removeItem(APP_SESSION_KEY);
     await AsyncStorage.removeItem(MEMBER_SESSION_KEY);
-    resetToRoute(router, '/member-login' as any);
+    setLaunchComplete(false);
+    resetToRoute(router, { pathname: '/', params: { access: 'choose' } } as any);
   };
 
   const recentBills = inquiries.slice(0, 5);
   const liveTrucks = trucks.slice(0, 3);
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <View style={{ flex: 1, backgroundColor: '#F3FAFF' }}>
+      <SafeAreaView style={{ backgroundColor: '#00450D' }} edges={['top']} />
+      {/* Header outside FlatList for sticky behavior and proper safe area color */}
+      <View style={[styles.header, { paddingHorizontal: Math.max(Spacing.md, contentHPad) }]}>
+        <View style={styles.headerLeft}>
+                <View
+                  style={{
+                    width: isSmall ? 42 : 48,
+                    height: isSmall ? 42 : 48,
+                    borderRadius: isSmall ? 21 : 24,
+                    backgroundColor: '#FFFFFF',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: Colors.primary }}>
+                    {member?.name ? member.name.charAt(0).toUpperCase() : 'M'}
+                  </Text>
+                </View>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      fontSize: 20,
+                      fontWeight: '900',
+                      color: '#FFFFFF',
+                      letterSpacing: -0.3,
+                    }}
+                  >
+                    {shop?.firmName || 'MandiBook Pro'}
+                  </Text>
+                  <Text
+                    numberOfLines={1}
+                    style={{
+                      fontSize: 12,
+                      color: 'rgba(255, 255, 255, 0.8)',
+                      letterSpacing: 0,
+                      fontWeight: '800',
+                      marginTop: 3,
+                    }}
+                  >
+                    {toIndianDate(getCurrentBusinessDate().getTime())} {'\u2022'} {member?.role?.toUpperCase() || 'MEMBER'}
+                  </Text>
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Pressable
+                  testID="member-notifications-btn"
+                  onPress={() => router.push('/notifications' as any)}
+                  style={styles.avatar}
+                >
+                  <Bell size={23} color="#FFFFFF" />
+                  {unreadCount > 0 ? (
+                    <View style={styles.badgeDot}>
+                      <Text style={styles.badgeDotText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
+                    </View>
+                  ) : null}
+                </Pressable>
+                <Pressable testID="member-dashboard-logout-btn" onPress={logout} style={[styles.avatar, styles.logoutAvatar]}>
+                  <LogOut size={21} color="#FFFFFF" />
+                </Pressable>
+              </View>
+            </View>
       <FlatList
         testID="member-dashboard"
         data={recentBills}
@@ -103,41 +168,6 @@ export default function MemberDashboardScreen() {
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           <View style={{ paddingHorizontal: Math.max(0, contentHPad - Spacing.md) }}>
-            {/* Header */}
-            <View style={[styles.header, { paddingHorizontal: Math.max(Spacing.md, contentHPad) }]}>
-              <View style={styles.headerLeft}>
-                <Pressable testID="member-menu-btn" style={styles.menuBtn}>
-                  <MaterialIcons name="menu" size={24} color={Colors.text} />
-                </Pressable>
-                <View>
-                  <Text style={styles.brandName}>MandiBook Pro</Text>
-                  <View style={styles.memberBadge}>
-                    <Text style={styles.memberBadgeText}>{member?.role || 'MEMBER'}</Text>
-                  </View>
-                </View>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                <Pressable
-                  testID="member-notifications-btn"
-                  onPress={() => router.push('/notifications' as any)}
-                  style={styles.avatar}
-                >
-                  <Bell size={22} color={Colors.primary} />
-                  {unreadCount > 0 ? (
-                    <View style={styles.badgeDot}>
-                      <Text style={styles.badgeDotText}>{unreadCount > 9 ? '9+' : unreadCount}</Text>
-                    </View>
-                  ) : null}
-                </Pressable>
-                <Pressable testID="member-avatar-btn" onPress={() => router.push('/member-profile')} style={styles.avatar}>
-                  <MaterialIcons name="person" size={24} color={Colors.primary} />
-                </Pressable>
-                <Pressable testID="member-dashboard-logout-btn" onPress={logout} style={[styles.avatar, styles.logoutAvatar]}>
-                  <LogOut size={21} color="#B91C1C" />
-                </Pressable>
-              </View>
-            </View>
-
             {/* Quick Action Cards */}
             <View style={[styles.actionRow, { paddingHorizontal: Math.max(Spacing.md, contentHPad) }]}>
               <Pressable
@@ -303,7 +333,7 @@ export default function MemberDashboardScreen() {
         contentContainerStyle={{ paddingBottom: 80 + insets.bottom }}
       />
 
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -317,12 +347,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
-    paddingVertical: 12,
-    backgroundColor: Colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    paddingVertical: 14,
+    backgroundColor: Colors.primary,
+    borderBottomWidth: 0,
   },
   headerLeft: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
@@ -336,11 +366,11 @@ const styles = StyleSheet.create({
   brandName: {
     fontSize: 19,
     fontWeight: '800',
-    color: Colors.primary,
+    color: '#FFFFFF',
     letterSpacing: -0.3,
   },
   memberBadge: {
-    backgroundColor: Colors.primary,
+    backgroundColor: '#FFFFFF',
     borderRadius: Radius.round,
     paddingHorizontal: 8,
     paddingVertical: 2,
@@ -350,22 +380,18 @@ const styles = StyleSheet.create({
   memberBadgeText: {
     fontSize: 9,
     fontWeight: '800',
-    color: '#fff',
+    color: Colors.primary,
     letterSpacing: 0.8,
   },
   avatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#E8F5E9',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: Colors.border,
   },
   logoutAvatar: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FECACA',
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
   badgeDot: {
     position: 'absolute',

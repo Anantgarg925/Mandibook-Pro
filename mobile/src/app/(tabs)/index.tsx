@@ -477,7 +477,7 @@ export default function HomeScreen() {
   }, [launchComplete]);
 
   useEffect(() => {
-    if (access !== 'choose' || !shop || launchComplete) return;
+    if (access !== 'choose' || launchComplete) return;
     setLaunchComplete(false);
     setSplashGone(true);
     setMinTimeElapsed(true);

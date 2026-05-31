@@ -15,7 +15,7 @@ const formatTime = (ts: number | undefined, fallback: string) => {
   return { timeEn, timeHi };
 };
 
-export default function TruckCard({ truck, onPress }: Props) {
+const TruckCard = React.memo(function TruckCard({ truck, onPress }: Props) {
   const { contentHPad, isSmall } = useResponsive();
   const totalAllocated = truck.gradeInventory.reduce((s, g) => s + g.confirmedKg + g.provisionalKg, 0);
   const totalKg = truck.totalKg || 1; // prevent div by zero
@@ -132,4 +132,6 @@ export default function TruckCard({ truck, onPress }: Props) {
       )}
     </Pressable>
   );
-}
+});
+
+export default TruckCard;

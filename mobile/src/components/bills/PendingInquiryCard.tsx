@@ -28,16 +28,33 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
   const { trucks } = useTodayTrucks();
   const queryClient = useQueryClient();
   const isAgentStock = !inquiry.truckId || inquiry.truckNumber === 'Agent Stock' || !!inquiry.sourceAgentName;
+  const rawEntries = (inquiry.chargeSnapshot as any)?.entries || [];
+  const getInitialValue = (field: 'weightPerSack' | 'ratePerKg' | 'grade') => {
+    if (rawEntries.length === 1) {
+      if (field === 'weightPerSack' && (!inquiry.weightPerSack || inquiry.weightPerSack === 0)) return rawEntries[0].weightPerSack;
+      if (field === 'ratePerKg' && (!inquiry.ratePerKg || inquiry.ratePerKg === 0)) return rawEntries[0].ratePerKg;
+      if (field === 'grade' && (!inquiry.grade || inquiry.grade === 'MIXED')) return rawEntries[0].grade;
+    }
+    return inquiry[field];
+  };
+
+  const initialGrade = getInitialValue('grade') as string;
+  const rawInitialWeight = getInitialValue('weightPerSack') as number;
+  const rawInitialRate = getInitialValue('ratePerKg') as number;
+  
+  // Fallbacks for very old bills where weight/rate wasn't stored explicitly
+  const initialWeight = rawInitialWeight || (inquiry.sacks > 0 && inquiry.totalWeight > 0 ? (inquiry.totalWeight / inquiry.sacks) : 0);
+  const initialRate = rawInitialRate || (inquiry.totalWeight > 0 && inquiry.grossAmount > 0 ? (inquiry.grossAmount / inquiry.totalWeight) : 0);
 
   const [truckId, setTruckId] = useState<string | null>(inquiry.truckId ?? null);
   const [customerName, setCustomerName] = useState(inquiry.customerName);
   const [customerPhone, setCustomerPhone] = useState(inquiry.customerPhone);
-  const [grade, setGrade] = useState(inquiry.grade);
+  const [grade, setGrade] = useState(initialGrade);
   const [sacks, setSacks] = useState(String(inquiry.sacks));
-  const [weightPerSack, setWeightPerSack] = useState(String(inquiry.weightPerSack));
-  const [rate, setRate] = useState(inquiry.ratePerKg > 0 ? String(inquiry.ratePerKg) : '');
+  const [weightPerSack, setWeightPerSack] = useState(String(initialWeight));
+  const [rate, setRate] = useState(initialRate > 0 ? String(initialRate) : '');
   const [totalBillAmount, setTotalBillAmount] = useState(
-    inquiry.ratePerKg > 0 ? String(Math.round(inquiry.totalWeight * inquiry.ratePerKg * 100) / 100) : ''
+    initialRate > 0 ? String(Math.round(inquiry.totalWeight * initialRate * 100) / 100) : ''
   );
   const [applyApmc, setApplyApmc] = useState(inquiry.applyApmc);
   const [applyBardana, setApplyBardana] = useState(inquiry.applyBardana);
@@ -46,6 +63,9 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
   const [paymentMode, setPaymentMode] = useState<PaymentMode>(inquiry.paymentMode || 'PENDING');
   const [upiRef, setUpiRef] = useState(inquiry.upiRef || '');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [localEntries, setLocalEntries] = useState<any[]>(rawEntries);
+
+  const isMultipleItems = localEntries.length > 1;
 
   const selectedTruck = trucks.find((truck) => truck.id === truckId);
   const gradeOptions = selectedTruck?.gradeInventory.length
@@ -66,15 +86,33 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
   const bardanaRateNum = parseFloat(bardanaRate) || 0;
 
   useEffect(() => {
+    const ents = (inquiry.chargeSnapshot as any)?.entries || [];
+    
+    const getVal = (field: 'weightPerSack' | 'ratePerKg' | 'grade') => {
+      if (ents.length === 1) {
+        if (field === 'weightPerSack' && (!inquiry.weightPerSack || inquiry.weightPerSack === 0)) return ents[0].weightPerSack;
+        if (field === 'ratePerKg' && (!inquiry.ratePerKg || inquiry.ratePerKg === 0)) return ents[0].ratePerKg;
+        if (field === 'grade' && (!inquiry.grade || inquiry.grade === 'MIXED')) return ents[0].grade;
+      }
+      return inquiry[field];
+    };
+
+    const g = getVal('grade') as string;
+    const rawW = getVal('weightPerSack') as number;
+    const rawR = getVal('ratePerKg') as number;
+    
+    const w = rawW || (inquiry.sacks > 0 && inquiry.totalWeight > 0 ? (inquiry.totalWeight / inquiry.sacks) : 0);
+    const r = rawR || (inquiry.totalWeight > 0 && inquiry.grossAmount > 0 ? (inquiry.grossAmount / inquiry.totalWeight) : 0);
+
     setTruckId(inquiry.truckId ?? null);
     setCustomerName(inquiry.customerName);
     setCustomerPhone(inquiry.customerPhone);
-    setGrade(inquiry.grade);
+    setGrade(g);
     setSacks(String(inquiry.sacks));
-    setWeightPerSack(String(inquiry.weightPerSack));
-    setRate(inquiry.ratePerKg > 0 ? String(inquiry.ratePerKg) : '');
+    setWeightPerSack(String(w));
+    setRate(r > 0 ? String(r) : '');
     setTotalBillAmount(
-      inquiry.ratePerKg > 0 ? String(Math.round(inquiry.totalWeight * inquiry.ratePerKg * 100) / 100) : ''
+      r > 0 ? String(Math.round(inquiry.totalWeight * r * 100) / 100) : ''
     );
     setApplyApmc(inquiry.applyApmc);
     setApplyBardana(inquiry.applyBardana);
@@ -82,6 +120,7 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
     setBardanaRate(String(inquiry.bardanaRate || shop?.charges?.bardanaPerSack || 0));
     setPaymentMode(inquiry.paymentMode || 'PENDING');
     setUpiRef(inquiry.upiRef || '');
+    setLocalEntries(ents);
   }, [inquiry, shop?.charges?.bardanaPerSack]);
 
   const lastTapRef = useRef(0);
@@ -98,11 +137,39 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
     );
   };
 
+
+
   const shakeRateStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shakeRate.value }] }));
   const shakePaymentStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shakePayment.value }] }));
 
-  const calc =
-    sacksNum > 0 && weightPerSackNum > 0 && shop?.charges
+  let calc: any = null;
+  if (isMultipleItems) {
+    let tWeight = 0, gross = 0, apmc = 0, bardana = 0, cartage = 0, net = 0;
+    for (const entry of localEntries) {
+      const entryCalc = calculateCharges({
+        sacks: entry.sacks,
+        weightPerSack: entry.weightPerSack,
+        ratePerKg: entry.ratePerKg,
+        charges: {
+          apmcPct: shop?.charges?.apmcCommission ?? 0,
+          bardanaPerSack: shop?.charges?.bardanaPerSack ?? 0,
+          cartagePerKg: shop?.charges?.cartagePerKg ?? 0,
+        },
+        applyApmc,
+        applyBardana,
+        bardanaSacks: applyBardana ? entry.sacks : 0,
+        bardanaRate: applyBardana ? (parseFloat(bardanaRate) || 0) : 0,
+      });
+      tWeight += entryCalc.totalWeight;
+      gross += entryCalc.gross;
+      apmc += entryCalc.apmc;
+      bardana += entryCalc.bardana;
+      cartage += entryCalc.cartage;
+      net += entryCalc.net;
+    }
+    calc = { totalWeight: tWeight, gross, apmc, bardana, cartage, net };
+  } else {
+    calc = sacksNum > 0 && weightPerSackNum > 0 && shop?.charges
       ? calculateCharges({
           sacks: sacksNum,
           weightPerSack: weightPerSackNum,
@@ -118,8 +185,9 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
           bardanaRate: bardanaRateNum,
         })
       : null;
+  }
 
-  const totalWeight = calc?.totalWeight ?? sacksNum * weightPerSackNum;
+  const totalWeight = calc?.totalWeight ?? (sacksNum * weightPerSackNum);
 
   const cleanDecimal = (value: string) => value.replace(/[^0-9.]/g, '').replace(/(\..*)\./g, '$1');
   const formatMoneyInput = (value: number) =>
@@ -146,6 +214,18 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
 
   const buildInquiryUpdate = (status?: 'PENDING' | 'DELIVERED' | 'CONFIRMED') => {
     if (!calc) throw new Error('Missing calculation');
+    
+    const finalEntries = localEntries.map(entry => {
+      const c = calculateCharges({
+        sacks: entry.sacks,
+        weightPerSack: entry.weightPerSack,
+        ratePerKg: entry.ratePerKg,
+        charges: { apmcPct: shop?.charges?.apmcCommission ?? 0, bardanaPerSack: shop?.charges?.bardanaPerSack ?? 0, cartagePerKg: shop?.charges?.cartagePerKg ?? 0 },
+        applyApmc, applyBardana, bardanaSacks: applyBardana ? entry.sacks : 0, bardanaRate: applyBardana ? (parseFloat(bardanaRate) || 0) : 0
+      });
+      return { ...entry, totalWeight: c.totalWeight, grossAmount: c.gross, apmcAmount: c.apmc, bardanaAmount: c.bardana, cartageAmount: c.cartage, netAmount: c.net };
+    });
+
     return {
       truck_id: isAgentStock ? null : truckId,
       truck_number: isAgentStock ? 'Agent Stock' : selectedTruck?.truckNumber ?? inquiry.truckNumber,
@@ -155,15 +235,15 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
       customer_phone: customerPhone.trim(),
       grade,
       grade_name: gradeName,
-      sacks: sacksNum,
-      weight_per_sack: weightPerSackNum,
+      sacks: isMultipleItems ? finalEntries.reduce((acc, curr) => acc + curr.sacks, 0) : sacksNum,
+      weight_per_sack: isMultipleItems ? 0 : weightPerSackNum,
       total_weight: calc.totalWeight,
-      rate_per_kg: rateNum,
+      rate_per_kg: isMultipleItems ? 0 : rateNum,
       gross_amount: calc.gross,
       apmc_amount: calc.apmc,
       bardana_amount: calc.bardana,
       cartage_amount: calc.cartage,
-      bardana_sacks: applyBardana ? bardanaSacksNum : 0,
+      bardana_sacks: applyBardana ? (isMultipleItems ? finalEntries.reduce((acc, curr) => acc + curr.sacks, 0) : bardanaSacksNum) : 0,
       bardana_rate: applyBardana ? bardanaRateNum : 0,
       apply_bardana: applyBardana,
       apply_apmc: applyApmc,
@@ -173,6 +253,7 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
         cartagePerKg: shop?.charges?.cartagePerKg ?? 0,
         applyApmc,
         applyBardana,
+        ...(isMultipleItems ? { entries: finalEntries } : {}),
       },
       net_amount: calc.net,
       payment_mode: paymentMode,
@@ -192,10 +273,19 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
     if (paymentMode === 'UDHAARI' && !customerName.trim() && !customerPhone.trim()) {
       e.customer = 'उधारी के लिए नाम या नंबर डालें / Enter name or phone';
     }
-    if (!grade) e.grade = 'ग्रेड चुनें / Select grade';
-    if (sacksNum <= 0) e.sacks = 'बोरे डालें / Enter sacks';
-    if (weightPerSackNum <= 0) e.weight = 'वजन डालें / Enter weight';
-    if (!rate.trim() || rateNum <= 0) e.rate = 'रेट डालें / Enter rate';
+    if (!isMultipleItems) {
+      if (!grade) e.grade = 'ग्रेड चुनें / Select grade';
+      if (sacksNum <= 0) e.sacks = 'बोरे डालें / Enter sacks';
+      if (weightPerSackNum <= 0) e.weight = 'वजन डालें / Enter weight';
+      if (!rate.trim() || rateNum <= 0) e.rate = 'रेट डालें / Enter rate';
+    } else {
+      for (const entry of localEntries) {
+        if (entry.sacks <= 0 || entry.weightPerSack <= 0 || entry.ratePerKg <= 0) {
+          e.rate = 'सभी आइटम्स के लिए वजन और रेट डालें / Enter weight and rate for all items';
+          break;
+        }
+      }
+    }
     if (requirePayment && paymentMode === 'PENDING') e.payment = 'भुगतान मोड चुनें / Select payment mode';
     setErrors(e);
     return e;
@@ -462,7 +552,7 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
       )}
 
       {/* Truck */}
-      <EditableSlipRow label="Truck / Lot" value={selectedTruck?.truckNumber || 'Agent Stock'} isEditing={editingField === "truck"} onToggle={() => setEditingField(editingField === "truck" ? null : "truck")} isError={!!errors.truck} />
+      <EditableSlipRow label="Truck / Lot" value={selectedTruck?.truckNumber || inquiry.sourceAgentName || 'Agent Stock'} isEditing={editingField === "truck"} onToggle={() => setEditingField(editingField === "truck" ? null : "truck")} isError={!!errors.truck} />
       {editingField === 'truck' && (
         <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB', flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
           {trucks.map(truck => (
@@ -485,67 +575,183 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
       )}
 
       {/* Grade */}
-      <EditableSlipRow label="Fruit Grade" value={gradeName} isEditing={editingField === "grade"} onToggle={() => setEditingField(editingField === "grade" ? null : "grade")} isError={!!errors.grade} />
-      {editingField === 'grade' && (
-        <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB', flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-          {gradeOptions.map(item => (
-            <Pressable
-              key={item.code}
-              onPress={() => { setGrade(item.code); setEditingField(null); if(errors.grade) setErrors(p => ({...p, grade: ''})); }}
-              style={{ paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: item.code === grade ? '#00450D' : '#CBD5E1', backgroundColor: item.code === grade ? '#E8F5E9' : '#FFF' }}
-            >
-              <Text style={{ fontSize: 13, fontWeight: '800', color: item.code === grade ? '#00450D' : '#334155' }}>{item.name}</Text>
-            </Pressable>
-          ))}
-        </View>
+      {!isMultipleItems && (
+        <>
+          <EditableSlipRow label="Fruit Grade" value={gradeName} isEditing={editingField === "grade"} onToggle={() => setEditingField(editingField === "grade" ? null : "grade")} isError={!!errors.grade} />
+          {editingField === 'grade' && (
+            <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB', flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
+              {gradeOptions.map(item => (
+                <Pressable
+                  key={item.code}
+                  onPress={() => { setGrade(item.code); setEditingField(null); if(errors.grade) setErrors(p => ({...p, grade: ''})); }}
+                  style={{ paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: item.code === grade ? '#00450D' : '#CBD5E1', backgroundColor: item.code === grade ? '#E8F5E9' : '#FFF' }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '800', color: item.code === grade ? '#00450D' : '#334155' }}>{item.name}</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </>
       )}
 
       {/* Quantity */}
-      <EditableSlipRow label="Quantity (Sacks)" value={`${sacksNum} sacks @ ${weightPerSackNum}kg`} isEditing={editingField === "quantity"} onToggle={() => setEditingField(editingField === "quantity" ? null : "quantity")} isError={!!errors.sacks || !!errors.weight} />
-      {editingField === 'quantity' && (
-        <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB', flexDirection: 'row', gap: 8 }}>
-          <TextInput
-            style={{ flex: 1, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }}
-            placeholder="Sacks"
-            keyboardType="number-pad"
-            value={sacks}
-            onChangeText={(v) => { setSacks(v.replace(/\D/g, '')); if(errors.sacks) setErrors(p => ({...p, sacks: ''})) }}
-          />
-          <TextInput
-            style={{ flex: 1, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }}
-            placeholder="Weight/Sack"
-            keyboardType="decimal-pad"
-            value={weightPerSack}
-            onChangeText={(v) => { setWeightPerSack(v.replace(/[^0-9.]/g, '')); if(errors.weight) setErrors(p => ({...p, weight: ''})) }}
-          />
-        </View>
+      {!isMultipleItems && (
+        <>
+          <EditableSlipRow label="Quantity" value={`${sacksNum} sacks, ${Math.round(totalWeight)}kg total`} isEditing={editingField === "quantity"} onToggle={() => setEditingField(editingField === "quantity" ? null : "quantity")} isError={!!errors.sacks || !!errors.weight} />
+          {editingField === 'quantity' && (
+            <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB' }}>
+              <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, color: '#4B5563', marginBottom: 4, fontWeight: '600' }}>Sacks</Text>
+                  <TextInput
+                    style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }}
+                    placeholder="Sacks"
+                    keyboardType="number-pad"
+                    value={sacks}
+                    onChangeText={(v) => { setSacks(v.replace(/\D/g, '')); if(errors.sacks) setErrors(p => ({...p, sacks: ''})) }}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, color: '#4B5563', marginBottom: 4, fontWeight: '600' }}>Total Wt (kg)</Text>
+                  <TextInput
+                    style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }}
+                    placeholder="Total Wt"
+                    keyboardType="decimal-pad"
+                    value={totalWeight > 0 ? String(totalWeight) : ''}
+                    onChangeText={(v) => {
+                      const tw = parseFloat(v.replace(/[^0-9.]/g, '')) || 0;
+                      if (sacksNum > 0) {
+                        setWeightPerSack(String(Math.round((tw / sacksNum) * 100) / 100));
+                      } else {
+                        setWeightPerSack('');
+                      }
+                      if (errors.weight) setErrors(p => ({...p, weight: ''}));
+                    }}
+                  />
+                </View>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontSize: 13, color: '#6B7280', flex: 1 }}>Or enter Wt/Sack:</Text>
+                <TextInput
+                  style={{ width: 120, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 8, fontSize: 14, color: '#111827' }}
+                  placeholder="Wt/Sack"
+                  keyboardType="decimal-pad"
+                  value={weightPerSack}
+                  onChangeText={(v) => { setWeightPerSack(v.replace(/[^0-9.]/g, '')); if(errors.weight) setErrors(p => ({...p, weight: ''})) }}
+                />
+              </View>
+            </View>
+          )}
+        </>
       )}
 
       {/* Rate */}
-      <EditableSlipRow label="Rate (per kg)" value={rateNum > 0 ? `₹${rateNum}` : '-'} isEditing={editingField === "rate"} onToggle={() => setEditingField(editingField === "rate" ? null : "rate")} isError={!!errors.rate} />
-      {editingField === 'rate' && (
-        <Animated.View style={[{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB' }, shakeRateStyle]}>
-          <TextInput
-            style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827', fontWeight: '800' }}
-            placeholder="Enter Rate (₹/kg)"
-            keyboardType="decimal-pad"
-            value={rate}
-            onChangeText={handleRateChange}
-          />
-        </Animated.View>
+      {!isMultipleItems && (
+        <>
+          <EditableSlipRow label="Rate (per kg)" value={rateNum > 0 ? `₹${rateNum}` : '-'} isEditing={editingField === "rate"} onToggle={() => setEditingField(editingField === "rate" ? null : "rate")} isError={!!errors.rate} />
+          {editingField === 'rate' && (
+            <Animated.View style={[{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB' }, shakeRateStyle]}>
+              <TextInput
+                style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827', fontWeight: '800' }}
+                placeholder="Enter Rate (₹/kg)"
+                keyboardType="decimal-pad"
+                value={rate}
+                onChangeText={handleRateChange}
+              />
+            </Animated.View>
+          )}
+        </>
       )}
 
       {/* Total Amount */}
-      <EditableSlipRow label="Total Bill Amount" value={totalBillAmount ? `₹${totalBillAmount}` : '-'} isEditing={editingField === "totalAmount"} onToggle={() => setEditingField(editingField === "totalAmount" ? null : "totalAmount")} />
-      {editingField === 'totalAmount' && (
-        <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB' }}>
-          <TextInput
-            style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827', fontWeight: '800' }}
-            placeholder="Enter Total Amount (₹) (Auto updates rate)"
-            keyboardType="decimal-pad"
-            value={totalBillAmount}
-            onChangeText={handleTotalBillAmountChange}
-          />
+      {!isMultipleItems && (
+        <>
+          <EditableSlipRow label="Total Bill Amount" value={totalBillAmount ? `₹${totalBillAmount}` : '-'} isEditing={editingField === "totalAmount"} onToggle={() => setEditingField(editingField === "totalAmount" ? null : "totalAmount")} />
+          {editingField === 'totalAmount' && (
+            <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB' }}>
+              <TextInput
+                style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827', fontWeight: '800' }}
+                placeholder="Enter Total Amount (₹) (Auto updates rate)"
+                keyboardType="decimal-pad"
+                value={totalBillAmount}
+                onChangeText={handleTotalBillAmountChange}
+              />
+            </View>
+          )}
+        </>
+      )}
+
+      {/* Multiple Items Display */}
+      {isMultipleItems && (
+        <View style={{ padding: Spacing.md, backgroundColor: '#F8FAFC', borderBottomWidth: 1, borderBottomColor: '#CBD5E1' }}>
+          <Text style={{ fontSize: 12, fontWeight: '800', color: '#64748B', textTransform: 'uppercase', marginBottom: 8, letterSpacing: 0.5 }}>
+            Multiple Items (Edit inline)
+          </Text>
+          {localEntries.map((entry: any, idx: number) => (
+            <View key={idx} style={{ paddingVertical: 8, borderBottomWidth: idx === localEntries.length - 1 ? 0 : 1, borderBottomColor: '#E2E8F0' }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#0F172A' }}>{entry.gradeName}</Text>
+                <Text style={{ fontSize: 14, fontWeight: '700', color: '#00450D' }}>₹{Math.round(entry.sacks * entry.weightPerSack * entry.ratePerKg)}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', gap: 6 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 10, color: '#64748B', marginBottom: 2 }}>Sacks</Text>
+                  <TextInput
+                    style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 8, fontSize: 13, color: '#111827' }}
+                    keyboardType="number-pad"
+                    value={String(entry.sacks)}
+                    onChangeText={(val) => {
+                      const newEntries = [...localEntries];
+                      newEntries[idx].sacks = parseInt(val.replace(/\D/g, ''), 10) || 0;
+                      setLocalEntries(newEntries);
+                    }}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 10, color: '#64748B', marginBottom: 2 }}>Total Wt</Text>
+                  <TextInput
+                    style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 8, fontSize: 13, color: '#111827' }}
+                    keyboardType="decimal-pad"
+                    value={String(Math.round(entry.sacks * entry.weightPerSack * 100) / 100 || 0)}
+                    onChangeText={(val) => {
+                      const newEntries = [...localEntries];
+                      const tw = parseFloat(val.replace(/[^0-9.]/g, '')) || 0;
+                      if (entry.sacks > 0) {
+                        newEntries[idx].weightPerSack = tw / entry.sacks;
+                      }
+                      setLocalEntries(newEntries);
+                    }}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 10, color: '#64748B', marginBottom: 2 }}>Wt/Sack</Text>
+                  <TextInput
+                    style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 8, fontSize: 13, color: '#111827' }}
+                    keyboardType="decimal-pad"
+                    value={String(Math.round(entry.weightPerSack * 100) / 100 || 0)}
+                    onChangeText={(val) => {
+                      const newEntries = [...localEntries];
+                      newEntries[idx].weightPerSack = parseFloat(val.replace(/[^0-9.]/g, '')) || 0;
+                      setLocalEntries(newEntries);
+                    }}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 10, color: '#64748B', marginBottom: 2 }}>Rate (₹)</Text>
+                  <TextInput
+                    style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 8, fontSize: 13, color: '#111827', fontWeight: '800' }}
+                    keyboardType="decimal-pad"
+                    value={String(entry.ratePerKg)}
+                    onChangeText={(val) => {
+                      const newEntries = [...localEntries];
+                      newEntries[idx].ratePerKg = parseFloat(val.replace(/[^0-9.]/g, '')) || 0;
+                      setLocalEntries(newEntries);
+                    }}
+                  />
+                </View>
+              </View>
+            </View>
+          ))}
         </View>
       )}
 

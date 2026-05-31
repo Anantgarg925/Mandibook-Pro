@@ -168,6 +168,12 @@ export default function BillDetailScreen() {
             <Row label="Sacks" value={String(entry.sacks)} />
             {entry.weightPerSack > 0 && <Row label="Weight/Sack" value={`${entry.weightPerSack} kg`} />}
             <Row label="Total Weight" value={toIndianWeight(entry.totalWeight)} />
+            {entry.ratePerKg > 0 ? (
+              <Row label="Rate" value={`₹${entry.ratePerKg}/kg`} />
+            ) : null}
+            {entry.grossAmount > 0 ? (
+              <Row label="Gross Amount" value={toIndianCurrency(entry.grossAmount)} />
+            ) : null}
           </View>
         ))}
 
@@ -185,8 +191,7 @@ export default function BillDetailScreen() {
               marginBottom: Spacing.md,
             }}
           >
-            <Row label="Rate" value={`₹${inquiry.ratePerKg}/kg`} />
-            <Row label="Gross" value={toIndianCurrency(inquiry.grossAmount)} />
+            <Row label="Total Gross" value={toIndianCurrency(inquiry.grossAmount)} />
             <Row label="APMC" value={`+${toIndianCurrency(inquiry.apmcAmount)}`} valueColor={Colors.text} />
             <Row label="Bardana" value={`+${toIndianCurrency(inquiry.bardanaAmount)}`} valueColor={Colors.text} />
             {inquiry.cartageAmount > 0 ? (

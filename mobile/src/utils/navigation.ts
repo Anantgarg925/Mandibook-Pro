@@ -1,6 +1,12 @@
 import type { Router } from 'expo-router';
 
+import { Platform } from 'react-native';
+
 export function resetToRoute(router: Router, href: Parameters<Router['replace']>[0]) {
+  if (Platform.OS === 'web' && (typeof href === 'string' ? href === '/' : href.pathname === '/')) {
+    window.location.href = typeof href === 'string' ? href : (href.pathname + (href.params ? '?' + new URLSearchParams(href.params as any).toString() : ''));
+    return;
+  }
   if (router.canDismiss()) router.dismissAll();
   router.replace(normalizeHref(href));
 }

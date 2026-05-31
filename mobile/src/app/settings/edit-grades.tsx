@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react-native';
@@ -210,11 +211,17 @@ export default function EditGradesScreen() {
         </Pressable>
       </View>
 
-      <FlatList
-        data={grades}
-        keyExtractor={(_, i) => String(i)}
-        renderItem={({ item, index }) => (
+      <KeyboardAwareScrollView
+        contentContainerStyle={{ paddingBottom: 112 }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        bottomOffset={112}
+        extraKeyboardSpace={16}
+        disableScrollOnKeyboardHide
+      >
+        {grades.map((item, index) => (
           <GradeRow
+            key={String(index)}
             item={item}
             index={index}
             total={grades.length}
@@ -223,32 +230,30 @@ export default function EditGradesScreen() {
             onMoveDown={moveDown}
             onRemove={remove}
           />
-        )}
-        ListFooterComponent={
-          <Pressable
-            testID="add-grade"
-            onPress={addGrade}
-            style={({ pressed }) => ({
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 6,
-              margin: Spacing.md,
-              height: 48,
-              borderRadius: Radius.sm,
-              borderWidth: 2,
-              borderColor: Colors.primary,
-              borderStyle: 'dashed',
-              backgroundColor: pressed ? '#FFF3E0' : Colors.surface,
-            })}
-          >
-            <Plus size={18} color={Colors.primary} />
-            <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.primary }}>
-              + Grade जोड़ें
-            </Text>
-          </Pressable>
-        }
-      />
+        ))}
+        <Pressable
+          testID="add-grade"
+          onPress={addGrade}
+          style={({ pressed }) => ({
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 6,
+            margin: Spacing.md,
+            height: 48,
+            borderRadius: Radius.sm,
+            borderWidth: 2,
+            borderColor: Colors.primary,
+            borderStyle: 'dashed',
+            backgroundColor: pressed ? '#FFF3E0' : Colors.surface,
+          })}
+        >
+          <Plus size={18} color={Colors.primary} />
+          <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.primary }}>
+            + Grade जोड़ें
+          </Text>
+        </Pressable>
+      </KeyboardAwareScrollView>
     </SafeAreaView>
   );
 }

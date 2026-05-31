@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useCallback } from 'react';
 import { View, Text, FlatList, Pressable, TextInput, ScrollView } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -10,6 +10,7 @@ import { SkeletonTable } from '@/components/common/SkeletonLoader';
 import { FontSize, Spacing, Radius } from '@/lib/theme';
 import type { Truck } from '@/types/truck';
 import { useResponsive } from '@/hooks/useResponsive';
+import { useShop } from '@/context/ShopContext';
 import { DraggableFAB } from '@/components/common/DraggableFAB';
 
 const BG = '#F3FAFF';
@@ -19,6 +20,7 @@ const BLUE_CHIP = '#DBF1FE';
 const AMBER = '#FFB300';
 
 export default function TrucksScreen() {
+  const { shop } = useShop();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { contentHPad, isSmall } = useResponsive();
@@ -30,7 +32,11 @@ export default function TrucksScreen() {
   const FILTER_TABS = ['ALL', 'ARRIVED', 'UNLOADING'];
 
   const handleAdd = () => router.push('/trucks/register');
-  const handlePress = (truck: Truck) => router.push(`/trucks/${truck.id}`);
+  const handlePress = useCallback((truck: Truck) => router.push(`/trucks/${truck.id}`), [router]);
+
+  const renderItem = useCallback(({ item }: { item: Truck }) => (
+    <TruckCard truck={item} onPress={() => handlePress(item)} />
+  ), [handlePress]);
 
   const stats = trucks.reduce(
     (acc, truck) => {
@@ -64,9 +70,10 @@ export default function TrucksScreen() {
   });
 
   const renderHeader = () => (
-    <View style={{ backgroundColor: BG, paddingBottom: Spacing.md, paddingHorizontal: Math.max(16, contentHPad) }}>
-      {/* Search Bar */}
-      <View style={{ paddingTop: Spacing.md, paddingBottom: Spacing.sm }}>
+    <View style={{ backgroundColor: BG }}>
+      <View style={{ paddingHorizontal: Math.max(16, contentHPad), paddingBottom: Spacing.md }}>
+        {/* Search Bar */}
+        <View style={{ paddingTop: Spacing.md, paddingBottom: Spacing.sm }}>
         <View style={{
           flexDirection: 'row',
           alignItems: 'center',
@@ -171,6 +178,7 @@ export default function TrucksScreen() {
           </View>
         </View>
       </ScrollView>
+      </View>
 
       {/* Section Title */}
       <View>
@@ -246,9 +254,9 @@ export default function TrucksScreen() {
                 <View key={index} style={{ flex: 1 }}>
                   <FlatList
                     testID={`truck-list-${tabStatus}`}
-                    data={pageTrucks}
+                    data={pageTrucks.slice(0, 50)}
                     keyExtractor={(t) => t.id}
-                    renderItem={({ item }) => <TruckCard truck={item} onPress={() => handlePress(item)} />}
+                    renderItem={renderItem}
                     contentContainerStyle={{ paddingBottom: 100, paddingTop: Spacing.md, paddingHorizontal: 0, backgroundColor: BG }}
                     showsVerticalScrollIndicator={false}
                     ListEmptyComponent={
