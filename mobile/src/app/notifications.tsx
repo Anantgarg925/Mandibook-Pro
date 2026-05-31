@@ -65,7 +65,7 @@ export default function NotificationsScreen() {
       items.push({
         id: `pending-${inq.id}`,
         type: 'pending',
-        title: `Bill #${inq.slipNumber} pending authorization`,
+        title: isMemberMode ? `Reference Slip #${inq.slipNumber}` : `Bill #${inq.slipNumber} pending authorization`,
         subtitle: `${inq.customerName} — ${inq.grade} — ${inq.sacks} bags`,
         time: inq.createdAt,
       });
@@ -101,7 +101,7 @@ export default function NotificationsScreen() {
 
     items.sort((a, b) => b.time - a.time);
     return items;
-  }, [inquiries, pending, trucks]);
+  }, [inquiries, isMemberMode, pending, trucks]);
 
   const timeAgo = (ts: number) => {
     const diff = Math.floor((Date.now() - ts) / 60000);
@@ -149,6 +149,8 @@ export default function NotificationsScreen() {
                   const inquiryId = item.id.replace(/^(pending|confirmed)-/, '');
                   if (item.type === 'confirmed') {
                     router.push(`/slip/${inquiryId}` as any);
+                  } else if (isMemberMode) {
+                    router.push(`/bills/${inquiryId}` as any);
                   } else {
                     router.push({ pathname: '/authorization', params: { id: inquiryId } } as any);
                   }

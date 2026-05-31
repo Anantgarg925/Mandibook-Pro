@@ -504,7 +504,7 @@ export default function HomeScreen() {
     return () => subscription.remove();
   }, [launchComplete, launchVisible, pinVisible, setLaunchComplete]);
 
-  const todaySale = useMemo(() => confirmed.reduce((s, i) => s + i.grossAmount, 0), [confirmed]);
+  const todaySale = useMemo(() => confirmed.reduce((s, i) => s + i.netAmount, 0), [confirmed]);
   const totalStock = useMemo(() => trucks.reduce(
     (sum, t) => {
       const soldKg = t.gradeInventory.reduce(
