@@ -812,15 +812,6 @@ export default function BuyerLedgerScreen() {
                   <Text style={{ fontSize: FontSize.sm, fontWeight: '700', color: Colors.textSecond }}>
                     BAL {toIndianCurrency(item.balanceAfter)}
                   </Text>
-                  {isSale && item.slipNumber ? (
-                    <Pressable
-                      testID={`view-bill-${item.id}`}
-                      onPress={() => router.push(`/slip/${item.id}` as any)}
-                      style={{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 8 }}
-                    >
-                      <Eye size={15} color={Colors.primary} />
-                    </Pressable>
-                  ) : null}
                   {isPayment ? (
                     <>
                       <Pressable
