@@ -127,6 +127,8 @@ export default function NewBillScreen() {
   // Refs for keyboard navigation
   const customerNameRef = useRef<TextInput>(null);
   const customerPhoneRef = useRef<TextInput>(null);
+  const sourceAgentNameRef = useRef<TextInput>(null);
+  const sourceAgentPhoneRef = useRef<TextInput>(null);
   const sacksRef = useRef<TextInput>(null);
   const weightPerSackRef = useRef<TextInput>(null);
   const ratePerKgRef = useRef<TextInput>(null);
@@ -838,7 +840,10 @@ export default function NewBillScreen() {
             ref={customerPhoneRef}
             value={customerPhone}
             onChangeText={(v) => setCustomerPhone(v.replace(/[^\d]/g, '').slice(0, 10))}
-            onSubmitEditing={() => scrollToSection('quantity')}
+            onSubmitEditing={() => {
+              setEditingField('source');
+              setTimeout(() => scrollToSection('source'), 100);
+            }}
             placeholder="Phone / फ़ोन (Optional)"
             placeholderTextColor={Colors.textSecond}
             keyboardType="phone-pad"
@@ -903,7 +908,10 @@ export default function NewBillScreen() {
                 ref={sacksRef}
                 value={sacksText}
                 onChangeText={(v) => { setSacksText(v); setSacks(parseInt(v.replace(/[^\d]/g, ''), 10) || 0); if(errors.sacks) setErrors(p => ({...p, sacks: ''})) }}
-                onSubmitEditing={() => weightPerSackRef.current?.focus()}
+                onSubmitEditing={() => {
+                  setEditingField('quantity');
+                  setTimeout(() => weightPerSackRef.current?.focus(), 100);
+                }}
                 keyboardType="numeric"
                 returnKeyType="next"
                 style={[inputStyle, errors.sacks ? { borderColor: Colors.danger } : {}]}
@@ -919,7 +927,9 @@ export default function NewBillScreen() {
                 ref={weightPerSackRef}
                 value={weightPerSack}
                 onChangeText={(v) => { setWeightPerSack(v.replace(/[^0-9.]/g, '')); if(errors.weight) setErrors(p => ({...p, weight: ''})) }}
-                onSubmitEditing={() => ratePerKgRef.current?.focus()}
+                onSubmitEditing={() => {
+                  setTimeout(() => ratePerKgRef.current?.focus(), 100);
+                }}
                 keyboardType="decimal-pad"
                 returnKeyType="next"
                 style={[inputStyle, errors.weight ? { borderColor: Colors.danger } : {}]}
@@ -1155,13 +1165,13 @@ export default function NewBillScreen() {
                   </View>
                   {boughtFromAgent ? (
                     <View style={{ gap: 8 }}>
-                      <TextInput style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }} placeholder="Agent name *" value={sourceAgentName} onChangeText={setSourceAgentName} />
-                      <TextInput style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }} placeholder="Agent phone (optional)" value={sourceAgentPhone} onChangeText={setSourceAgentPhone} keyboardType="phone-pad" />
+                      <TextInput ref={sourceAgentNameRef} style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }} placeholder="Agent name *" value={sourceAgentName} onChangeText={setSourceAgentName} returnKeyType="next" onSubmitEditing={() => sourceAgentPhoneRef.current?.focus()} />
+                      <TextInput ref={sourceAgentPhoneRef} style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }} placeholder="Agent phone (optional)" value={sourceAgentPhone} onChangeText={setSourceAgentPhone} keyboardType="phone-pad" returnKeyType="done" onSubmitEditing={() => { setEditingField('grade'); setTimeout(() => scrollToSection('grade'), 100); }} />
                     </View>
                   ) : (
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                       {trucks.map(truck => (
-                        <Pressable key={truck.id} onPress={() => { setSelectedTruckId(truck.id); setSelectedGrade(null); if (errors.truck) setErrors(p => ({...p, truck: ''})); }} style={{ paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: truck.id === selectedTruckId ? '#00450D' : '#CBD5E1', backgroundColor: truck.id === selectedTruckId ? '#E8F5E9' : '#FFF' }}>
+                        <Pressable key={truck.id} onPress={() => { setSelectedTruckId(truck.id); setSelectedGrade(null); if (errors.truck) setErrors(p => ({...p, truck: ''})); setEditingField('grade'); setTimeout(() => scrollToSection('grade'), 100); }} style={{ paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: truck.id === selectedTruckId ? '#00450D' : '#CBD5E1', backgroundColor: truck.id === selectedTruckId ? '#E8F5E9' : '#FFF' }}>
                           <Text style={{ fontSize: 13, fontWeight: '800', color: truck.id === selectedTruckId ? '#00450D' : '#334155' }}>{truck.truckNumber}</Text>
                         </Pressable>
                       ))}
@@ -1174,7 +1184,7 @@ export default function NewBillScreen() {
               {editingField === 'grade' && (
                 <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB', flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                   {(boughtFromAgent ? (shop?.grades || []) : (selectedTruck?.gradeInventory || [])).map((item: any) => (
-                    <Pressable key={item.code} onPress={() => { setSelectedGrade(item.code); setEditingField('quantity'); if(errors.grade) setErrors(p => ({...p, grade: ''})); }} style={{ paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: item.code === selectedGrade ? '#00450D' : '#CBD5E1', backgroundColor: item.code === selectedGrade ? '#E8F5E9' : '#FFF' }}>
+                    <Pressable key={item.code} onPress={() => { setSelectedGrade(item.code); setEditingField('quantity'); if(errors.grade) setErrors(p => ({...p, grade: ''})); setTimeout(() => { scrollToSection('quantity'); sacksRef.current?.focus(); }, 100); }} style={{ paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: item.code === selectedGrade ? '#00450D' : '#CBD5E1', backgroundColor: item.code === selectedGrade ? '#E8F5E9' : '#FFF' }}>
                       <Text style={{ fontSize: 13, fontWeight: '800', color: item.code === selectedGrade ? '#00450D' : '#334155' }}>{item.code} - {item.name}</Text>
                     </Pressable>
                   ))}
