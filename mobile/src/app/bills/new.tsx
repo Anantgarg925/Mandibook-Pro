@@ -1207,6 +1207,8 @@ export default function NewBillScreen() {
                         keyboardType="decimal-pad"
                         value={weightPerSack}
                         onChangeText={(v) => { setWeightPerSack(v.replace(/[^0-9.]/g, '')); if(errors.weight) setErrors(p => ({...p, weight: ''})) }}
+                        returnKeyType="next"
+                        onSubmitEditing={() => { setEditingField('rate'); setTimeout(() => ratePerKgRef.current?.focus(), 100); }}
                       />
                     </View>
                   </View>
@@ -1237,7 +1239,7 @@ export default function NewBillScreen() {
               <EditableSlipRow label="Rate (per kg)" value={ratePerKg ? `₹${ratePerKg}` : ''} isEditing={editingField === 'rate'} onToggle={() => setEditingField(editingField === 'rate' ? null : 'rate')} isError={!!errors.rate} />
               {editingField === 'rate' && (
                 <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB' }}>
-                  <TextInput style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827', fontWeight: '800' }} placeholder="Enter Rate (₹/kg)" keyboardType="decimal-pad" value={ratePerKg} onChangeText={(v) => { setRatePerKg(v.replace(/[^0-9.]/g, '')); if(errors.rate) setErrors(p => ({...p, rate: ''})); }} />
+                  <TextInput ref={ratePerKgRef} style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827', fontWeight: '800' }} placeholder="Enter Rate (₹/kg)" keyboardType="decimal-pad" value={ratePerKg} onChangeText={(v) => { setRatePerKg(v.replace(/[^0-9.]/g, '')); if(errors.rate) setErrors(p => ({...p, rate: ''})); }} returnKeyType="done" onSubmitEditing={handleAddEntry} />
                   <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 12 }}>
                     <Pressable onPress={handleAddEntry} style={{ backgroundColor: '#00450D', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                       <Plus size={18} color="#FFF" />
