@@ -374,6 +374,11 @@ export default function NewBillScreen() {
     setWeightPerSack('');
     setRatePerKg('');
     setErrors({});
+    
+    // Scroll back to grade section for next entry
+    setTimeout(() => {
+      scrollToSection('grade');
+    }, 100);
   };
 
 
