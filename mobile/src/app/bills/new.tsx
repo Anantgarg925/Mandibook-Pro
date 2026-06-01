@@ -14,6 +14,7 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import * as Contacts from 'expo-contacts';
+import { useNetInfo } from '@react-native-community/netinfo';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ArrowLeft, ChevronDown, Minus, Plus, Phone, Trash2, User } from 'lucide-react-native';
@@ -73,6 +74,8 @@ function SectionHeader({ title, style }: { title: string, style?: any }) {
 
 export default function NewBillScreen() {
   const router = useRouter();
+  const netInfo = useNetInfo();
+  const isOffline = netInfo.isConnected === false;
   const { truckId: preselectedTruckId } = useLocalSearchParams<{ truckId?: string }>();
   const { shop } = useShop();
   const { trucks } = useTodayTrucks();
@@ -268,8 +271,10 @@ export default function NewBillScreen() {
       buyerUpsert?: { name: string; phone: string } | null;
     }) => {
       // 1. Fetch latest slip just before saving to prevent simultaneous duplicates
-      const memberIndex = shop?.teamMembers?.findIndex(m => m.phone === member?.phone) ?? -1;
-      const offsetBase = memberIndex !== -1 ? (memberIndex + 1) * 10000 : 0;
+      // Use the offsetBase from the slip number generated in the UI to prevent block jumping
+      // (e.g. if offline it generated 10005, offsetBase is 10000)
+      const uiSlipNumber = Number(payload.inquiry.slipNumber) || 0;
+      const offsetBase = Math.floor(uiSlipNumber / 10000) * 10000;
       const realTimeSlip = await getNextSlipNumber(payload.inquiry.shopId, offsetBase);
 
       // 2. Create inquiry
@@ -1199,11 +1204,23 @@ export default function NewBillScreen() {
               <EditableSlipRow label="Fruit Grade" value={selectedGrade ? `${selectedGrade} - ${selectedTruck?.gradeInventory.find(g => g.code === selectedGrade)?.name ?? shop?.grades?.find(g => g.code === selectedGrade)?.name ?? selectedGrade}` : 'Select Grade'} isEditing={editingField === 'grade'} onToggle={() => setEditingField(editingField === 'grade' ? null : 'grade')} isError={!!errors.grade} />
               {editingField === 'grade' && (
                 <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB', flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
-                  {(boughtFromAgent ? (shop?.grades || []) : (selectedTruck?.gradeInventory || [])).map((item: any) => (
-                    <Pressable key={item.code} onPress={() => { setSelectedGrade(item.code); setEditingField('quantity'); if(errors.grade) setErrors(p => ({...p, grade: ''})); setTimeout(() => { scrollToSection('quantity'); sacksRef.current?.focus(); }, 100); }} style={{ paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: item.code === selectedGrade ? '#00450D' : '#CBD5E1', backgroundColor: item.code === selectedGrade ? '#E8F5E9' : '#FFF' }}>
-                      <Text style={{ fontSize: 13, fontWeight: '800', color: item.code === selectedGrade ? '#00450D' : '#334155' }}>{item.code} - {item.name}</Text>
-                    </Pressable>
-                  ))}
+                  {(boughtFromAgent ? (shop?.grades || []) : (selectedTruck?.gradeInventory || [])).map((item: any) => {
+                    const sold = (item.confirmedKg || 0) + (item.provisionalKg || 0);
+                    const est = item.totalKg || 0;
+                    const estText = est > 0 ? ` / Est: ${est}kg` : '';
+                    const displayLabel = boughtFromAgent 
+                      ? `${item.code} - ${item.name}`
+                      : `${item.code} - ${item.name} (Sold: ${sold}kg${estText})`;
+                    
+                    return (
+                      <Pressable key={item.code} onPress={() => { setSelectedGrade(item.code); setEditingField('quantity'); if(errors.grade) setErrors(p => ({...p, grade: ''})); setTimeout(() => { scrollToSection('quantity'); sacksRef.current?.focus(); }, 100); }} style={{ paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: item.code === selectedGrade ? '#00450D' : '#CBD5E1', backgroundColor: item.code === selectedGrade ? '#E8F5E9' : '#FFF' }}>
+                        <Text style={{ fontSize: 13, fontWeight: '800', color: item.code === selectedGrade ? '#00450D' : '#334155' }}>{displayLabel}</Text>
+                        {!boughtFromAgent && isOffline && (
+                          <Text style={{ fontSize: 9, color: '#D97706', fontWeight: 'bold', marginTop: 2 }}>🟡 Cached</Text>
+                        )}
+                      </Pressable>
+                    );
+                  })}
                 </View>
               )}
 
@@ -1249,6 +1266,20 @@ export default function NewBillScreen() {
                       />
                     </View>
                   </View>
+                  {!boughtFromAgent && isOffline && selectedGrade && selectedTruck && calc && calc.totalWeight > 0 && (() => {
+                    const gInfo = selectedTruck.gradeInventory.find((g: any) => g.code === selectedGrade);
+                    if (gInfo && gInfo.totalKg > 0) {
+                      const remaining = Math.max(0, gInfo.totalKg - gInfo.confirmedKg - (gInfo.provisionalKg || 0));
+                      if (calc.totalWeight > remaining) {
+                        return (
+                          <Text style={{ fontSize: 11, color: '#D97706', marginTop: 8, fontStyle: 'italic' }}>
+                            ⚠️ Note: This exceeds the agent's estimated split ({remaining}kg) for this grade, but fits within total truck stock.
+                          </Text>
+                        );
+                      }
+                    }
+                    return null;
+                  })()}
                 </View>
               )}
 
@@ -1435,9 +1466,16 @@ export default function NewBillScreen() {
                             {item.senderName}
                           </Text>
                         </View>
-                        <Text style={{ fontSize: FontSize.sm, color: Colors.success, fontWeight: '600' }}>
-                          {toIndianWeight(totalAvail)}
-                        </Text>
+                        <View style={{ alignItems: 'flex-end' }}>
+                          <Text style={{ fontSize: FontSize.sm, color: Colors.success, fontWeight: '600' }}>
+                            {toIndianWeight(totalAvail)}
+                          </Text>
+                          {isOffline && (
+                            <Text style={{ fontSize: 10, color: '#D97706', fontWeight: 'bold', marginTop: 2 }}>
+                              🟡 Cached
+                            </Text>
+                          )}
+                        </View>
                       </Pressable>
                     );
                   }}
