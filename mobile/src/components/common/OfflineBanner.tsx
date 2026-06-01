@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text } from 'react-native';
+import { View, Text, DeviceEventEmitter } from 'react-native';
+import { getOfflineQueue } from '@/lib/offlineQueue';
 import NetInfo from '@react-native-community/netinfo';
 import Animated, {
   useSharedValue,
@@ -19,7 +20,16 @@ export default function OfflineBanner() {
   const wasOfflineRef = useRef(false);
   const height = useSharedValue(0);
 
+  const [queueLength, setQueueLength] = useState(0);
+
+  const fetchQueue = () => {
+    getOfflineQueue().then((q) => setQueueLength(q.length));
+  };
+
   useEffect(() => {
+    fetchQueue();
+    const sub = DeviceEventEmitter.addListener('onQueueUpdate', fetchQueue);
+    
     const unsubscribe = NetInfo.addEventListener((state) => {
       const offline = !(state.isConnected && state.isInternetReachable !== false);
 
@@ -40,7 +50,10 @@ export default function OfflineBanner() {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      sub.remove();
+    };
   }, [height]);
 
   const animStyle = useAnimatedStyle(() => ({
@@ -81,7 +94,11 @@ export default function OfflineBanner() {
           <Wifi size={16} color="#FFF" />
         )}
         <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFF' }}>
-          {isOffline ? 'No Internet Connection / इंटरनेट नहीं है' : 'Back Online / वापस ऑनलाइन'}
+          {isOffline 
+            ? queueLength > 0 
+              ? `Offline mode — ${queueLength} bills pending sync`
+              : 'Offline mode — No internet connection' 
+            : 'Back Online / वापस ऑनलाइन'}
         </Text>
       </View>
     </Animated.View>

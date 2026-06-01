@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider, dehydrate, hydrate, onlineManager } f
 import { Platform, Text, TextInput, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider as RNKeyboardProvider } from 'react-native-keyboard-controller';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Storage as AsyncStorage } from '@/lib/offlineDB';
 import NetInfo from '@react-native-community/netinfo';
 
 // KeyboardProvider crashes silently on web — use a passthrough wrapper
@@ -22,6 +22,7 @@ import { LaunchProvider, useLaunch } from '@/context/LaunchContext';
 import { BillNotificationProvider } from '@/context/BillNotificationContext';
 import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import OfflineBanner from '@/components/common/OfflineBanner';
+import PWAInstallBanner from '@/components/common/PWAInstallBanner';
 import { BottomNavBar } from '@/components/common/BottomNavBar';
 import { SubscriptionGate } from '@/components/subscription/SubscriptionGate';
 import React, { type ComponentType, useEffect, useState } from 'react';
@@ -217,6 +218,7 @@ export default function RootLayout() {
                 <ShopProvider>
                   <BillNotificationProvider>
                     <StatusBar style="dark" backgroundColor={Colors.background} translucent={false} />
+                    <PWAInstallBanner />
                     <OfflineBanner />
                     <SubscriptionGate>
                       <PersistentNavigationShell colorScheme={colorScheme} />

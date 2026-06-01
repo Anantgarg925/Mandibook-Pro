@@ -1,4 +1,4 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Storage as AsyncStorage } from './offlineDB';
 
 export type OfflineOperationType =
   | 'CREATE_TRUCK'
@@ -28,6 +28,8 @@ export async function getOfflineQueue(): Promise<OfflineOperation[]> {
   }
 }
 
+import { DeviceEventEmitter } from 'react-native';
+
 export async function enqueueOfflineOperation(
   type: OfflineOperationType,
   payload: Record<string, unknown>,
@@ -41,6 +43,7 @@ export async function enqueueOfflineOperation(
     attempts: 0,
   };
   await AsyncStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify([...queue, operation]));
+  DeviceEventEmitter.emit('onQueueUpdate');
   return operation;
 }
 
@@ -50,10 +53,12 @@ export async function removeOfflineOperation(id: string): Promise<void> {
     OFFLINE_QUEUE_KEY,
     JSON.stringify(queue.filter((operation) => operation.id !== id)),
   );
+  DeviceEventEmitter.emit('onQueueUpdate');
 }
 
 export async function clearOfflineQueue(): Promise<void> {
   await AsyncStorage.removeItem(OFFLINE_QUEUE_KEY);
+  DeviceEventEmitter.emit('onQueueUpdate');
 }
 
 // Ensure only one sync process runs at a time

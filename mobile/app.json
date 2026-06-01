@@ -44,6 +44,16 @@
         "projectId": "efd28e1e-9e9b-4096-b28f-dc72acba1811"
       }
     },
+    "web": {
+      "bundler": "metro",
+      "favicon": "./assets/logo.png",
+      "themeColor": "#00450d",
+      "backgroundColor": "#ffffff",
+      "name": "MandiBook Pro",
+      "shortName": "MandiBook",
+      "display": "standalone",
+      "orientation": "portrait"
+    },
     "owner": "anant925"
   }
 }
