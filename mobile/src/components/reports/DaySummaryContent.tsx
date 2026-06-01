@@ -12,6 +12,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
+import { crossAlert } from '@/utils/crossAlert';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
@@ -188,7 +189,7 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
       }
       await refetchDayClosure();
     } catch {
-      Alert.alert('Error', 'Could not update day close status.');
+      crossAlert('Error', 'Could not update day close status.');
     } finally {
       setClosingDay(false);
     }
@@ -398,7 +399,7 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
         cashEntries,
       });
     } catch {
-      Alert.alert('Error', 'Could not generate report.');
+      crossAlert('Error', 'Could not generate report.');
     } finally {
       setExporting(false);
     }
@@ -407,7 +408,7 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
   const handleSendBill = (bill: Inquiry) => {
     if (!shop) return;
     if (!bill.customerPhone) {
-      Alert.alert('No phone number', 'Open the slip and use Share PDF/Image, or add the buyer phone number first.');
+      crossAlert('No phone number', 'Open the slip and use Share PDF/Image, or add the buyer phone number first.');
       return;
     }
     openWhatsApp(bill.customerPhone, generateCustomerMessage(bill, shop));

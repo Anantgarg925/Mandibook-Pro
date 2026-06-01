@@ -29,6 +29,10 @@ import React, { type ComponentType, useEffect, useState } from 'react';
 import { Colors } from '@/lib/theme';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { Analytics } from '@vercel/analytics/react';
+import { patchAlertForWeb } from '@/utils/alertPolyfill';
+
+// Patch Alert.alert for web — must run before any component renders
+patchAlertForWeb();
 
 (Text as any).defaultProps = {
   ...((Text as any).defaultProps ?? {}),

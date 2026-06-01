@@ -8,7 +8,6 @@ import {
   Share,
   Platform,
   BackHandler,
-  Alert,
   Modal,
   TextInput,
   KeyboardAvoidingView,
@@ -28,6 +27,7 @@ import { useMemberMode } from '@/hooks/useMemberMode';
 import { archiveQueryOptions } from '@/lib/queryOptions';
 import { makeReferenceSlipNumber, mapEntriesToSlipRows, ReferenceSlipCard } from '@/utils/referenceSlip';
 import { downloadTestIdAsJpeg } from '@/utils/webExport';
+import { crossAlert } from '@/utils/crossAlert';
 import type { Inquiry } from '@/types/inquiry';
 import type { TruckGradeEntry } from '@/types/truck';
 
@@ -199,7 +199,7 @@ export default function TruckDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ['inquiries', shop?.shopId] });
     },
     onError: (error) => {
-      Alert.alert('Could not update truck', error instanceof Error ? error.message : 'Please try again.');
+      crossAlert('Could not update truck', error instanceof Error ? error.message : 'Please try again.');
     },
   });
 
@@ -226,20 +226,20 @@ export default function TruckDetailScreen() {
       router.replace((isMemberMode ? '/member-trucks' : '/trucks') as any);
     },
     onError: (error) => {
-      Alert.alert('Could not delete truck', error instanceof Error ? error.message : 'Please try again.');
+      crossAlert('Could not delete truck', error instanceof Error ? error.message : 'Please try again.');
     },
   });
 
   const confirmDeleteTruck = () => {
     if (deleteTruckMutation.isPending) return;
     if (truckBills.length > 0) {
-      Alert.alert(
+      crossAlert(
         'Truck has bills',
         'This truck cannot be deleted because bills are already linked to it. This protects your stock and ledger history.'
       );
       return;
     }
-    Alert.alert(
+    crossAlert(
       'Delete truck?',
       'This will permanently delete this truck and its grade breakdown. This cannot be undone.',
       [
@@ -313,7 +313,7 @@ export default function TruckDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ['truck', shop?.shopId, id] });
     },
     onError: (error) => {
-      Alert.alert('Godown entry failed', error instanceof Error ? error.message : 'Please check the weights and try again.');
+      crossAlert('Godown entry failed', error instanceof Error ? error.message : 'Please check the weights and try again.');
     },
   });
 
@@ -326,7 +326,7 @@ export default function TruckDetailScreen() {
       }
       const available = await Sharing.isAvailableAsync();
       if (!available) {
-        Alert.alert('Sharing unavailable', 'Reference slip sharing is not available on this device.');
+        crossAlert('Sharing unavailable', 'Reference slip sharing is not available on this device.');
         return;
       }
       const uri = await captureRef(referenceSlipRef, { format: 'jpg', quality: 1, result: 'tmpfile' });
@@ -336,7 +336,7 @@ export default function TruckDetailScreen() {
         dialogTitle: 'Share reference slip',
       });
     } catch {
-      Alert.alert('Reference Slip', 'Could not create the reference slip image.');
+      crossAlert('Reference Slip', 'Could not create the reference slip image.');
     }
   };
 

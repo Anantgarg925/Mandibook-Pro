@@ -1,42 +1,71 @@
 import { Platform } from 'react-native';
 
-function openHiddenWindow(title: string, html: string): Window | null {
-  const win = window.open('', '_blank', 'noopener,noreferrer,width=1024,height=768');
-  if (!win) return null;
-  win.document.open();
-  win.document.write(`<!DOCTYPE html><html><head><title>${title}</title></head><body>${html}</body></html>`);
-  win.document.close();
-  return win;
-}
-
+/**
+ * Print HTML on web using an invisible iframe instead of window.open().
+ * This avoids popup blockers on mobile browsers (Chrome Android, etc.).
+ */
 export async function printHtmlOnWeb(html: string, title: string): Promise<void> {
   if (Platform.OS !== 'web') return;
 
-  const win = openHiddenWindow(title, html);
-  if (!win) throw new Error('Popup blocked by the browser');
+  // Create a hidden iframe
+  const iframe = document.createElement('iframe');
+  iframe.style.position = 'fixed';
+  iframe.style.right = '0';
+  iframe.style.bottom = '0';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = 'none';
+  document.body.appendChild(iframe);
 
-  await new Promise<void>((resolve, reject) => {
-    const timer = window.setInterval(() => {
-      if (win.document.readyState === 'complete') {
-        window.clearInterval(timer);
-        win.focus();
-        win.print();
-        window.setTimeout(() => {
-          win.close();
-          resolve();
-        }, 250);
-      }
-    }, 50);
+  const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+  if (!iframeDoc) {
+    document.body.removeChild(iframe);
+    throw new Error('Could not access iframe document');
+  }
 
-    window.setTimeout(() => {
-      window.clearInterval(timer);
-      if (!win.closed) {
-        reject(new Error('Timed out opening print window'));
+  iframeDoc.open();
+  iframeDoc.write(`<!DOCTYPE html><html><head><title>${title}</title></head><body>${html}</body></html>`);
+  iframeDoc.close();
+
+  // Wait for content to load
+  await new Promise<void>((resolve) => {
+    setTimeout(() => {
+      try {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      } catch (e) {
+        console.warn('Print failed, falling back to download', e);
+        // Fallback: download as HTML file
+        downloadHtmlFile(html, title);
       }
-    }, 4000);
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+        resolve();
+      }, 500);
+    }, 300);
   });
 }
 
+/**
+ * Fallback: Download HTML as a file that can be opened and printed manually
+ */
+function downloadHtmlFile(html: string, title: string): void {
+  const fullHtml = `<!DOCTYPE html><html><head><title>${title}</title></head><body>${html}</body></html>`;
+  const blob = new Blob([fullHtml], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `${title.replace(/\s+/g, '_')}.html`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Download an HTML element as a JPEG using html2canvas-style approach.
+ * Uses canvas API to render DOM to image.
+ */
 async function elementToDataUrl(element: HTMLElement, format: 'png' | 'jpeg'): Promise<string> {
   const rect = element.getBoundingClientRect();
   const width = Math.ceil(rect.width);
