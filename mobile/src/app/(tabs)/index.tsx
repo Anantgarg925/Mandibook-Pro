@@ -300,6 +300,10 @@ const BillRow = memo(function BillRow({
   item: Inquiry;
   onPress: () => void;
 }) {
+  const { shop } = useShop();
+  const roleRaw = shop?.teamMembers?.find((m: any) => m.name === item.paymentReceivedBy)?.role;
+  const displayRole = roleRaw ? roleRaw.charAt(0).toUpperCase() + roleRaw.slice(1).toLowerCase() : 'Munshi';
+
   const initials = getInitials(item.customerName);
   return (
     <Pressable
@@ -361,7 +365,7 @@ const BillRow = memo(function BillRow({
                   borderColor: '#BBF7D0',
                 }}>
                   <Text style={{ fontSize: 9, fontWeight: '700', color: '#16A34A' }}>
-                    Munshi: {item.paymentReceivedBy}
+                    {displayRole}: {item.paymentReceivedBy}
                   </Text>
                 </View>
               </View>

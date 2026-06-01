@@ -21,6 +21,7 @@ const BLUE_CHIP = '#DBF1FE';
 const AMBER = '#FFB300';
 
 const BillCard = React.memo(function BillCard({ item, onPress, isSmall }: { item: Inquiry; onPress: () => void; isSmall: boolean }) {
+  const { shop } = useShop();
   const isConfirmed = item.status === 'CONFIRMED';
   const isCancelled = item.status === 'CANCELLED';
   const isDelivered = item.status === 'DELIVERED';
@@ -39,6 +40,9 @@ const BillCard = React.memo(function BillCard({ item, onPress, isSmall }: { item
     : isCancelled ? '#991B1B' 
     : isDelivered ? '#1D4ED8'
     : '#854D0E';
+
+  const roleRaw = shop?.teamMembers?.find((m: any) => m.name === item.paymentReceivedBy)?.role;
+  const displayRole = roleRaw ? roleRaw.charAt(0).toUpperCase() + roleRaw.slice(1).toLowerCase() : 'Munshi';
 
   return (
     <Pressable
@@ -97,7 +101,7 @@ const BillCard = React.memo(function BillCard({ item, onPress, isSmall }: { item
                 borderColor: '#BBF7D0',
               }}>
                 <Text style={{ fontSize: 8.5, fontWeight: '700', color: '#16A34A' }}>
-                  Munshi: {item.paymentReceivedBy}
+                  {displayRole}: {item.paymentReceivedBy}
                 </Text>
               </View>
             </View>
