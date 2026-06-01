@@ -58,6 +58,7 @@ export type Buyer = {
   lastTransactionDate: number;
   lastPaymentAmount?: number;
   lastPaymentDate?: number;
+  preferredPaymentMode?: PaymentMode;
   createdAt: number;
 };
 

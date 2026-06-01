@@ -117,6 +117,13 @@ export default function NewBillScreen() {
   const calcOpacity = useSharedValue(0);
   const scrollRef = useRef<any>(null);
   const sectionY = useRef<Record<string, number>>({});
+  
+  // Refs for keyboard navigation
+  const customerNameRef = useRef<TextInput>(null);
+  const customerPhoneRef = useRef<TextInput>(null);
+  const sacksRef = useRef<TextInput>(null);
+  const weightPerSackRef = useRef<TextInput>(null);
+  const ratePerKgRef = useRef<TextInput>(null);
 
   const rememberSection = (key: string) => (event: any) => {
     sectionY.current[key] = event.nativeEvent.layout.y;
@@ -183,6 +190,9 @@ export default function NewBillScreen() {
   const selectBuyer = (b: Buyer) => {
     setCustomerName(b.name);
     setCustomerPhone(b.phone);
+    if (b.preferredPaymentMode) {
+      setPaymentMode(b.preferredPaymentMode);
+    }
     setBuyerSuggestions([]);
   };
 
@@ -310,9 +320,16 @@ export default function NewBillScreen() {
               shop_id: shop!.shopId,
               name: payload.buyerUpsert.name,
               phone: payload.buyerUpsert.phone,
+              preferred_payment_mode: payload.inquiry.paymentMode,
               last_transaction_date: Date.now(),
               created_at: Date.now(),
             });
+          } else {
+            // Update existing buyer's preferred payment mode
+            await supabase
+              .from('buyers')
+              .update({ preferred_payment_mode: payload.inquiry.paymentMode })
+              .eq('id', existing.id);
           }
         }
       } catch { /* best-effort */ }
@@ -768,6 +785,7 @@ export default function NewBillScreen() {
           <View style={{ flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.sm }}>
             <TextInput
               testID="edit-customer-name"
+              ref={customerNameRef}
               value={customerName}
               onChangeText={(val) => {
                 setCustomerName(val);
@@ -777,6 +795,7 @@ export default function NewBillScreen() {
                   setBuyerSuggestions(buyers.filter((b) => b.name.toLowerCase().includes(lower)).slice(0, 5));
                 } else setBuyerSuggestions([]);
               }}
+              onSubmitEditing={() => customerPhoneRef.current?.focus()}
               placeholder="Customer name / ग्राहक का नाम"
               placeholderTextColor={Colors.textSecond}
               returnKeyType="next"
@@ -806,8 +825,10 @@ export default function NewBillScreen() {
           )}
           <TextInput
             testID="edit-customer-phone"
+            ref={customerPhoneRef}
             value={customerPhone}
             onChangeText={(v) => setCustomerPhone(v.replace(/[^\d]/g, '').slice(0, 10))}
+            onSubmitEditing={() => scrollToSection('quantity')}
             placeholder="Phone / फ़ोन (Optional)"
             placeholderTextColor={Colors.textSecond}
             keyboardType="phone-pad"
@@ -869,8 +890,10 @@ export default function NewBillScreen() {
               </Text>
               <TextInput
                 testID="edit-sacks"
+                ref={sacksRef}
                 value={sacksText}
                 onChangeText={(v) => { setSacksText(v); setSacks(parseInt(v.replace(/[^\d]/g, ''), 10) || 0); if(errors.sacks) setErrors(p => ({...p, sacks: ''})) }}
+                onSubmitEditing={() => weightPerSackRef.current?.focus()}
                 keyboardType="numeric"
                 returnKeyType="next"
                 style={[inputStyle, errors.sacks ? { borderColor: Colors.danger } : {}]}
@@ -883,8 +906,10 @@ export default function NewBillScreen() {
               </Text>
               <TextInput
                 testID="edit-weight"
+                ref={weightPerSackRef}
                 value={weightPerSack}
                 onChangeText={(v) => { setWeightPerSack(v.replace(/[^0-9.]/g, '')); if(errors.weight) setErrors(p => ({...p, weight: ''})) }}
+                onSubmitEditing={() => ratePerKgRef.current?.focus()}
                 keyboardType="decimal-pad"
                 returnKeyType="next"
                 style={[inputStyle, errors.weight ? { borderColor: Colors.danger } : {}]}
@@ -904,9 +929,12 @@ export default function NewBillScreen() {
               </Text>
               <TextInput
                 testID="edit-rate"
+                ref={ratePerKgRef}
                 value={ratePerKg}
                 onChangeText={(v) => { setRatePerKg(v.replace(/[^0-9.]/g, '')); if(errors.rate) setErrors(p => ({...p, rate: ''})); }}
+                onSubmitEditing={handleAddEntry}
                 keyboardType="decimal-pad"
+                returnKeyType="done"
                 style={[inputStyle, errors.rate ? { borderColor: Colors.danger } : {}]}
               />
               {errors.rate ? <Text style={{ fontSize: 11, color: Colors.danger, marginTop: 2 }}>{errors.rate}</Text> : null}
@@ -1053,7 +1081,7 @@ export default function NewBillScreen() {
             <View style={{ borderWidth: 2, borderColor: '#111827', marginBottom: 16, paddingVertical: 8, paddingHorizontal: 10 }}>
               <Text style={{ fontSize: 18, fontWeight: '900', color: '#111827', textAlign: 'center' }}>NEW BILL</Text>
               <Text style={{ fontSize: 14, fontWeight: '900', color: '#111827', textAlign: 'center', marginTop: 2 }}>
-                SLIP #SL-{slipNumber ?? '...'} • {toIndianDate(Date.now())}
+                SLIP #SL-{slipNumber ?? '...'} • {toIndianDate(getCurrentBusinessDate().getTime())}
               </Text>
             </View>
 

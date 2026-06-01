@@ -184,6 +184,7 @@ export function mapBuyer(row: Record<string, unknown>) {
     lastTransactionDate: row.last_transaction_date as number,
     lastPaymentAmount: row.last_payment_amount as number | undefined,
     lastPaymentDate: row.last_payment_date as number | undefined,
+    preferredPaymentMode: (row.preferred_payment_mode as any) ?? undefined,
     createdAt: row.created_at as number,
   };
 }
