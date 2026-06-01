@@ -958,7 +958,20 @@ export default function NewBillScreen() {
               {errors.weight ? <Text style={{ fontSize: 11, color: Colors.danger, marginTop: 2 }}>{errors.weight}</Text> : null}
             </View>
           </View>
-
+          {!boughtFromAgent && isOffline && selectedGrade && selectedTruck && calc && calc.totalWeight > 0 && (() => {
+            const gInfo = selectedTruck.gradeInventory.find((g: any) => g.code === selectedGrade);
+            if (gInfo && gInfo.totalKg > 0) {
+              const remaining = Math.max(0, gInfo.totalKg - gInfo.confirmedKg - (gInfo.provisionalKg || 0));
+              if (calc.totalWeight > remaining) {
+                return (
+                  <Text style={{ fontSize: 11, color: '#D97706', marginTop: 8, fontStyle: 'italic', paddingHorizontal: 4 }}>
+                    ⚠️ Note: This exceeds the agent's estimated split ({remaining}kg) for this grade, but fits within total truck stock.
+                  </Text>
+                );
+              }
+            }
+            return null;
+          })()}
           {/* Rate Section */}
           <View onLayout={rememberSection('rate')}>
             <SectionHeader title="रेट / Rate" />
