@@ -75,11 +75,17 @@ export default function NewBillScreen() {
   const { truckId: preselectedTruckId } = useLocalSearchParams<{ truckId?: string }>();
   const { shop } = useShop();
   const { trucks } = useTodayTrucks();
-  const { buyers } = useBuyers();
+  const { buyers, refetch: refetchBuyers } = useBuyers();
   const isMemberMode = useMemberMode();
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
   const isWeb = (Platform.OS as string) === 'web';
+
+  // Refetch buyers on component mount to ensure fresh data
+  useEffect(() => {
+    refetchBuyers();
+  }, []);
+
 
   const [slipNumber, setSlipNumber] = useState<number | null>(null);
   const [selectedTruckId, setSelectedTruckId] = useState<string | null>(null);
@@ -190,9 +196,8 @@ export default function NewBillScreen() {
   const selectBuyer = (b: Buyer) => {
     setCustomerName(b.name);
     setCustomerPhone(b.phone);
-    if (b.preferredPaymentMode) {
-      setPaymentMode(b.preferredPaymentMode);
-    }
+    // Always set payment mode - use preferred if available, otherwise default to CASH
+    setPaymentMode(b.preferredPaymentMode || 'CASH');
     setBuyerSuggestions([]);
   };
 

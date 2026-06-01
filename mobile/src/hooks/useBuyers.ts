@@ -7,7 +7,7 @@ import { archiveQueryOptions } from '@/lib/queryOptions';
 export function useBuyers() {
   const { shop } = useShop();
 
-  const { data: buyers = [], isLoading: loading } = useQuery({
+  const { data: buyers = [], isLoading: loading, refetch } = useQuery({
     queryKey: ['buyers', shop?.shopId],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -25,7 +25,7 @@ export function useBuyers() {
 
   const getBuyer = (code: string) => buyers.find((b) => b.code === code) ?? null;
 
-  return { buyers, loading, getBuyer };
+  return { buyers, loading, getBuyer, refetch };
 }
 
 export function useBuyerTransactions(buyerCode: string) {
