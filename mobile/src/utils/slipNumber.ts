@@ -1,45 +1,57 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabase } from '@/lib/supabase';
-import { getBusinessDateKey, getBusinessDateRange, getCurrentBusinessDate } from '@/lib/businessDay';
 
-const STORAGE_KEY = 'today_slip_counter';
-
-export async function getNextSlipNumber(shopId: string, date = getCurrentBusinessDate()): Promise<number> {
-  const { startMs, endMs } = getBusinessDateRange(date);
-  const storageKey = getBusinessDateKey(date);
+export async function getNextSlipNumber(shopId: string, offsetBase = 0): Promise<number> {
+  const userStorageKey = `continuous_slip_counter_${offsetBase}`;
 
   try {
-    const { data, error } = await supabase
+    let supabaseQuery = supabase
       .from('inquiries')
       .select('slip_number')
-      .eq('shop_id', shopId)
-      .gte('date', startMs)
-      .lte('date', endMs)
+      .eq('shop_id', shopId);
+
+    if (offsetBase > 0) {
+      supabaseQuery = supabaseQuery
+        .gte('slip_number', offsetBase)
+        .lt('slip_number', offsetBase + 10000);
+    } else {
+      supabaseQuery = supabaseQuery
+        .lt('slip_number', 10000); // Admin slips are < 10000
+    }
+
+    const supabasePromise = supabaseQuery
       .order('slip_number', { ascending: false })
       .limit(1);
+
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Network timeout')), 2500)
+    );
+
+    const { data, error } = await Promise.race([supabasePromise, timeoutPromise]) as any;
 
     if (error) throw new Error(error.message);
 
     const maxSlip = data && data.length > 0 ? (data[0].slip_number as number) : 0;
-    const next = maxSlip > 0 ? maxSlip + 1 : 1001;
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ key: storageKey, value: next }));
+    const next = maxSlip > 0 ? maxSlip + 1 : (offsetBase > 0 ? offsetBase + 1 : 1001);
+    await AsyncStorage.setItem(userStorageKey, String(next));
     return next;
   } catch {
-    // Supabase unavailable — fall back to AsyncStorage
+    // Supabase unavailable — fall back to AsyncStorage continuous value
     try {
-      const raw = await AsyncStorage.getItem(STORAGE_KEY);
+      const raw = await AsyncStorage.getItem(userStorageKey);
       if (raw) {
-        const { key, value } = JSON.parse(raw) as { key: string; value: number };
-        if (key === storageKey) {
-          const next = value + 1;
-          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ key: storageKey, value: next }));
+        const val = parseInt(raw, 10);
+        if (!isNaN(val)) {
+          const next = val + 1;
+          await AsyncStorage.setItem(userStorageKey, String(next));
           return next;
         }
       }
     } catch {
       // storage also failed
     }
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ key: storageKey, value: 1001 }));
-    return 1001;
+    const defaultStart = offsetBase > 0 ? offsetBase + 1 : 1001;
+    await AsyncStorage.setItem(userStorageKey, String(defaultStart));
+    return defaultStart;
   }
 }

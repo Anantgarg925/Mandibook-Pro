@@ -79,8 +79,8 @@ export default function MemberLoginScreen() {
       Alert.alert('Invalid Number', 'कृपया 10 अंकों का सही फोन नंबर डालें।');
       return;
     }
-    if (!pin || pin.length < 4) {
-      Alert.alert('Invalid PIN', 'कृपया 4 अंकों का PIN डालें।');
+    if (!pin || pin.length !== 4) {
+      Alert.alert('Invalid PIN', 'कृपया ठीक 4-अंकीय Shop PIN डालें।');
       return;
     }
 
@@ -241,7 +241,7 @@ export default function MemberLoginScreen() {
               placeholderTextColor="#a0a0a0"
               keyboardType="number-pad"
               secureTextEntry
-              maxLength={6}
+              maxLength={4}
               value={pin}
               onChangeText={(t) => {
                 setPin(t.replace(/\D/g, ''));

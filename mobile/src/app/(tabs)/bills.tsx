@@ -79,11 +79,29 @@ const BillCard = React.memo(function BillCard({ item, onPress, isSmall }: { item
       </View>
       <View style={{ height: 0.8, backgroundColor: '#E5E7EB', marginBottom: 8 }} />
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-          <Clock size={12} color="#4B5563" />
-          <Text style={{ fontSize: 11, color: '#4B5563', marginLeft: 4, flexShrink: 1 }}>
-            {item.sacks} bags • {Math.round(item.totalWeight).toLocaleString('en-IN')} kg
-          </Text>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Clock size={12} color="#4B5563" />
+            <Text style={{ fontSize: 11, color: '#4B5563', marginLeft: 4, flexShrink: 1 }}>
+              {item.sacks} bags • {Math.round(item.totalWeight).toLocaleString('en-IN')} kg
+            </Text>
+          </View>
+          {item.paymentReceivedBy ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+              <View style={{
+                paddingHorizontal: 5,
+                paddingVertical: 1,
+                borderRadius: 4,
+                backgroundColor: '#F0FDF4',
+                borderWidth: 0.5,
+                borderColor: '#BBF7D0',
+              }}>
+                <Text style={{ fontSize: 8.5, fontWeight: '700', color: '#16A34A' }}>
+                  Munshi: {item.paymentReceivedBy}
+                </Text>
+              </View>
+            </View>
+          ) : null}
         </View>
         <Text style={{ fontSize: 12, color: isConfirmed ? '#166534' : '#111827', fontWeight: '600', textAlign: 'right' }}>
           ₹ {toIndianCurrency(item.netAmount).replace('₹', '')}

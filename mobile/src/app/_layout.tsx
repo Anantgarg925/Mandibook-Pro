@@ -3,10 +3,12 @@ import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useColorScheme } from '@/lib/useColorScheme';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider, dehydrate, hydrate, onlineManager } from '@tanstack/react-query';
 import { Platform, Text, TextInput, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider as RNKeyboardProvider } from 'react-native-keyboard-controller';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 
 // KeyboardProvider crashes silently on web — use a passthrough wrapper
 function KeyboardProvider({ children }: { children: React.ReactNode }) {
@@ -22,7 +24,7 @@ import { ErrorBoundary } from '@/components/common/ErrorBoundary';
 import OfflineBanner from '@/components/common/OfflineBanner';
 import { BottomNavBar } from '@/components/common/BottomNavBar';
 import { SubscriptionGate } from '@/components/subscription/SubscriptionGate';
-import React, { type ComponentType, useEffect } from 'react';
+import React, { type ComponentType, useEffect, useState } from 'react';
 import { Colors } from '@/lib/theme';
 import { useFonts, Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { Analytics } from '@vercel/analytics/react';
@@ -42,7 +44,24 @@ export const unstable_settings = {
 
 SplashScreen.preventAutoHideAsync().catch(() => { });
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1, // Only retry once on failure to prevent long loading hangs in low internet
+      staleTime: 1000 * 60 * 5, // Keep cached data fresh for 5 minutes
+      gcTime: 1000 * 60 * 60 * 24, // Retain in cache for 24 hours to support offline hydration
+      refetchOnWindowFocus: false, // Avoid refetching when focusing app
+      refetchOnReconnect: 'always', // Auto-refetch when internet reconnects
+    },
+  },
+});
+
+// Configure React Query to use NetInfo for accurate online/offline detection
+onlineManager.setEventListener((setOnline) => {
+  return NetInfo.addEventListener((state) => {
+    setOnline(!!(state.isConnected && state.isInternetReachable !== false));
+  });
+});
 
 function RootLayoutNav({ colorScheme }: { colorScheme: 'light' | 'dark' | null | undefined }) {
   return (
@@ -120,10 +139,63 @@ export default function RootLayout() {
     Inter_700Bold,
   });
 
+  const [cacheHydrated, setCacheHydrated] = useState(false);
+
+  // 1. Hydrate cache from AsyncStorage on startup
   useEffect(() => {
-    if (!fontsLoaded) return;
+    async function loadCache() {
+      try {
+        const cachedString = await AsyncStorage.getItem('MANDIBOOK_QUERY_CACHE');
+        if (cachedString) {
+          const dehydratedState = JSON.parse(cachedString);
+          hydrate(queryClient, dehydratedState);
+        }
+      } catch (error) {
+        console.error('Error hydrating query cache:', error);
+      } finally {
+        setCacheHydrated(true);
+      }
+    }
+    loadCache();
+  }, []);
+
+  // 2. Hide Splash screen only when both fonts and query cache are loaded
+  useEffect(() => {
+    if (!fontsLoaded || !cacheHydrated) return;
     SplashScreen.hideAsync().catch(() => { });
-  }, [fontsLoaded]);
+  }, [fontsLoaded, cacheHydrated]);
+
+  // 3. Dehydrate and save cache on updates (with 1s debounce)
+  useEffect(() => {
+    if (!cacheHydrated) return;
+
+    let saveTimeout: any;
+
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      // Save cache on query success or updates
+      if (event.type === 'updated' && event.action.type === 'success') {
+        clearTimeout(saveTimeout);
+        saveTimeout = setTimeout(async () => {
+          try {
+            const dehydratedState = dehydrate(queryClient, {
+              shouldDehydrateQuery: (query) => {
+                // Only dehydrate successful queries that have data
+                return query.state.status === 'success';
+              },
+            });
+            await AsyncStorage.setItem('MANDIBOOK_QUERY_CACHE', JSON.stringify(dehydratedState));
+          } catch (error) {
+            console.error('Error saving query cache:', error);
+          }
+        }, 1000);
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      clearTimeout(saveTimeout);
+    };
+  }, [cacheHydrated]);
 
   let FirstRunTutorialSafe: ComponentType | null = null;
   try {

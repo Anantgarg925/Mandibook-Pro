@@ -350,6 +350,22 @@ const BillRow = memo(function BillRow({
             >
               Grade: {item.gradeName || item.grade} {'\u2022'} Qty: {Math.round(item.totalWeight || item.sacks)}kg
             </Text>
+            {item.paymentReceivedBy ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                <View style={{
+                  paddingHorizontal: 6,
+                  paddingVertical: 1.5,
+                  borderRadius: 4,
+                  backgroundColor: '#F0FDF4',
+                  borderWidth: 0.5,
+                  borderColor: '#BBF7D0',
+                }}>
+                  <Text style={{ fontSize: 9, fontWeight: '700', color: '#16A34A' }}>
+                    Munshi: {item.paymentReceivedBy}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
           </View>
 
           {/* Right */}

@@ -89,4 +89,6 @@ const PagerView = forwardRef((props: any, ref) => {
   );
 });
 
+PagerView.displayName = 'PagerView';
+
 export default PagerView;

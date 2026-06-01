@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Switch,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import * as Contacts from 'expo-contacts';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -81,12 +82,7 @@ export default function NewBillScreen() {
   const insets = useSafeAreaInsets();
   const isWeb = (Platform.OS as string) === 'web';
 
-  // Refetch buyers on component mount to ensure fresh data
-  useEffect(() => {
-    refetchBuyers();
-  }, []);
-
-
+  const [member, setMember] = useState<any>(null);
   const [slipNumber, setSlipNumber] = useState<number | null>(null);
   const [selectedTruckId, setSelectedTruckId] = useState<string | null>(null);
   const selectedTruck = trucks.find(t => t.id === selectedTruckId) || null;
@@ -144,9 +140,19 @@ export default function NewBillScreen() {
   };
 
   useEffect(() => {
+    AsyncStorage.getItem('mandibook_member_session')
+      .then((raw) => {
+        if (raw) setMember(JSON.parse(raw));
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (!shop?.shopId) return;
-    getNextSlipNumber(shop.shopId).then(setSlipNumber);
-  }, [shop?.shopId]);
+    const memberIndex = shop.teamMembers?.findIndex(m => m.phone === member?.phone) ?? -1;
+    const offsetBase = memberIndex !== -1 ? (memberIndex + 1) * 10000 : 0;
+    getNextSlipNumber(shop.shopId, offsetBase).then(setSlipNumber);
+  }, [shop?.shopId, member, shop?.teamMembers]);
 
   useEffect(() => {
     if (preselectedTruckId && trucks.length > 0) {
@@ -262,7 +268,9 @@ export default function NewBillScreen() {
       buyerUpsert?: { name: string; phone: string } | null;
     }) => {
       // 1. Fetch latest slip just before saving to prevent simultaneous duplicates
-      const realTimeSlip = await getNextSlipNumber(payload.inquiry.shopId);
+      const memberIndex = shop?.teamMembers?.findIndex(m => m.phone === member?.phone) ?? -1;
+      const offsetBase = memberIndex !== -1 ? (memberIndex + 1) * 10000 : 0;
+      const realTimeSlip = await getNextSlipNumber(payload.inquiry.shopId, offsetBase);
 
       // 2. Create inquiry
       const dbInq = {
@@ -296,6 +304,7 @@ export default function NewBillScreen() {
         status: payload.inquiry.status,
         date: payload.inquiry.date,
         created_at: payload.inquiry.createdAt,
+        payment_received_by: member?.name || 'Admin',
       };
       const { data: inquiry, error: inqErr } = await supabase
         .from('inquiries')
@@ -499,7 +508,12 @@ export default function NewBillScreen() {
             cartagePerKg: shop!.charges?.cartagePerKg ?? 0,
             applyApmc,
             applyBardana,
-            entries: allEntries
+            entries: allEntries,
+            creator: {
+              id: member?.id || 'admin',
+              name: member?.name || 'Admin',
+              phone: member?.phone || ''
+            }
           },
           netAmount: finalNet,
           paymentMode,
@@ -549,7 +563,9 @@ export default function NewBillScreen() {
     saveMutation.reset();
     successY.value = 400;
     if (shop?.shopId) {
-      const next = await getNextSlipNumber(shop.shopId);
+      const memberIndex = shop.teamMembers?.findIndex(m => m.phone === member?.phone) ?? -1;
+      const offsetBase = memberIndex !== -1 ? (memberIndex + 1) * 10000 : 0;
+      const next = await getNextSlipNumber(shop.shopId, offsetBase);
       setSlipNumber(next);
     }
     

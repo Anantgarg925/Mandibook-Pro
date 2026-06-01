@@ -52,8 +52,8 @@ export default function AdminLoginScreen() {
       setError('कृपया 10 अंकों का सही फोन नंबर डालें।');
       return;
     }
-    if (!pin || pin.length < 4) {
-      setError('कृपया 4-अंकीय Admin PIN डालें।');
+    if (!pin || pin.length !== 4) {
+      setError('कृपया ठीक 4-अंकीय Admin PIN डालें।');
       return;
     }
 

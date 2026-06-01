@@ -1,9 +1,13 @@
--- Add a one-time firm password gate on top of existing phone + PIN login.
+-- FIX: The 20260531000000_firm_password_unlock migration overwrote
+-- verify_member_login and dropped the session_token generation that was
+-- added in 20260519000300. The member-login code checks for session_token
+-- and returns null when it's missing, causing ALL logins to appear as
+-- "incorrect PIN" even with the correct PIN.
+--
+-- This migration restores session_token generation while keeping the
+-- firm_password_set field added in 20260531.
 
 create extension if not exists pgcrypto with schema extensions;
-
-alter table public.shops
-  add column if not exists firm_password_hash text;
 
 create or replace function public.verify_member_login(p_phone text, p_pin text)
 returns jsonb
@@ -23,6 +27,7 @@ begin
     return null;
   end if;
 
+  -- Try member login first
   select *
     into v_member
   from public.members m
@@ -34,6 +39,7 @@ begin
   if found then
     select * into v_shop from public.shops s where s.id = v_member.shop_id;
   else
+    -- Try admin login
     select *
       into v_shop
     from public.shops s
@@ -49,7 +55,7 @@ begin
     v_is_admin := true;
   end if;
 
-  -- Generate session token (was dropped in this migration, restoring from 20260519000300)
+  -- Generate session token (restored from 20260519000300)
   v_session_token := gen_random_uuid()::text || gen_random_uuid()::text;
 
   insert into public.app_sessions (token_hash, shop_id, member_id, role, expires_at, created_at)
@@ -62,6 +68,7 @@ begin
     v_now
   );
 
+  -- Cleanup expired sessions
   delete from public.app_sessions
   where expires_at < v_now;
 
@@ -115,71 +122,3 @@ $$;
 
 revoke all on function public.verify_member_login(text, text) from public;
 grant execute on function public.verify_member_login(text, text) to anon, authenticated;
-
-create or replace function public.set_shop_firm_password(
-  p_shop_id text,
-  p_new_password text,
-  p_current_password text default null
-)
-returns void
-language plpgsql
-security definer
-set search_path = public, extensions
-as $$
-declare
-  v_hash text;
-begin
-  if length(coalesce(p_new_password, '')) < 8 then
-    raise exception 'Firm password must be at least 8 characters';
-  end if;
-
-  select firm_password_hash
-    into v_hash
-  from public.shops
-  where id = p_shop_id
-  for update;
-
-  if not found then
-    raise exception 'Shop not found';
-  end if;
-
-  if v_hash is not null and (p_current_password is null or v_hash <> crypt(p_current_password, v_hash)) then
-    raise exception 'Current password is incorrect';
-  end if;
-
-  update public.shops
-  set firm_password_hash = crypt(p_new_password, gen_salt('bf'))
-  where id = p_shop_id;
-end;
-$$;
-
-revoke all on function public.set_shop_firm_password(text, text, text) from public;
-grant execute on function public.set_shop_firm_password(text, text, text) to anon, authenticated;
-
-create or replace function public.verify_shop_firm_password(
-  p_shop_id text,
-  p_password text
-)
-returns boolean
-language plpgsql
-security definer
-set search_path = public, extensions
-as $$
-declare
-  v_hash text;
-begin
-  select firm_password_hash
-    into v_hash
-  from public.shops
-  where id = p_shop_id;
-
-  if not found or v_hash is null then
-    return false;
-  end if;
-
-  return v_hash = crypt(p_password, v_hash);
-end;
-$$;
-
-revoke all on function public.verify_shop_firm_password(text, text) from public;
-grant execute on function public.verify_shop_firm_password(text, text) to anon, authenticated;

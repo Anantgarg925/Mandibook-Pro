@@ -23,12 +23,14 @@ function stripAnimationProps<P extends Record<string, unknown>>(props: P) {
 function createAnimatedComponent<TProps extends Record<string, unknown>>(
   Component: React.ComponentType<TProps>
 ) {
-  return React.forwardRef<unknown, TProps>((props, ref) => (
+  const AnimatedComponent = React.forwardRef<unknown, TProps>((props, ref) => (
     React.createElement(Component as React.ComponentType<any>, {
       ...stripAnimationProps(props),
       ref,
     })
   ));
+  AnimatedComponent.displayName = `Animated${Component.displayName || Component.name || 'Component'}`;
+  return AnimatedComponent;
 }
 
 export function useSharedValue<T>(initialValue: T) {

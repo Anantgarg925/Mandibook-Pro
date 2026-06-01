@@ -21,7 +21,7 @@ import { useShop } from '@/context/ShopContext';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { toIndianWeight } from '@/lib/formatters';
 import { useMemberMode } from '@/hooks/useMemberMode';
-import { getCurrentBusinessDate } from '@/lib/businessDay';
+import { getBusinessDateRange, getCurrentBusinessDate } from '@/lib/businessDay';
 import { makeReferenceSlipNumber, normalizeGradeRows, ReferenceSlipCard } from '@/utils/referenceSlip';
 import { downloadTestIdAsJpeg } from '@/utils/webExport';
 import type { GradeInventory } from '@/types/truck';
@@ -203,6 +203,7 @@ export default function RegisterTruckScreen() {
   const [gradeRows, setGradeRows] = useState([{ gradeLabel: '', weightKg: '' }]);
   const [referenceSlipNumber, setReferenceSlipNumber] = useState(() => makeReferenceSlipNumber());
   const [success, setSuccess] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const submitModeRef = useRef<'done' | 'add-another'>('done');
   const referenceSlipRef = useRef<View>(null);
   const chlRef = useRef<TextInput>(null);
@@ -300,8 +301,76 @@ export default function RegisterTruckScreen() {
     },
   });
 
+  const proceedWithRegistration = async (
+    validGradeRows: { gradeLabel: string; weightKg: number }[],
+    gradeInventory: GradeInventory[],
+    businessDate: Date,
+    addAnother: boolean
+  ) => {
+    try {
+      const { data: truckData, error } = await supabase
+        .from('trucks')
+        .insert({
+          shop_id: shop!.shopId,
+          truck_number: truckNumber.toUpperCase(),
+          sender_name: senderName,
+          sender_code: senderCode,
+          chl_number: chlNumber,
+          total_kg: totalKgNum,
+          freight_amount: parseFloat(freightAmount) || 0,
+          grade_inventory: gradeInventory,
+          reference_slip_number: referenceSlipNumber,
+          status: 'ACTIVE',
+          date: businessDate.getTime(),
+          created_at: Date.now(),
+        })
+        .select()
+        .single();
+
+      if (error) {
+        Alert.alert('Could not register truck', error.message);
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (validGradeRows.length > 0) {
+        await supabase.from('truck_grade_entries').insert(
+          validGradeRows.map((row) => ({
+            id: `${truckData.id}-${row.gradeLabel}-${Date.now()}`.replace(/\s+/g, '-'),
+            truck_id: truckData.id,
+            grade_label: row.gradeLabel,
+            weight_kg: row.weightKg,
+            created_at: Date.now(),
+          }))
+        );
+      }
+
+      queryClient.invalidateQueries({ queryKey: ['trucks', shop?.shopId] });
+
+      if (addAnother) {
+        setTruckNumber('');
+        setSenderName('');
+        setSenderCode('');
+        setChlNumber('');
+        setTotalKg('');
+        setFreightAmount('');
+        setGradeRows(firmGradeRows.length > 0 ? firmGradeRows : [{ gradeLabel: '', weightKg: '' }]);
+        setGradeBreakdownOpen(false);
+        setReferenceSlipNumber(makeReferenceSlipNumber());
+        setIsSubmitting(false);
+        return;
+      }
+
+      setSuccess(true);
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Something went wrong');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleSubmit = async (addAnother = false) => {
-    if (!shop?.shopId || !formComplete || mutation.isPending) return;
+    if (!shop?.shopId || !formComplete || isSubmitting) return;
     if (gradeBreakdownOpen) {
       if (totalGradedWeight > totalKgNum) return;
       const invalidRow = gradeRows.some((row) => (parseFloat(row.weightKg) || 0) > 0 && !row.gradeLabel.trim());
@@ -328,51 +397,65 @@ export default function RegisterTruckScreen() {
       };
     });
 
-    const { data: truckData, error } = await supabase
-      .from('trucks')
-      .insert({
-      shop_id: shop.shopId,
-      truck_number: truckNumber.toUpperCase(),
-      sender_name: senderName,
-      sender_code: senderCode,
-      chl_number: chlNumber,
-      total_kg: totalKgNum,
-      freight_amount: parseFloat(freightAmount) || 0,
-      grade_inventory: gradeInventory,
-      reference_slip_number: referenceSlipNumber,
-      status: 'ACTIVE',
-      date: businessDate.getTime(),
-      created_at: Date.now(),
-      })
-      .select()
-      .single();
-    if (error) {
-      Alert.alert('Could not register truck', error.message);
-      return;
+    setIsSubmitting(true);
+    try {
+      const { startMs, endMs } = getBusinessDateRange(businessDate);
+      const normalizedInput = truckNumber.replace(/[^A-Z0-9]/ig, '').toUpperCase();
+
+      const checkPromise = supabase
+        .from('trucks')
+        .select('truck_number')
+        .eq('shop_id', shop.shopId)
+        .gte('date', startMs)
+        .lte('date', endMs);
+
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Network timeout')), 2500)
+      );
+
+      let existingTrucks: any[] | null = null;
+      let checkError: any = null;
+
+      try {
+        const result = await Promise.race([checkPromise, timeoutPromise]) as any;
+        existingTrucks = result.data;
+        checkError = result.error;
+      } catch (err) {
+        checkError = err;
+      }
+
+      if (checkError) {
+        console.warn('Could not complete duplicate check due to network issue/timeout. Proceeding with registration.', checkError);
+      } else {
+        const isDuplicate = (existingTrucks ?? []).some(
+          (t: { truck_number: string }) => t.truck_number.replace(/[^A-Z0-9]/ig, '').toUpperCase() === normalizedInput
+        );
+
+        if (isDuplicate) {
+          setIsSubmitting(false);
+          Alert.alert(
+            'Duplicate Truck / डुप्लीकेट गाड़ी',
+            `Truck ${truckNumber.toUpperCase()} is already registered today. Do you still want to register it?\n\nगाड़ी ${truckNumber.toUpperCase()} आज पहले ही रजिस्टर हो चुकी है। क्या आप इसे दोबारा जोड़ना चाहते हैं?`,
+            [
+              { text: 'Cancel / रद्द करें', style: 'cancel' },
+              {
+                text: 'Register Anyway / फिर भी रजिस्टर करें',
+                onPress: () => {
+                  setIsSubmitting(true);
+                  proceedWithRegistration(validGradeRows, gradeInventory, businessDate, addAnother);
+                },
+              },
+            ]
+          );
+          return;
+        }
+      }
+
+      await proceedWithRegistration(validGradeRows, gradeInventory, businessDate, addAnother);
+    } catch (e: any) {
+      Alert.alert('Error', e.message || 'Something went wrong');
+      setIsSubmitting(false);
     }
-    if (validGradeRows.length > 0) {
-      await supabase.from('truck_grade_entries').insert(validGradeRows.map((row) => ({
-        id: `${truckData.id}-${row.gradeLabel}-${Date.now()}`.replace(/\s+/g, '-'),
-        truck_id: truckData.id,
-        grade_label: row.gradeLabel,
-        weight_kg: row.weightKg,
-        created_at: Date.now(),
-      })));
-    }
-    queryClient.invalidateQueries({ queryKey: ['trucks', shop?.shopId] });
-    if (submitModeRef.current === 'add-another') {
-      setTruckNumber('');
-      setSenderName('');
-      setSenderCode('');
-      setChlNumber('');
-      setTotalKg('');
-      setFreightAmount('');
-      setGradeRows(firmGradeRows.length > 0 ? firmGradeRows : [{ gradeLabel: '', weightKg: '' }]);
-      setGradeBreakdownOpen(false);
-      setReferenceSlipNumber(makeReferenceSlipNumber());
-      return;
-    }
-    setSuccess(true);
   };
 
   const resetForm = () => {
@@ -804,7 +887,7 @@ export default function RegisterTruckScreen() {
         <BottomBar
           totalKgNum={totalKgNum}
           formComplete={formComplete}
-          isPending={mutation.isPending}
+          isPending={isSubmitting}
           onSubmit={() => handleSubmit(false)}
           onSubmitAndAddAnother={() => handleSubmit(true)}
         />
