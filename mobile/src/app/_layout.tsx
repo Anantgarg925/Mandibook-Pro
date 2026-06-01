@@ -140,6 +140,15 @@ export default function RootLayout() {
     Inter_700Bold,
   });
 
+  // Register Service Worker for PWA
+  useEffect(() => {
+    if (Platform.OS === 'web' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js').catch(err => {
+        console.warn('Service worker registration failed:', err);
+      });
+    }
+  }, []);
+
   const [cacheHydrated, setCacheHydrated] = useState(false);
 
   // 1. Hydrate cache from AsyncStorage on startup
