@@ -1110,7 +1110,7 @@ export default function NewBillScreen() {
             {editingField === 'customer' && (
               <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <TextInput style={{ flex: 1, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }} placeholder="Customer name" value={customerName} onChangeText={(val) => { setCustomerName(val); if (errors.customer) setErrors((prev) => { const { customer, ...rest } = prev; return rest; }); const lower = val.toLowerCase(); if (lower.length > 0) { setBuyerSuggestions(buyers.filter((b) => b.name.toLowerCase().includes(lower)).slice(0, 5)); } else setBuyerSuggestions([]); }} />
+                  <TextInput style={{ flex: 1, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }} placeholder="Customer name" value={customerName} onChangeText={(val) => { setCustomerName(val); if (errors.customer) setErrors((prev) => { const { customer, ...rest } = prev; return rest; }); const lower = val.toLowerCase(); if (lower.length > 0) { setBuyerSuggestions(buyers.filter((b) => b.name.toLowerCase().includes(lower)).slice(0, 5)); } else setBuyerSuggestions([]); }} returnKeyType="next" onSubmitEditing={() => customerPhoneRef.current?.focus()} />
                   <Pressable onPress={openContactPicker} style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#E0F2FE', alignItems: 'center', justifyContent: 'center' }}><User size={20} color="#0EA5E9" /></Pressable>
                 </View>
                 {buyerSuggestions.length > 0 && (
@@ -1123,7 +1123,7 @@ export default function NewBillScreen() {
                     ))}
                   </View>
                 )}
-                <TextInput style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827', marginTop: 8 }} placeholder="Phone number" keyboardType="phone-pad" value={customerPhone} onChangeText={(v) => setCustomerPhone(v.replace(/[^\d]/g, '').slice(0, 10))} />
+                <TextInput ref={customerPhoneRef} style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827', marginTop: 8 }} placeholder="Phone number" keyboardType="phone-pad" value={customerPhone} onChangeText={(v) => setCustomerPhone(v.replace(/[^\d]/g, '').slice(0, 10))} returnKeyType="done" onSubmitEditing={() => { setEditingField('source'); setTimeout(() => scrollToSection('source'), 100); }} />
               </View>
             )}
 
@@ -1197,11 +1197,11 @@ export default function NewBillScreen() {
                   <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 12, color: '#4B5563', marginBottom: 4, fontWeight: '600' }}>Sacks</Text>
-                      <TextInput style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }} placeholder="Qty" keyboardType="number-pad" value={sacksText} onChangeText={(v) => { setSacksText(v); setSacks(parseInt(v.replace(/[^\d]/g, ''), 10) || 0); if(errors.sacks) setErrors(p => ({...p, sacks: ''})) }} />
+                      <TextInput ref={sacksRef} style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }} placeholder="Qty" keyboardType="number-pad" value={sacksText} onChangeText={(v) => { setSacksText(v); setSacks(parseInt(v.replace(/[^\d]/g, ''), 10) || 0); if(errors.sacks) setErrors(p => ({...p, sacks: ''})) }} returnKeyType="next" onSubmitEditing={() => weightPerSackRef.current?.focus()} />
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: 12, color: '#4B5563', marginBottom: 4, fontWeight: '600' }}>Wt/Sack</Text>
-                      <TextInput
+                      <TextInput ref={weightPerSackRef}
                         style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }}
                         placeholder="Wt/Sack"
                         keyboardType="decimal-pad"
