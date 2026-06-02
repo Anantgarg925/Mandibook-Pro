@@ -9,8 +9,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { KeyboardProvider as RNKeyboardProvider } from 'react-native-keyboard-controller';
 import { Storage as AsyncStorage } from '@/lib/offlineDB';
 import NetInfo from '@react-native-community/netinfo';
-
-// KeyboardProvider crashes silently on web — use a passthrough wrapper
+import { supabase } from '@/lib/supabase';
+import { processOfflineQueue } from '@/lib/offlineQueue';
 function KeyboardProvider({ children }: { children: React.ReactNode }) {
   if (Platform.OS === 'web') return <>{children}</>;
   return <RNKeyboardProvider>{children}</RNKeyboardProvider>;
@@ -64,7 +64,19 @@ const queryClient = new QueryClient({
 // Configure React Query to use NetInfo for accurate online/offline detection
 onlineManager.setEventListener((setOnline) => {
   return NetInfo.addEventListener((state) => {
-    setOnline(!!(state.isConnected && state.isInternetReachable !== false));
+    const isOnline = !!(state.isConnected && state.isInternetReachable !== false);
+    setOnline(isOnline);
+    if (isOnline) {
+      processOfflineQueue(supabase)
+        .then((syncedAny) => {
+          if (syncedAny) {
+            queryClient.invalidateQueries({ queryKey: ['inquiries'] });
+            queryClient.invalidateQueries({ queryKey: ['trucks'] });
+            queryClient.invalidateQueries({ queryKey: ['truck'] });
+          }
+        })
+        .catch(err => console.error('Queue sync error:', err));
+    }
   });
 });
 

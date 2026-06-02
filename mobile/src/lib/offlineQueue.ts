@@ -64,13 +64,14 @@ export async function clearOfflineQueue(): Promise<void> {
 // Ensure only one sync process runs at a time
 let isSyncing = false;
 
-export async function processOfflineQueue(supabaseClient: any): Promise<void> {
-  if (isSyncing) return;
+export async function processOfflineQueue(supabaseClient: any): Promise<boolean> {
+  if (isSyncing) return false;
   
   const queue = await getOfflineQueue();
-  if (queue.length === 0) return;
+  if (queue.length === 0) return false;
   
   isSyncing = true;
+  let syncedAny = false;
   try {
     // Sort oldest first
     const sortedQueue = [...queue].sort((a, b) => a.createdAt - b.createdAt);
@@ -90,28 +91,23 @@ export async function processOfflineQueue(supabaseClient: any): Promise<void> {
             break;
           }
           console.error('Error syncing bill:', error);
-          // If it's a hard error (not network), we might want to flag it or remove it,
-          // but for safety we'll let it stay for manual review unless we know it's unrecoverable.
-          // For now, if we get a definitive response (even conflict), the RPC handles DB insertion.
         }
         
         // If the RPC succeeded (returned accepted or conflict), it's safely in the database.
-        // We can remove it from the local queue.
         if (data && (data.status === 'accepted' || data.status === 'conflict')) {
           await removeOfflineOperation(operation.id);
+          syncedAny = true;
           
-          // Optionally, handle the buyer upsert and truck update if they were in the payload
           if (payload.buyerUpsert) {
              // Upsert buyer... (simplified)
           }
         }
       } else {
-        // Handle other operations (CREATE_TRUCK, etc.)
-        // For now, just remove to not block queue if unimplemented
         await removeOfflineOperation(operation.id);
       }
     }
   } finally {
     isSyncing = false;
   }
+  return syncedAny;
 }

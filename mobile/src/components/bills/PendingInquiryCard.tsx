@@ -410,6 +410,10 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inquiries', shop?.shopId] });
       queryClient.invalidateQueries({ queryKey: ['trucks', shop?.shopId] });
+      if (inquiry.truck_id) {
+        queryClient.invalidateQueries({ queryKey: ['truck', shop?.shopId, inquiry.truck_id] });
+        queryClient.invalidateQueries({ queryKey: ['inquiries', shop?.shopId, 'truck', inquiry.truck_id] });
+      }
     },
   });
 

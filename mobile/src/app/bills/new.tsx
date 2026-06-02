@@ -393,6 +393,10 @@ export default function NewBillScreen() {
             const list = Array.isArray(old) ? old : [];
             return [offlineInquiry, ...list];
           });
+          queryClient.setQueryData(['inquiries', payload.inquiry.shopId, 'truck', payload.inquiry.truckId], (old: any) => {
+            const list = Array.isArray(old) ? old : [];
+            return [offlineInquiry, ...list];
+          });
 
           // 3. Update trucks cache optimistically
           const { startMs: dateParam, endMs: dateEnd } = getBusinessDateRange(getCurrentBusinessDate());
