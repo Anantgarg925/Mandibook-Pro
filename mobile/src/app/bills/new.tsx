@@ -86,6 +86,7 @@ export default function NewBillScreen() {
   const isWeb = (Platform.OS as string) === 'web';
 
   const [member, setMember] = useState<any>(null);
+  const isSavingRef = useRef(false);
   const [slipNumber, setSlipNumber] = useState<number | null>(null);
   const [selectedTruckId, setSelectedTruckId] = useState<string | null>(null);
   const selectedTruck = trucks.find(t => t.id === selectedTruckId) || null;
@@ -259,6 +260,7 @@ export default function NewBillScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inquiries', shop?.shopId] });
+      queryClient.invalidateQueries({ queryKey: ['trucks', shop?.shopId] });
       successY.value = 400; // hide bottom sheet
       router.replace('/member-dashboard' as any);
     },
@@ -365,6 +367,32 @@ export default function NewBillScreen() {
   });
 
 
+  // Compute inventory overflow warning for the CURRENT item being entered
+  const currentEntryWeight = calc?.totalWeight ?? 0;
+  const alreadyAddedWeightForGrade = entries
+    .filter(e => e.grade === selectedGrade)
+    .reduce((s, e) => s + e.totalWeight, 0);
+  const totalWeightForGrade = alreadyAddedWeightForGrade + currentEntryWeight;
+
+  let inventoryWarning: string | null = null;
+  if (selectedTruck && selectedGrade && !boughtFromAgent && currentEntryWeight > 0) {
+    const gradeInfo = selectedTruck.gradeInventory.find(g => g.code === selectedGrade);
+    if (gradeInfo) {
+      const gradeAvailable = Math.max(0, gradeInfo.totalKg - gradeInfo.confirmedKg - gradeInfo.provisionalKg);
+      if (gradeInfo.totalKg > 0 && totalWeightForGrade > gradeAvailable) {
+        inventoryWarning = `⚠️ Warning: ${totalWeightForGrade}kg exceeds available ${gradeAvailable}kg for this grade (${gradeInfo.name}). Truck has only ${gradeAvailable}kg remaining.`;
+      }
+    }
+    // Also check total truck level
+    const totalTruckAvailable = selectedTruck.totalKg > 0
+      ? Math.max(0, selectedTruck.totalKg - selectedTruck.gradeInventory.reduce((s, g) => s + g.confirmedKg + g.provisionalKg, 0))
+      : 0;
+    const totalAllEntries = entries.reduce((s, e) => s + e.totalWeight, 0) + currentEntryWeight;
+    if (selectedTruck.totalKg > 0 && totalAllEntries > totalTruckAvailable && !inventoryWarning) {
+      inventoryWarning = `⚠️ Warning: Total bill weight ${totalAllEntries}kg exceeds truck's available stock of ${totalTruckAvailable}kg.`;
+    }
+  }
+
   const handleAddEntry = () => {
     if (!validate() || !shop?.shopId || (!selectedTruck && !boughtFromAgent) || !selectedGrade) return;
 
@@ -426,8 +454,11 @@ export default function NewBillScreen() {
   };
 
   const handleSave = async () => {
+    // Immediate lock to prevent duplicate clicks (especially during offline/slow saves)
+    if (isSavingRef.current) return;
     if (entries.length === 0 && (!validate() || !shop?.shopId || (!selectedTruck && !boughtFromAgent) || !selectedGrade || saveMutation.isPending)) return;
     if (saveMutation.isPending) return;
+    isSavingRef.current = true;
 
     const slip = slipNumber ?? 1001;
 
@@ -546,6 +577,8 @@ export default function NewBillScreen() {
         ...prev,
         save: error instanceof Error ? error.message : 'Could not save bill. Try again.',
       }));
+    } finally {
+      isSavingRef.current = false;
     }
   };
 
@@ -565,6 +598,7 @@ export default function NewBillScreen() {
     setEntries([]);
     setManualTotal('');
     setSuccess(false);
+    isSavingRef.current = false;
     saveMutation.reset();
     successY.value = 400;
     if (shop?.shopId) {
@@ -958,20 +992,13 @@ export default function NewBillScreen() {
               {errors.weight ? <Text style={{ fontSize: 11, color: Colors.danger, marginTop: 2 }}>{errors.weight}</Text> : null}
             </View>
           </View>
-          {!boughtFromAgent && isOffline && selectedGrade && selectedTruck && calc && calc.totalWeight > 0 && (() => {
-            const gInfo = selectedTruck.gradeInventory.find((g: any) => g.code === selectedGrade);
-            if (gInfo && gInfo.totalKg > 0) {
-              const remaining = Math.max(0, gInfo.totalKg - gInfo.confirmedKg - (gInfo.provisionalKg || 0));
-              if (calc.totalWeight > remaining) {
-                return (
-                  <Text style={{ fontSize: 11, color: '#D97706', marginTop: 8, fontStyle: 'italic', paddingHorizontal: 4 }}>
-                    ⚠️ Note: This exceeds the agent's estimated split ({remaining}kg) for this grade, but fits within total truck stock.
-                  </Text>
-                );
-              }
-            }
-            return null;
-          })()}
+          {inventoryWarning && (
+            <View style={{ marginTop: 8, padding: 10, backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#F59E0B', borderRadius: 8, flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+              <Text style={{ fontSize: 12, color: '#92400E', fontWeight: '700', flex: 1 }}>
+                {inventoryWarning}
+              </Text>
+            </View>
+          )}
           {/* Rate Section */}
           <View onLayout={rememberSection('rate')}>
             <SectionHeader title="रेट / Rate" />
@@ -1089,7 +1116,7 @@ export default function NewBillScreen() {
           <Pressable
             testID="save-bill-button"
             onPress={handleSave}
-            disabled={saveMutation.isPending}
+            disabled={saveMutation.isPending || isSavingRef.current}
           >
             {({ pressed }) => (
               <View style={{
@@ -1099,10 +1126,15 @@ export default function NewBillScreen() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
-                backgroundColor: saveMutation.isPending ? Colors.border : pressed ? '#EAB308' : '#FBBF24',
+                backgroundColor: (saveMutation.isPending || isSavingRef.current) ? Colors.border : pressed ? '#EAB308' : '#FBBF24',
               }}>
-                {saveMutation.isPending ? (
-                  <ActivityIndicator color="#111827" />
+                {(saveMutation.isPending || isSavingRef.current) ? (
+                  <>
+                    <ActivityIndicator color="#111827" />
+                    <Text style={{ fontSize: FontSize.md, fontWeight: '900', color: '#111827', marginLeft: 8 }}>
+                      SAVING...
+                    </Text>
+                  </>
                 ) : (
                   <>
                     <Text style={{ fontSize: FontSize.md, fontWeight: '900', color: '#111827' }}>
@@ -1279,20 +1311,13 @@ export default function NewBillScreen() {
                       />
                     </View>
                   </View>
-                  {!boughtFromAgent && isOffline && selectedGrade && selectedTruck && calc && calc.totalWeight > 0 && (() => {
-                    const gInfo = selectedTruck.gradeInventory.find((g: any) => g.code === selectedGrade);
-                    if (gInfo && gInfo.totalKg > 0) {
-                      const remaining = Math.max(0, gInfo.totalKg - gInfo.confirmedKg - (gInfo.provisionalKg || 0));
-                      if (calc.totalWeight > remaining) {
-                        return (
-                          <Text style={{ fontSize: 11, color: '#D97706', marginTop: 8, fontStyle: 'italic' }}>
-                            ⚠️ Note: This exceeds the agent's estimated split ({remaining}kg) for this grade, but fits within total truck stock.
-                          </Text>
-                        );
-                      }
-                    }
-                    return null;
-                  })()}
+                  {inventoryWarning && (
+                    <View style={{ marginTop: 8, padding: 10, backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#F59E0B', borderRadius: 8, flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+                      <Text style={{ fontSize: 12, color: '#92400E', fontWeight: '700', flex: 1 }}>
+                        {inventoryWarning}
+                      </Text>
+                    </View>
+                  )}
                 </View>
               )}
 
@@ -1357,8 +1382,9 @@ export default function NewBillScreen() {
             {/* Action buttons */}
             <View style={{ marginTop: 24, gap: Spacing.sm }}>
               {errors.save ? <Text style={{ color: Colors.danger, fontSize: FontSize.xs, textAlign: 'center' }}>{errors.save}</Text> : null}
-              <Pressable testID="save-bill-button" onPress={handleSave} disabled={saveMutation.isPending} style={{ padding: 16, borderWidth: 2, borderColor: '#111827', backgroundColor: saveMutation.isPending ? '#CBD5E1' : '#FBBF24', alignItems: 'center' }}>
-                <Text style={{ fontSize: 18, fontWeight: '900', color: '#111827' }}>{saveMutation.isPending ? 'PROCESSING...' : 'SAVE BILL'}</Text>
+              <Pressable testID="save-bill-button" onPress={handleSave} disabled={saveMutation.isPending || isSavingRef.current} style={{ padding: 16, borderWidth: 2, borderColor: '#111827', backgroundColor: (saveMutation.isPending || isSavingRef.current) ? '#CBD5E1' : '#FBBF24', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
+                {(saveMutation.isPending || isSavingRef.current) && <ActivityIndicator color="#111827" size="small" />}
+                <Text style={{ fontSize: 18, fontWeight: '900', color: '#111827' }}>{(saveMutation.isPending || isSavingRef.current) ? 'SAVING...' : 'SAVE BILL'}</Text>
               </Pressable>
             </View>
           </View>

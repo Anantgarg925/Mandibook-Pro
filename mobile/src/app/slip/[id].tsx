@@ -143,6 +143,7 @@ export default function SlipPreviewScreen() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inquiries', shop?.shopId] });
+      queryClient.invalidateQueries({ queryKey: ['trucks', shop?.shopId] });
       queryClient.invalidateQueries({ queryKey: ['buyers', shop?.shopId] });
       queryClient.invalidateQueries({ queryKey: ['transactions', shop?.shopId] });
       goBack();

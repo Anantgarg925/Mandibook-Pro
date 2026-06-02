@@ -91,6 +91,7 @@ export default function EditBillScreen() {
   const [rate, setRate] = useState('');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [initialized, setInitialized] = useState(false);
+  const isSavingRef = useRef(false);
 
   // Refs for focus
   const customerPhoneRef = useRef<TextInput>(null);
@@ -279,15 +280,19 @@ export default function EditBillScreen() {
         'बिल अपडेट हो गया',
         [{ text: 'OK', onPress: () => router.back() }]
       );
+      isSavingRef.current = false;
     },
     onError: (error: Error) => {
+      isSavingRef.current = false;
       Alert.alert('Error', error.message || 'Could not save. Try again.');
     },
   });
 
   const handleSave = () => {
+    if (isSavingRef.current) return;
     const errs = validate();
     if (Object.keys(errs).length > 0) return;
+    isSavingRef.current = true;
     saveMutation.mutate();
   };
 
@@ -674,7 +679,7 @@ export default function EditBillScreen() {
           <Pressable
             testID="save-edit-button"
             onPress={handleSave}
-            disabled={saveMutation.isPending}
+            disabled={saveMutation.isPending || isSavingRef.current}
           >
             {({ pressed }) => (
               <View style={{
@@ -684,10 +689,15 @@ export default function EditBillScreen() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
-                backgroundColor: saveMutation.isPending ? Colors.border : pressed ? Colors.primaryPressed : Colors.primary,
+                backgroundColor: (saveMutation.isPending || isSavingRef.current) ? Colors.border : pressed ? Colors.primaryPressed : Colors.primary,
               }}>
-                {saveMutation.isPending ? (
-                  <ActivityIndicator color="#FFFFFF" />
+                {(saveMutation.isPending || isSavingRef.current) ? (
+                  <>
+                    <ActivityIndicator color="#FFFFFF" />
+                    <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: '#FFFFFF' }}>
+                      Saving... / सेव हो रहा है
+                    </Text>
+                  </>
                 ) : (
                   <>
                     <Check size={20} color="#FFFFFF" />

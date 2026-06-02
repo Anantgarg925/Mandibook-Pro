@@ -26,7 +26,7 @@ function attachBillSummary(trucks: Truck[], rows: InquiryRow[], grades: { code: 
           .filter((bill) => bill.status === 'CONFIRMED')
           .reduce((sum, bill) => sum + (bill.total_weight || 0), 0),
         provisionalKg: gradeBills
-          .filter((bill) => bill.status === 'PENDING')
+          .filter((bill) => bill.status === 'PENDING' || bill.status === 'DELIVERED')
           .reduce((sum, bill) => sum + (bill.total_weight || 0), 0),
       };
     });
