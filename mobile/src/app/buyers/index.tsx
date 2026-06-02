@@ -12,7 +12,7 @@ import {
   Platform,
   useWindowDimensions,
 } from 'react-native';
-import * as Contacts from 'expo-contacts';
+import { presentContactPicker } from '@/utils/contactPicker';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -56,10 +56,10 @@ export default function BuyerListScreen() {
   const addBuyerOpeningRef = useRef<TextInput>(null);
   const addBuyerNotesRef = useRef<TextInput>(null);
 
-  const fillBuyerFromContact = (contact: Contacts.Contact | Contacts.ExistingContact) => {
+  const fillBuyerFromContact = (contact: any) => {
     const phones: string[] = [];
     if (contact.phoneNumbers) {
-      contact.phoneNumbers.forEach(p => {
+      contact.phoneNumbers.forEach((p: any) => {
         const cleaned = p.number?.replace(/\D/g, '').slice(-10);
         if (cleaned && !phones.includes(cleaned)) phones.push(cleaned);
       });
@@ -73,12 +73,7 @@ export default function BuyerListScreen() {
 
   const pickBuyerContact = async () => {
     try {
-      const permission = await Contacts.requestPermissionsAsync();
-      if (permission.status !== 'granted') {
-        Alert.alert('Contacts permission needed', 'Contact access is required to select buyer details.');
-        return;
-      }
-      const contact = await Contacts.presentContactPickerAsync();
+      const contact = await presentContactPicker();
       if (contact) fillBuyerFromContact(contact);
     } catch (err) {
       console.log('Buyer contact picker error:', err);

@@ -54,6 +54,12 @@
       "display": "standalone",
       "orientation": "portrait"
     },
-    "owner": "anant925"
+    "owner": "anant925",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/efd28e1e-9e9b-4096-b28f-dc72acba1811"
+    }
   }
 }

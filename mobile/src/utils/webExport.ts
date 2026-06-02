@@ -63,49 +63,18 @@ function downloadHtmlFile(html: string, title: string): void {
 }
 
 /**
- * Download an HTML element as a JPEG using html2canvas-style approach.
- * Uses canvas API to render DOM to image.
+ * Download an HTML element as a JPEG/PNG using html2canvas.
  */
 async function elementToDataUrl(element: HTMLElement, format: 'png' | 'jpeg'): Promise<string> {
-  const rect = element.getBoundingClientRect();
-  const width = Math.ceil(rect.width);
-  const height = Math.ceil(rect.height);
-  const clone = element.cloneNode(true) as HTMLElement;
-  clone.style.margin = '0';
-  clone.style.transform = 'none';
-  clone.style.position = 'relative';
-
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}">
-      <foreignObject width="100%" height="100%">
-        <div xmlns="http://www.w3.org/1999/xhtml" style="width:${width}px;height:${height}px;">
-          ${clone.outerHTML}
-        </div>
-      </foreignObject>
-    </svg>
-  `;
-
-  const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-
-  try {
-    const image = new Image();
-    image.crossOrigin = 'anonymous';
-    image.src = url;
-    await image.decode();
-
-    const canvas = document.createElement('canvas');
-    canvas.width = width;
-    canvas.height = height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas unavailable');
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillRect(0, 0, width, height);
-    ctx.drawImage(image, 0, 0);
-    return canvas.toDataURL(format === 'png' ? 'image/png' : 'image/jpeg', 0.98);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+  const html2canvas = (await import('html2canvas')).default;
+  const canvas = await html2canvas(element, {
+    useCORS: true,
+    allowTaint: true,
+    backgroundColor: '#FFFFFF',
+    scale: 2,
+    logging: false,
+  });
+  return canvas.toDataURL(format === 'png' ? 'image/png' : 'image/jpeg', 0.98);
 }
 
 export async function downloadElementAsJpeg(element: HTMLElement, filename: string): Promise<void> {

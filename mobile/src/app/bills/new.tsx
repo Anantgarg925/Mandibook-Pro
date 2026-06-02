@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
-import * as Contacts from 'expo-contacts';
+import { presentContactPicker } from '@/utils/contactPicker';
 import { useNetInfo } from '@react-native-community/netinfo';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams } from 'expo-router';
@@ -27,7 +27,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useShop } from '@/context/ShopContext';
 import { useTodayTrucks } from '@/hooks/useTodayTrucks';
-import { getCurrentBusinessDate } from '@/lib/businessDay';
+import { getCurrentBusinessDate, getBusinessDateRange } from '@/lib/businessDay';
+import { enqueueOfflineOperation } from '@/lib/offlineQueue';
 import { useBuyers } from '@/hooks/useBuyers';
 import { useMemberMode } from '@/hooks/useMemberMode';
 import PaymentSelector from '@/components/bills/PaymentSelector';
@@ -155,8 +156,8 @@ export default function NewBillScreen() {
     if (!shop?.shopId) return;
     const memberIndex = shop.teamMembers?.findIndex(m => m.phone === member?.phone) ?? -1;
     const offsetBase = memberIndex !== -1 ? (memberIndex + 1) * 10000 : 0;
-    getNextSlipNumber(shop.shopId, offsetBase).then(setSlipNumber);
-  }, [shop?.shopId, member, shop?.teamMembers]);
+    getNextSlipNumber(shop.shopId, offsetBase, isOffline).then(setSlipNumber);
+  }, [shop?.shopId, member, shop?.teamMembers, isOffline]);
 
   useEffect(() => {
     if (preselectedTruckId && trucks.length > 0) {
@@ -188,17 +189,14 @@ export default function NewBillScreen() {
 
   const openContactPicker = async () => {
     try {
-      const permission = await Contacts.requestPermissionsAsync();
-      if (permission.status === 'granted') {
-        const contact = await Contacts.presentContactPickerAsync();
-        if (contact) {
-          setCustomerName(contact.name || '');
-          if (contact.phoneNumbers && contact.phoneNumbers.length > 0) {
-            const phone = contact.phoneNumbers[0].number?.replace(/[^\d]/g, '') || '';
-            setCustomerPhone(phone);
-          }
-          setBuyerSuggestions([]);
+      const contact = await presentContactPicker();
+      if (contact) {
+        setCustomerName(contact.name || '');
+        if (contact.phoneNumbers && contact.phoneNumbers.length > 0) {
+          const phone = contact.phoneNumbers[0].number?.replace(/[^\d]/g, '') || '';
+          setCustomerPhone(phone);
         }
+        setBuyerSuggestions([]);
       }
     } catch (error) {
       console.log('Contact picker error:', error);
@@ -277,10 +275,10 @@ export default function NewBillScreen() {
       // (e.g. if offline it generated 10005, offsetBase is 10000)
       const uiSlipNumber = Number(payload.inquiry.slipNumber) || 0;
       const offsetBase = Math.floor(uiSlipNumber / 10000) * 10000;
-      const realTimeSlip = await getNextSlipNumber(payload.inquiry.shopId, offsetBase);
+      const realTimeSlip = await getNextSlipNumber(payload.inquiry.shopId, offsetBase, isOffline);
 
       // 2. Create inquiry
-      const dbInq = {
+      const dbInq: any = {
         shop_id: payload.inquiry.shopId,
         slip_number: realTimeSlip,
         truck_id: payload.inquiry.truckId,
@@ -313,51 +311,136 @@ export default function NewBillScreen() {
         created_at: payload.inquiry.createdAt,
         payment_received_by: member?.name || 'Admin',
       };
-      const { data: inquiry, error: inqErr } = await supabase
-        .from('inquiries')
-        .insert(dbInq)
-        .select()
-        .single();
-      if (inqErr) throw new Error(inqErr.message);
 
-      // 2. Update truck inventory (best-effort)
       try {
-        if (payload.truckUpdate) {
-          await supabase
-            .from('trucks')
-            .update({ grade_inventory: payload.truckUpdate.gradeInventory })
-            .eq('id', payload.truckUpdate.id);
-        }
-      } catch { /* best-effort */ }
+        const { data: inquiry, error: inqErr } = await supabase
+          .from('inquiries')
+          .insert(dbInq)
+          .select()
+          .single();
+        if (inqErr) throw new Error(inqErr.message);
 
-      // 3. Upsert buyer (best-effort)
-      try {
-        if (payload.buyerUpsert) {
-          const existing = buyers.find(
-            (b) =>
-              b.phone === payload.buyerUpsert!.phone ||
-              b.name.toLowerCase() === payload.buyerUpsert!.name.toLowerCase()
-          );
-          if (!existing) {
-            await supabase.from('buyers').insert({
-              shop_id: shop!.shopId,
-              name: payload.buyerUpsert.name,
-              phone: payload.buyerUpsert.phone,
-              preferred_payment_mode: payload.inquiry.paymentMode,
-              last_transaction_date: Date.now(),
-              created_at: Date.now(),
-            });
-          } else {
-            // Update existing buyer's preferred payment mode
+        // Update truck inventory (best-effort)
+        try {
+          if (payload.truckUpdate) {
             await supabase
-              .from('buyers')
-              .update({ preferred_payment_mode: payload.inquiry.paymentMode })
-              .eq('id', existing.id);
+              .from('trucks')
+              .update({ grade_inventory: payload.truckUpdate.gradeInventory })
+              .eq('id', payload.truckUpdate.id);
           }
-        }
-      } catch { /* best-effort */ }
+        } catch { /* best-effort */ }
 
-      return inquiry;
+        // Upsert buyer (best-effort)
+        try {
+          if (payload.buyerUpsert) {
+            const existing = buyers.find(
+              (b) =>
+                b.phone === payload.buyerUpsert!.phone ||
+                b.name.toLowerCase() === payload.buyerUpsert!.name.toLowerCase()
+            );
+            if (!existing) {
+              await supabase.from('buyers').insert({
+                shop_id: shop!.shopId,
+                name: payload.buyerUpsert.name,
+                phone: payload.buyerUpsert.phone,
+                preferred_payment_mode: payload.inquiry.paymentMode,
+                last_transaction_date: Date.now(),
+                created_at: Date.now(),
+              });
+            } else {
+              // Update existing buyer's preferred payment mode
+              await supabase
+                .from('buyers')
+                .update({ preferred_payment_mode: payload.inquiry.paymentMode })
+                .eq('id', existing.id);
+            }
+          }
+        } catch { /* best-effort */ }
+
+        return inquiry;
+      } catch (err: any) {
+        const isNetworkError =
+          isOffline ||
+          err?.message?.toLowerCase().includes('fetch') ||
+          err?.message?.toLowerCase().includes('network') ||
+          err?.message?.toLowerCase().includes('timeout') ||
+          err?.message?.toLowerCase().includes('connection');
+
+        if (isNetworkError) {
+          console.log('Offline/Network error during bill save, queueing offline...');
+          
+          // Generate a temp offline ID
+          const offlineId = `offline-${Date.now()}`;
+          const offlineInquiry = {
+            ...dbInq,
+            id: offlineId,
+            sync_status: 'pending',
+            created_offline: true,
+            optimistic_stock: payload.inquiry.totalWeight || 0,
+          };
+
+          // 1. Enqueue offline operation
+          await enqueueOfflineOperation('CREATE_INQUIRY', {
+            inquiry: offlineInquiry,
+            truckUpdate: payload.truckUpdate,
+            buyerUpsert: payload.buyerUpsert,
+          });
+
+          // 2. Optimistically update React Query inquiries cache
+          queryClient.setQueryData(['inquiries', payload.inquiry.shopId], (old: any) => {
+            const list = Array.isArray(old) ? old : [];
+            return [offlineInquiry, ...list];
+          });
+
+          // 3. Update trucks cache optimistically
+          const { startMs: dateParam, endMs: dateEnd } = getBusinessDateRange(getCurrentBusinessDate());
+          queryClient.setQueryData(['trucks', payload.inquiry.shopId, dateParam, dateEnd, shop?.grades], (oldTrucks: any) => {
+            if (!oldTrucks) return oldTrucks;
+            return oldTrucks.map((truck: any) => {
+              if (truck.id !== payload.inquiry.truckId) return truck;
+              const updatedGradeInventory = truck.gradeInventory.map((grade: any) => {
+                const matchingEntries = payload.inquiry.chargeSnapshot?.entries?.filter((e: any) => e.grade === grade.code) || [];
+                const isSingleMatch = !payload.inquiry.chargeSnapshot?.entries && payload.inquiry.grade === grade.code;
+                const totalMatchingWeight = matchingEntries.reduce((sum: number, e: any) => sum + e.totalWeight, 0) + 
+                  (isSingleMatch ? payload.inquiry.totalWeight : 0);
+                
+                return {
+                  ...grade,
+                  provisionalKg: grade.provisionalKg + totalMatchingWeight,
+                };
+              });
+              return { ...truck, gradeInventory: updatedGradeInventory };
+            });
+          });
+
+          // 4. Update buyers cache optimistically
+          if (payload.buyerUpsert) {
+            const buyerData = payload.buyerUpsert;
+            queryClient.setQueryData(['buyers', payload.inquiry.shopId], (oldBuyers: any) => {
+              const list = Array.isArray(oldBuyers) ? oldBuyers : [];
+              const exists = list.some((b: any) => b.phone === buyerData.phone || b.name.toLowerCase() === buyerData.name.toLowerCase());
+              if (!exists) {
+                const newBuyer = {
+                  id: `buyer-offline-${Date.now()}`,
+                  shop_id: payload.inquiry.shopId,
+                  name: buyerData.name,
+                  phone: buyerData.phone,
+                  outstanding_balance: 0,
+                  preferred_payment_mode: payload.inquiry.paymentMode,
+                  last_transaction_date: Date.now(),
+                  created_at: Date.now(),
+                };
+                return [...list, newBuyer];
+              }
+              return list;
+            });
+          }
+
+          return offlineInquiry;
+        }
+
+        throw err;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inquiries', shop?.shopId] });
@@ -604,7 +687,7 @@ export default function NewBillScreen() {
     if (shop?.shopId) {
       const memberIndex = shop.teamMembers?.findIndex(m => m.phone === member?.phone) ?? -1;
       const offsetBase = memberIndex !== -1 ? (memberIndex + 1) * 10000 : 0;
-      const next = await getNextSlipNumber(shop.shopId, offsetBase);
+      const next = await getNextSlipNumber(shop.shopId, offsetBase, isOffline);
       setSlipNumber(next);
     }
     

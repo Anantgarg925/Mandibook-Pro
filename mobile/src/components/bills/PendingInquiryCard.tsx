@@ -19,7 +19,7 @@ import { toIndianWeight } from '@/lib/formatters';
 import type { Inquiry, PaymentMode } from '@/types/inquiry';
 import PaymentSelector from './PaymentSelector';
 import EditableSlipRow from './EditableSlipRow';
-import * as Contacts from 'expo-contacts';
+import { presentContactPicker } from '@/utils/contactPicker';
 import { useBuyers } from '@/hooks/useBuyers';
 
 export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
@@ -459,17 +459,14 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
 
   const openContactPicker = async () => {
     try {
-      const permission = await Contacts.requestPermissionsAsync();
-      if (permission.status === 'granted') {
-        const contact = await Contacts.presentContactPickerAsync();
-        if (contact) {
-          setCustomerName(contact.name || '');
-          if (contact.phoneNumbers && contact.phoneNumbers.length > 0) {
-            const phone = contact.phoneNumbers[0].number?.replace(/[^\d]/g, '') || '';
-            setCustomerPhone(phone);
-          }
-          setBuyerSuggestions([]);
+      const contact = await presentContactPicker();
+      if (contact) {
+        setCustomerName(contact.name || '');
+        if (contact.phoneNumbers && contact.phoneNumbers.length > 0) {
+          const phone = contact.phoneNumbers[0].number?.replace(/[^\d]/g, '') || '';
+          setCustomerPhone(phone);
         }
+        setBuyerSuggestions([]);
       }
     } catch (error) {
       console.log('Contact picker error:', error);
