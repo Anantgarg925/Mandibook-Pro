@@ -265,6 +265,7 @@ export default function NewBillScreen() {
   });
 
   const saveMutation = useMutation({
+    networkMode: 'always',
     mutationFn: async (payload: {
       inquiry: any;
       truckUpdate?: { id: string; gradeInventory: any[] };

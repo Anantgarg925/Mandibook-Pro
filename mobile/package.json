@@ -114,7 +114,7 @@
     "expo-video-thumbnails": "~10.0.8",
     "expo-web-browser": "~15.0.11",
     "fuse.js": "7.1.0",
-    "html2canvas": "^1.4.1",
+    "html-to-image": "^1.11.13",
     "idb-keyval": "^6.2.4",
     "lottie-react-native": "7.3.4",
     "lucide-react-native": "0.544.0",

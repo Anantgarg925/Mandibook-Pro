@@ -404,7 +404,8 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
   const cancelMutation = useMutation({
     mutationFn: async () => {
       if (!shop?.shopId) throw new Error('Missing shop');
-      await supabase.from('inquiries').update({ status: 'CANCELLED' }).eq('id', inquiry.id);
+      const { error } = await supabase.from('inquiries').update({ status: 'CANCELLED' }).eq('id', inquiry.id);
+      if (error) throw new Error(error.message);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inquiries', shop?.shopId] });
