@@ -463,13 +463,13 @@ export default function NewBillScreen() {
     .reduce((s, e) => s + e.totalWeight, 0);
   const totalWeightForGrade = alreadyAddedWeightForGrade + currentEntryWeight;
 
-  let inventoryWarning: string | null = null;
+  let inventoryError: string | null = null;
   if (selectedTruck && selectedGrade && !boughtFromAgent && currentEntryWeight > 0) {
     const gradeInfo = selectedTruck.gradeInventory.find(g => g.code === selectedGrade);
     if (gradeInfo) {
       const gradeAvailable = Math.max(0, gradeInfo.totalKg - gradeInfo.confirmedKg - gradeInfo.provisionalKg);
       if (gradeInfo.totalKg > 0 && totalWeightForGrade > gradeAvailable) {
-        inventoryWarning = `⚠️ Warning: ${totalWeightForGrade}kg exceeds available ${gradeAvailable}kg for this grade (${gradeInfo.name}). Truck has only ${gradeAvailable}kg remaining.`;
+        inventoryError = `🚫 Error: ${totalWeightForGrade}kg exceeds available ${gradeAvailable}kg for this grade (${gradeInfo.name}). Truck has only ${gradeAvailable}kg remaining.`;
       }
     }
     // Also check total truck level
@@ -477,8 +477,8 @@ export default function NewBillScreen() {
       ? Math.max(0, selectedTruck.totalKg - selectedTruck.gradeInventory.reduce((s, g) => s + g.confirmedKg + g.provisionalKg, 0))
       : 0;
     const totalAllEntries = entries.reduce((s, e) => s + e.totalWeight, 0) + currentEntryWeight;
-    if (selectedTruck.totalKg > 0 && totalAllEntries > totalTruckAvailable && !inventoryWarning) {
-      inventoryWarning = `⚠️ Warning: Total bill weight ${totalAllEntries}kg exceeds truck's available stock of ${totalTruckAvailable}kg.`;
+    if (selectedTruck.totalKg > 0 && totalAllEntries > totalTruckAvailable && !inventoryError) {
+      inventoryError = `🚫 Error: Total bill weight ${totalAllEntries}kg exceeds truck's available stock of ${totalTruckAvailable}kg.`;
     }
   }
 
@@ -538,6 +538,7 @@ export default function NewBillScreen() {
     if (boughtFromAgent && !sourceAgentName.trim()) e.sourceAgent = 'एजेंट का नाम डालें';
     if (!selectedGrade) e.grade = 'ग्रेड चुनें';
     if (sacks <= 0) e.sacks = 'बोरों की संख्या डालें';
+    if (inventoryError) e.stock = inventoryError;
     setErrors(e);
     return Object.keys(e).length === 0;
   };
@@ -1081,10 +1082,10 @@ export default function NewBillScreen() {
               {errors.weight ? <Text style={{ fontSize: 11, color: Colors.danger, marginTop: 2 }}>{errors.weight}</Text> : null}
             </View>
           </View>
-          {inventoryWarning && (
-            <View style={{ marginTop: 8, padding: 10, backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#F59E0B', borderRadius: 8, flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
-              <Text style={{ fontSize: 12, color: '#92400E', fontWeight: '700', flex: 1 }}>
-                {inventoryWarning}
+          {inventoryError && (
+            <View style={{ marginTop: 8, padding: 10, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#DC2626', borderRadius: 8, flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+              <Text style={{ fontSize: 12, color: '#991B1B', fontWeight: '700', flex: 1 }}>
+                {inventoryError}
               </Text>
             </View>
           )}
@@ -1400,10 +1401,10 @@ export default function NewBillScreen() {
                       />
                     </View>
                   </View>
-                  {inventoryWarning && (
-                    <View style={{ marginTop: 8, padding: 10, backgroundColor: '#FEF3C7', borderWidth: 1, borderColor: '#F59E0B', borderRadius: 8, flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
-                      <Text style={{ fontSize: 12, color: '#92400E', fontWeight: '700', flex: 1 }}>
-                        {inventoryWarning}
+                  {inventoryError && (
+                    <View style={{ marginTop: 8, padding: 10, backgroundColor: '#FEF2F2', borderWidth: 1, borderColor: '#DC2626', borderRadius: 8, flexDirection: 'row', alignItems: 'flex-start', gap: 6 }}>
+                      <Text style={{ fontSize: 12, color: '#991B1B', fontWeight: '700', flex: 1 }}>
+                        {inventoryError}
                       </Text>
                     </View>
                   )}
