@@ -1,5 +1,4 @@
 import { Platform, Alert } from 'react-native';
-import * as Contacts from 'expo-contacts';
 
 export interface UnifiedContact {
   name?: string;
@@ -25,15 +24,18 @@ export async function presentContactPicker(): Promise<UnifiedContact | null> {
         console.warn('Web Contacts select error:', err);
       }
     }
-    Alert.alert(
-      'Not Supported',
-      'Select from contacts is not supported on this browser. Please enter details manually.'
-    );
+    
+    if (typeof window !== 'undefined' && window.alert) {
+      window.alert('Select from contacts is not supported on this browser. Please enter details manually.');
+    } else {
+      Alert.alert('Not Supported', 'Select from contacts is not supported on this browser.');
+    }
     return null;
   }
 
   // Native Implementation
   try {
+    const Contacts = require('expo-contacts');
     const permission = await Contacts.requestPermissionsAsync();
     if (permission.status !== 'granted') {
       Alert.alert(
@@ -50,7 +52,7 @@ export async function presentContactPicker(): Promise<UnifiedContact | null> {
       firstName: contact.firstName,
       middleName: contact.middleName,
       lastName: contact.lastName,
-      phoneNumbers: contact.phoneNumbers?.map(p => ({ number: p.number || '' })) || []
+      phoneNumbers: contact.phoneNumbers?.map((p: any) => ({ number: p.number || '' })) || []
     };
   } catch (err) {
     console.error('Native contact picker error:', err);

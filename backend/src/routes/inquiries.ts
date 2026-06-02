@@ -170,4 +170,126 @@ inquiriesRouter.delete("/:id", async (c) => {
   }
 });
 
+// POST /api/inquiries/sync-offline
+inquiriesRouter.post("/sync-offline", zValidator("json", InquiryCreateSchema.extend({
+  createdOffline: z.boolean().default(true),
+  optimisticStock: z.number().optional()
+})), async (c) => {
+  const body = c.req.valid("json");
+  try {
+    // Run sequentially per truck using a database transaction if needed,
+    // but SQLite locks the DB during transactions so we can just do a transaction.
+    return await prisma.$transaction(async (tx) => {
+      // 1. Get current truck stock
+      const truck = await tx.truck.findUnique({
+        where: { id: body.truckId }
+      });
+
+      if (!truck) {
+        return c.json({ error: { message: "Truck not found", code: "NOT_FOUND" } }, 404);
+      }
+
+      // 2. Get sum of existing valid bills for this truck
+      const existingBills = await tx.inquiry.aggregate({
+        where: {
+          truckId: body.truckId,
+          status: { in: ["CONFIRMED", "PENDING"] },
+          syncStatus: { not: "conflict" }
+        },
+        _sum: {
+          totalWeight: true
+        }
+      });
+
+      const soldStock = existingBills._sum.totalWeight || 0;
+      const availableStock = truck.totalKg - soldStock;
+
+      const requestedWeight = body.totalWeight;
+
+      if (requestedWeight <= availableStock) {
+        // Accept the bill
+        const inquiry = await tx.inquiry.create({
+          data: {
+            ...(body.id ? { id: body.id } : {}),
+            shopId: body.shopId,
+            slipNumber: body.slipNumber,
+            truckId: body.truckId,
+            truckNumber: body.truckNumber,
+            customerName: body.customerName,
+            customerPhone: body.customerPhone,
+            grade: body.grade,
+            gradeName: body.gradeName,
+            sacks: body.sacks,
+            weightPerSack: body.weightPerSack,
+            totalWeight: body.totalWeight,
+            ratePerKg: body.ratePerKg,
+            grossAmount: body.grossAmount,
+            apmcAmount: body.apmcAmount,
+            bardanaAmount: body.bardanaAmount,
+            cartageAmount: body.cartageAmount,
+            netAmount: body.netAmount,
+            paymentMode: body.paymentMode,
+            upiRef: body.upiRef,
+            status: body.status,
+            date: body.date,
+            createdAt: body.createdAt,
+            syncStatus: "synced",
+            createdOffline: body.createdOffline,
+            optimisticStock: body.optimisticStock,
+            needsAgentReview: body.optimisticStock !== undefined && body.optimisticStock < requestedWeight
+          },
+        });
+        return c.json({
+          status: "accepted",
+          final_slip_number: inquiry.slipNumber,
+          data: inquiry
+        });
+      } else {
+        // Reject the bill - save it as conflict
+        const inquiry = await tx.inquiry.create({
+          data: {
+            ...(body.id ? { id: body.id } : {}),
+            shopId: body.shopId,
+            slipNumber: body.slipNumber,
+            truckId: body.truckId,
+            truckNumber: body.truckNumber,
+            customerName: body.customerName,
+            customerPhone: body.customerPhone,
+            grade: body.grade,
+            gradeName: body.gradeName,
+            sacks: body.sacks,
+            weightPerSack: body.weightPerSack,
+            totalWeight: body.totalWeight,
+            ratePerKg: body.ratePerKg,
+            grossAmount: body.grossAmount,
+            apmcAmount: body.apmcAmount,
+            bardanaAmount: body.bardanaAmount,
+            cartageAmount: body.cartageAmount,
+            netAmount: body.netAmount,
+            paymentMode: body.paymentMode,
+            upiRef: body.upiRef,
+            status: body.status, // stays PENDING but syncStatus is conflict
+            date: body.date,
+            createdAt: body.createdAt,
+            syncStatus: "conflict",
+            createdOffline: body.createdOffline,
+            optimisticStock: body.optimisticStock,
+            needsAgentReview: true
+          },
+        });
+        return c.json({
+          status: "conflict",
+          required: requestedWeight,
+          available: availableStock,
+          message: "Stock insufficient at time of sync",
+          data: inquiry
+        });
+      }
+    });
+  } catch (err) {
+    console.error('[POST /api/inquiries/sync-offline]', err);
+    return c.json({ error: { message: "Failed to sync offline bill", code: "INTERNAL_ERROR" } }, 500);
+  }
+});
+
 export { inquiriesRouter };

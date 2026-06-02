@@ -84,6 +84,10 @@ model Inquiry {
   paymentMode    String
   upiRef         String  @default("")
   status         String  @default("PENDING")
+  syncStatus     String  @default("synced") // "queued"|"syncing"|"synced"|"conflict"|"failed"
+  createdOffline Boolean @default(false)
+  needsAgentReview Boolean @default(false)
+  optimisticStock Float?
   date           Float
   createdAt      Float
 

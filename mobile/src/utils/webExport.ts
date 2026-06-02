@@ -66,8 +66,9 @@ function downloadHtmlFile(html: string, title: string): void {
  * Download an HTML element as a JPEG/PNG using html2canvas.
  */
 async function elementToDataUrl(element: HTMLElement, format: 'png' | 'jpeg'): Promise<string> {
-  const html2canvas = (await import('html2canvas')).default;
-  const canvas = await html2canvas(element, {
+  const html2canvasModule = await import('html2canvas');
+  const html2canvasFn = typeof html2canvasModule.default === 'function' ? html2canvasModule.default : html2canvasModule;
+  const canvas = await (html2canvasFn as any)(element, {
     useCORS: true,
     allowTaint: true,
     backgroundColor: '#FFFFFF',

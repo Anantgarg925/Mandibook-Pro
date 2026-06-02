@@ -359,12 +359,13 @@ export default function NewBillScreen() {
 
         return inquiry;
       } catch (err: any) {
+        const errMsg = err instanceof Error ? err.message : String(err || '');
         const isNetworkError =
           isOffline ||
-          err?.message?.toLowerCase().includes('fetch') ||
-          err?.message?.toLowerCase().includes('network') ||
-          err?.message?.toLowerCase().includes('timeout') ||
-          err?.message?.toLowerCase().includes('connection');
+          errMsg.toLowerCase().includes('fetch') ||
+          errMsg.toLowerCase().includes('network') ||
+          errMsg.toLowerCase().includes('timeout') ||
+          errMsg.toLowerCase().includes('connection');
 
         if (isNetworkError) {
           console.log('Offline/Network error during bill save, queueing offline...');
