@@ -115,6 +115,8 @@ export default function NewBillScreen() {
   const [sourceAgentName, setSourceAgentName] = useState('');
   const [sourceAgentPhone, setSourceAgentPhone] = useState('');
   const [agentPurchaseAmount, setAgentPurchaseAmount] = useState('');
+  const [agentSacks, setAgentSacks] = useState('');
+  const [agentRatePerSack, setAgentRatePerSack] = useState('');
   const [savedSlip, setSavedSlip] = useState<number | null>(null);
   const [savedInquiryId, setSavedInquiryId] = useState<string | null>(null);
   const [applyApmc, setApplyApmc] = useState(true);
@@ -553,7 +555,7 @@ export default function NewBillScreen() {
     const e: Record<string, string> = {};
     if (!boughtFromAgent && !selectedTruck) e.truck = 'गाड़ी चुनें';
     if (boughtFromAgent && !sourceAgentName.trim()) e.sourceAgent = 'एजेंट का नाम डालें';
-    if (boughtFromAgent && (!agentPurchaseAmount || parseFloat(agentPurchaseAmount) <= 0)) e.agentPurchaseAmount = 'Please enter purchase amount';
+    if (boughtFromAgent && (!(parseFloat(agentSacks) > 0) || !(parseFloat(agentRatePerSack) > 0))) e.agentPurchaseAmount = 'Enter sacks bought from agent and rate paid per sack';
     if (!selectedGrade) e.grade = 'ग्रेड चुनें';
     if (sacks <= 0) e.sacks = 'बोरों की संख्या डालें';
     if (inventoryError) e.stock = inventoryError;
@@ -632,7 +634,7 @@ export default function NewBillScreen() {
           truckNumber: boughtFromAgent ? 'Agent Stock' : selectedTruck?.truckNumber,
           sourceAgentName: boughtFromAgent ? sourceAgentName.trim() : '',
           sourceAgentPhone: boughtFromAgent ? sourceAgentPhone.trim() : '',
-          agentPurchaseAmount: boughtFromAgent ? (parseFloat(agentPurchaseAmount) || 0) : 0,
+          agentPurchaseAmount: boughtFromAgent ? (parseFloat(agentSacks) * parseFloat(agentRatePerSack) || 0) : 0,
           customerName: customerName.trim(),
           customerPhone: customerPhone.trim(),
           grade: mainGrade,
@@ -704,6 +706,8 @@ export default function NewBillScreen() {
     setCustomerName('');
     setCustomerPhone('');
     setAgentPurchaseAmount('');
+    setAgentSacks('');
+    setAgentRatePerSack('');
     setApplyApmc(true);
     setApplyBardana(true);
     setErrors({});
@@ -945,14 +949,46 @@ export default function NewBillScreen() {
                 onChangeText={setSourceAgentPhone}
                 keyboardType="phone-pad"
               />
-              <TextInput
-                style={inputStyle}
-                placeholder="Purchase Amount (₹) *"
-                placeholderTextColor={Colors.textSecond}
-                value={agentPurchaseAmount}
-                onChangeText={(v) => setAgentPurchaseAmount(v.replace(/[^0-9.]/g, ''))}
-                keyboardType="decimal-pad"
-              />
+              {/* Separate purchase fields — how many sacks you BOUGHT from the agent and at what rate */}
+              <View style={{ backgroundColor: '#FFF8E1', borderRadius: Radius.sm, padding: Spacing.sm, borderWidth: 1, borderColor: '#FDE68A' }}>
+                <Text style={{ fontSize: FontSize.xs, fontWeight: '800', color: '#92400E', marginBottom: Spacing.sm, textTransform: 'uppercase' }}>
+                  ℹ️ Purchase from agent (what you paid)
+                </Text>
+                <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+                  <TextInput
+                    style={[inputStyle, { flex: 1 }]}
+                    placeholder="Sacks bought *"
+                    placeholderTextColor={Colors.textSecond}
+                    value={agentSacks}
+                    onChangeText={(v) => {
+                      const cleaned = v.replace(/[^0-9.]/g, '');
+                      setAgentSacks(cleaned);
+                      const total = (parseFloat(cleaned) || 0) * (parseFloat(agentRatePerSack) || 0);
+                      setAgentPurchaseAmount(total > 0 ? String(total) : '');
+                    }}
+                    keyboardType="decimal-pad"
+                  />
+                  <TextInput
+                    style={[inputStyle, { flex: 1 }]}
+                    placeholder="Rate paid/sack (₹) *"
+                    placeholderTextColor={Colors.textSecond}
+                    value={agentRatePerSack}
+                    onChangeText={(v) => {
+                      const cleaned = v.replace(/[^0-9.]/g, '');
+                      setAgentRatePerSack(cleaned);
+                      const total = (parseFloat(agentSacks) || 0) * (parseFloat(cleaned) || 0);
+                      setAgentPurchaseAmount(total > 0 ? String(total) : '');
+                    }}
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+                {agentPurchaseAmount && parseFloat(agentPurchaseAmount) > 0 && (
+                  <Text style={{ fontSize: FontSize.xs, fontWeight: '800', color: '#92400E', marginTop: Spacing.xs }}>
+                    Total paid to agent: ₹{parseFloat(agentPurchaseAmount).toLocaleString('en-IN')}
+                  </Text>
+                )}
+              </View>
+              {errors.agentPurchaseAmount ? <Text style={{ fontSize: 11, color: Colors.danger }}>{errors.agentPurchaseAmount}</Text> : null}
             </View>
           ) : (
             <Pressable 
@@ -1354,7 +1390,53 @@ export default function NewBillScreen() {
                     <View style={{ gap: 8 }}>
                       <TextInput ref={sourceAgentNameRef} style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }} placeholder="Agent name *" value={sourceAgentName} onChangeText={setSourceAgentName} returnKeyType="next" onSubmitEditing={() => sourceAgentPhoneRef.current?.focus()} />
                       <TextInput ref={sourceAgentPhoneRef} style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }} placeholder="Agent phone (optional)" value={sourceAgentPhone} onChangeText={setSourceAgentPhone} keyboardType="phone-pad" returnKeyType="next" />
-                      <TextInput style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }} placeholder="Purchase Amount (₹) *" value={agentPurchaseAmount} onChangeText={(v) => setAgentPurchaseAmount(v.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad" returnKeyType="done" onSubmitEditing={() => { setEditingField('grade'); setTimeout(() => scrollToSection('grade'), 100); }} />
+                      {/* Purchase from agent fields */}
+                      <View style={{ backgroundColor: '#FFF8E1', padding: 10, borderWidth: 1, borderColor: '#FDE68A', borderRadius: 6 }}>
+                        <Text style={{ fontSize: 11, fontWeight: '800', color: '#92400E', marginBottom: 8, textTransform: 'uppercase' }}>
+                          ℹ️ What you PAID the agent (purchase cost)
+                        </Text>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 11, color: '#92400E', marginBottom: 4, fontWeight: '600' }}>Sacks bought</Text>
+                            <TextInput
+                              style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 15, color: '#111827' }}
+                              placeholder="Sacks *"
+                              value={agentSacks}
+                              onChangeText={(v) => {
+                                const cleaned = v.replace(/[^0-9.]/g, '');
+                                setAgentSacks(cleaned);
+                                const total = (parseFloat(cleaned) || 0) * (parseFloat(agentRatePerSack) || 0);
+                                setAgentPurchaseAmount(total > 0 ? String(total) : '');
+                              }}
+                              keyboardType="decimal-pad"
+                              returnKeyType="next"
+                            />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 11, color: '#92400E', marginBottom: 4, fontWeight: '600' }}>Rate paid/sack (₹)</Text>
+                            <TextInput
+                              style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 15, color: '#111827' }}
+                              placeholder="Rate *"
+                              value={agentRatePerSack}
+                              onChangeText={(v) => {
+                                const cleaned = v.replace(/[^0-9.]/g, '');
+                                setAgentRatePerSack(cleaned);
+                                const total = (parseFloat(agentSacks) || 0) * (parseFloat(cleaned) || 0);
+                                setAgentPurchaseAmount(total > 0 ? String(total) : '');
+                              }}
+                              keyboardType="decimal-pad"
+                              returnKeyType="done"
+                              onSubmitEditing={() => { setEditingField('grade'); setTimeout(() => scrollToSection('grade'), 100); }}
+                            />
+                          </View>
+                        </View>
+                        {agentPurchaseAmount && parseFloat(agentPurchaseAmount) > 0 && (
+                          <Text style={{ fontSize: 12, fontWeight: '800', color: '#92400E', marginTop: 6 }}>
+                            Total paid: ₹{parseFloat(agentPurchaseAmount).toLocaleString('en-IN')}
+                          </Text>
+                        )}
+                      </View>
+                      {errors.agentPurchaseAmount ? <Text style={{ fontSize: 11, color: Colors.danger }}>{errors.agentPurchaseAmount}</Text> : null}
                     </View>
                   ) : (
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>

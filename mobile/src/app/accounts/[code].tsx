@@ -639,10 +639,12 @@ export default function BuyerLedgerScreen() {
                 backgroundColor: '#F8FAFC',
               }}>
                 <Text style={{ fontSize: FontSize.xs, fontWeight: '800', color: Colors.textSecond, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                  {isAgent ? 'Agent Purchases' : 'Sales Bills'}
+                  {isAgent ? 'Stock Purchased from Agent / खरीद' : 'Sales Bills'}
                 </Text>
                 <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 2 }}>
-                  {bills.length} bill{bills.length === 1 ? '' : 's'} associated with this {isAgent ? 'agent' : 'buyer'}
+                  {isAgent
+                    ? `${bills.length} stock purchase${bills.length === 1 ? '' : 's'} — showing what you paid to this agent`
+                    : `${bills.length} bill${bills.length === 1 ? '' : 's'} associated with this buyer`}
                 </Text>
               </View>
 
@@ -666,11 +668,19 @@ export default function BuyerLedgerScreen() {
                   <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.sm }}>
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: Colors.text }}>
-                        Bill #{bill.slipNumber} · {toIndianCurrency(bill.netAmount)}
+                        Bill #{bill.slipNumber}{isAgent && (bill as any).agentPurchaseAmount > 0
+                          ? ` · ${toIndianCurrency((bill as any).agentPurchaseAmount)} (your cost)`
+                          : ` · ${toIndianCurrency(bill.netAmount)}`
+                        }
                       </Text>
                       <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 2 }}>
-                        {toIndianDate(bill.date)} · {bill.truckNumber} · {bill.grade} · {bill.sacks} case
+                        {toIndianDate(bill.date)} · {bill.grade} · {bill.sacks} case
                       </Text>
+                      {isAgent && (bill as any).agentPurchaseAmount > 0 && (
+                        <Text style={{ fontSize: FontSize.xs, color: Colors.info, marginTop: 2 }}>
+                          Sold for: {toIndianCurrency(bill.netAmount)} · {bill.customerName || 'No buyer'}
+                        </Text>
+                      )}
                       <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 2 }}>
                         {bill.status} · {bill.paymentMode}
                       </Text>
