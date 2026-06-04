@@ -27,7 +27,7 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react-native';
-import SegmentedControl from '@react-native-segmented-control/segmented-control';
+
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { DraggableFAB } from '@/components/common/DraggableFAB';
 import { useBuyers } from '@/hooks/useBuyers';
@@ -225,16 +225,51 @@ export default function AccountsListScreen() {
       </View>
 
       <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
-        <SegmentedControl
-          values={['Buyers (ग्राहक)', 'Agents (एजेंट)']}
-          selectedIndex={activeTab}
-          onChange={(event) => {
-            setActiveTab(event.nativeEvent.selectedSegmentIndex);
-            setSearch('');
+        {/* Custom themed Buyers / Agents toggle */}
+        <View
+          style={{
+            flexDirection: 'row',
+            backgroundColor: '#E8F5E9',
+            borderRadius: 12,
+            borderWidth: 1.5,
+            borderColor: '#C8E6C9',
+            padding: 4,
+            marginBottom: 16,
           }}
-          style={{ height: 44, marginBottom: 20 }}
-          fontStyle={{ fontSize: 15, fontWeight: '600' }}
-        />
+        >
+          {(['Buyers (ग्राहक)', 'Agents (एजेंट)'] as const).map((label, index) => {
+            const isActive = activeTab === index;
+            return (
+              <Pressable
+                key={index}
+                onPress={() => { setActiveTab(index); setSearch(''); }}
+                style={{
+                  flex: 1,
+                  height: 40,
+                  borderRadius: 9,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: isActive ? '#00450d' : 'transparent',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 1 },
+                  shadowOpacity: isActive ? 0.14 : 0,
+                  shadowRadius: 3,
+                  elevation: isActive ? 3 : 0,
+                }}
+              >
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: isActive ? '800' : '600',
+                    color: isActive ? '#ffffff' : '#2E7D32',
+                  }}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
 
         <View
           style={{
