@@ -163,6 +163,7 @@ export function mapInquiry(row: Record<string, unknown>): Inquiry {
     sourceAgentName: (row.source_agent_name as string) ?? '',
     sourceAgentPhone: (row.source_agent_phone as string) ?? '',
     sourceAgentHidden: (row.source_agent_hidden as boolean) ?? true,
+    agentPurchaseAmount: (row.agent_purchase_amount as number) ?? 0,
     date: row.date as number,
     createdAt: row.created_at as number,
   };
@@ -175,6 +176,7 @@ export function mapBuyer(row: Record<string, unknown>) {
     code: row.code as string,
     name: row.name as string,
     phone: (row.phone as string) ?? '',
+    partyType: (row.party_type as 'BUYER' | 'AGENT') ?? 'BUYER',
     outstandingBalance: (row.outstanding_balance as number) ?? 0,
     openingBalance: (row.opening_balance as number) ?? 0,
     openingBalanceType: (row.opening_balance_type as 'DR' | 'CR') ?? 'DR',

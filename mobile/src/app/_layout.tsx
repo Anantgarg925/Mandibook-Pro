@@ -99,8 +99,8 @@ function RootLayoutNav({ colorScheme }: { colorScheme: 'light' | 'dark' | null |
         <Stack.Screen name="member-trucks" options={{ headerShown: false }} />
         <Stack.Screen name="member-profile" options={{ headerShown: false }} />
         <Stack.Screen name="authorization" options={{ headerShown: false }} />
-        <Stack.Screen name="buyers/index" options={{ headerShown: false }} />
-        <Stack.Screen name="buyers/[code]" options={{ headerShown: false }} />
+        <Stack.Screen name="accounts/index" options={{ headerShown: false }} />
+        <Stack.Screen name="accounts/[code]" options={{ headerShown: false }} />
         <Stack.Screen name="settings/index" options={{ headerShown: false }} />
         <Stack.Screen name="settings/edit-grades" options={{ headerShown: false }} />
         <Stack.Screen name="settings/edit-charges" options={{ headerShown: false }} />
@@ -132,7 +132,7 @@ function PersistentNavigationShell({ colorScheme }: { colorScheme: 'light' | 'da
     (pathname.startsWith('/bills/') && pathname !== '/bills/new') ||
     pathname.startsWith('/slip/') ||
     pathname.startsWith('/authorization') ||
-    pathname.startsWith('/buyers/') ||
+    pathname.startsWith('/accounts/') ||
     pathname.startsWith('/trucks/');
 
   return (

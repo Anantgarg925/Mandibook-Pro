@@ -13,7 +13,7 @@ export function computeRunningBalances(transactions: Transaction[]): EnrichedTra
     } else {
       running -= txn.amount;
     }
-    return { ...txn, balanceAfter: Math.max(0, running) };
+    return { ...txn, balanceAfter: Math.abs(running) < 0.01 ? 0 : running };
   });
   return withBalance.reverse();
 }

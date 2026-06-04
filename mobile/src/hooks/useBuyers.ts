@@ -72,3 +72,26 @@ export function useBuyerBills(buyerName?: string) {
 
   return { bills, loading };
 }
+
+export function useAgentPurchases(agentName?: string) {
+  const { shop } = useShop();
+
+  const { data: bills = [], isLoading: loading } = useQuery({
+    queryKey: ['agent-purchases', shop?.shopId, agentName],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('inquiries')
+        .select('*')
+        .eq('shop_id', shop!.shopId)
+        .eq('source_agent_name', agentName!)
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false });
+      if (error) throw new Error(error.message);
+      return (data ?? []).map((r: unknown) => mapInquiry(r as Record<string, unknown>)) as Inquiry[];
+    },
+    enabled: !!shop?.shopId && !!agentName,
+    ...archiveQueryOptions,
+  });
+
+  return { bills, loading };
+}

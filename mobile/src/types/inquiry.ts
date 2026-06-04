@@ -39,6 +39,7 @@ export type Inquiry = {
   sourceAgentName?: string;
   sourceAgentPhone?: string;
   sourceAgentHidden: boolean;
+  agentPurchaseAmount?: number;
   date: number;
   createdAt: number;
 };
@@ -49,6 +50,7 @@ export type Buyer = {
   code: string;
   name: string;
   phone: string;
+  partyType?: 'BUYER' | 'AGENT';
   outstandingBalance: number;
   openingBalance: number;
   openingBalanceType: 'DR' | 'CR';

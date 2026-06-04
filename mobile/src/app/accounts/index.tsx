@@ -27,6 +27,7 @@ import {
   Plus,
   Trash2,
 } from 'lucide-react-native';
+import SegmentedControl from '@react-native-segmented-control/segmented-control';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { DraggableFAB } from '@/components/common/DraggableFAB';
 import { useBuyers } from '@/hooks/useBuyers';
@@ -37,7 +38,7 @@ import { generateCode } from '@/utils/buyerCode';
 import { FontSize, Spacing, Radius } from '@/lib/theme';
 import type { Buyer } from '@/types/inquiry';
 
-export default function BuyerListScreen() {
+export default function AccountsListScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -45,6 +46,10 @@ export default function BuyerListScreen() {
   const { shop } = useShop();
   const { buyers, loading } = useBuyers();
   const queryClient = useQueryClient();
+  
+  const [activeTab, setActiveTab] = useState(0); // 0 = Buyers, 1 = Agents
+  const currentPartyType = activeTab === 0 ? 'BUYER' : 'AGENT';
+  
   const [search, setSearch] = useState('');
   const [addVisible, setAddVisible] = useState(false);
   const [newName, setNewName] = useState('');
@@ -52,11 +57,11 @@ export default function BuyerListScreen() {
   const [openingAmount, setOpeningAmount] = useState('');
   const [openingType, setOpeningType] = useState<'DR' | 'CR'>('DR');
   const [notes, setNotes] = useState('');
-  const addBuyerPhoneRef = useRef<TextInput>(null);
-  const addBuyerOpeningRef = useRef<TextInput>(null);
-  const addBuyerNotesRef = useRef<TextInput>(null);
+  const addPartyPhoneRef = useRef<TextInput>(null);
+  const addPartyOpeningRef = useRef<TextInput>(null);
+  const addPartyNotesRef = useRef<TextInput>(null);
 
-  const fillBuyerFromContact = (contact: any) => {
+  const fillPartyFromContact = (contact: any) => {
     const phones: string[] = [];
     if (contact.phoneNumbers) {
       contact.phoneNumbers.forEach((p: any) => {
@@ -71,19 +76,20 @@ export default function BuyerListScreen() {
     if (phones.length > 0) setNewPhones(phones);
   };
 
-  const pickBuyerContact = async () => {
+  const pickPartyContact = async () => {
     try {
       const contact = await presentContactPicker();
-      if (contact) fillBuyerFromContact(contact);
+      if (contact) fillPartyFromContact(contact);
     } catch (err) {
-      console.log('Buyer contact picker error:', err);
-      Alert.alert('Could not open contacts', 'Please enter buyer details manually.');
+      console.log('Party contact picker error:', err);
+      Alert.alert('Could not open contacts', 'Please enter details manually.');
     }
   };
 
   const sorted = useMemo(
     () =>
       [...buyers]
+        .filter((b) => (b.partyType || 'BUYER') === currentPartyType)
         .sort((a, b) => b.outstandingBalance - a.outstandingBalance)
         .filter(
           (b) =>
@@ -92,12 +98,16 @@ export default function BuyerListScreen() {
             b.phone.includes(search) ||
             b.code.toLowerCase().includes(search.toLowerCase())
         ),
-    [buyers, search]
+    [buyers, search, currentPartyType]
   );
 
-  const totalOutstanding = buyers.reduce((s, b) => s + b.outstandingBalance, 0);
+  const totalOutstanding = useMemo(() => {
+    return buyers
+      .filter((b) => (b.partyType || 'BUYER') === currentPartyType)
+      .reduce((s, b) => s + b.outstandingBalance, 0);
+  }, [buyers, currentPartyType]);
 
-  const addBuyerMutation = useMutation({
+  const addPartyMutation = useMutation({
     mutationFn: async () => {
       if (!shop?.shopId) throw new Error('Missing shop');
       if (!newName.trim()) throw new Error('Name is required');
@@ -106,11 +116,13 @@ export default function BuyerListScreen() {
       const signedBalance = openingType === 'CR' ? -amount : amount;
       const code = generateCode(newName, buyers.map((b) => b.code));
       const phoneString = newPhones.map(p => p.trim()).filter(Boolean).join(', ');
+      
       const { error } = await supabase.from('buyers').insert({
         shop_id: shop.shopId,
         code,
         name: newName.trim(),
         phone: phoneString,
+        party_type: currentPartyType,
         outstanding_balance: signedBalance,
         opening_balance: amount,
         opening_balance_type: openingType,
@@ -144,12 +156,11 @@ export default function BuyerListScreen() {
       setOpeningType('DR');
       setNotes('');
     },
-    onError: (err) => Alert.alert('Could not add buyer', (err as Error).message),
+    onError: (err) => Alert.alert('Could not add party', (err as Error).message),
   });
 
   const ListHeader = (
     <>
-      {/* Unified Header */}
       <View
         style={{
           backgroundColor: '#00450d',
@@ -162,7 +173,7 @@ export default function BuyerListScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
             <Pressable
               onPress={() => router.navigate('/' as any)}
-              testID="buyers-back"
+              testID="accounts-back"
               hitSlop={8}
             >
               <ArrowLeft size={24} color="#ffffff" />
@@ -176,10 +187,10 @@ export default function BuyerListScreen() {
                   letterSpacing: -0.5,
                 }}
               >
-                Buyers / ग्राहक
+                Parties / व्यापारी
               </Text>
               <Text style={{ fontSize: 13, color: 'rgba(255, 255, 255, 0.8)', marginTop: 2 }}>
-                {buyers.length} active buyer accounts
+                {buyers.filter(b => (b.partyType || 'BUYER') === currentPartyType).length} active {activeTab === 0 ? 'buyers' : 'agents'}
               </Text>
             </View>
           </View>
@@ -195,7 +206,7 @@ export default function BuyerListScreen() {
                   textAlign: 'right',
                 }}
               >
-                TOTAL RECEIVABLE
+                {activeTab === 0 ? 'TOTAL RECEIVABLE' : 'TOTAL PAYABLE'}
               </Text>
               <Text
                 style={{
@@ -213,10 +224,18 @@ export default function BuyerListScreen() {
         </View>
       </View>
 
-      {/* Page content starts here */}
       <View style={{ paddingHorizontal: 20, paddingTop: 16 }}>
+        <SegmentedControl
+          values={['Buyers (ग्राहक)', 'Agents (एजेंट)']}
+          selectedIndex={activeTab}
+          onChange={(event) => {
+            setActiveTab(event.nativeEvent.selectedSegmentIndex);
+            setSearch('');
+          }}
+          style={{ height: 44, marginBottom: 20 }}
+          fontStyle={{ fontSize: 15, fontWeight: '600' }}
+        />
 
-        {/* Search + Filter row */}
         <View
           style={{
             flexDirection: 'row',
@@ -226,8 +245,8 @@ export default function BuyerListScreen() {
         >
           <View style={{ flex: 1, position: 'relative', justifyContent: 'center' }}>
             <TextInput
-              testID="buyers-search"
-              placeholder="Search by name or code..."
+              testID="accounts-search"
+              placeholder={`Search ${activeTab === 0 ? 'buyers' : 'agents'}...`}
               placeholderTextColor="#9CA3AF"
               value={search}
               onChangeText={setSearch}
@@ -257,7 +276,7 @@ export default function BuyerListScreen() {
             </View>
           </View>
           <Pressable
-            testID="buyers-filter-btn"
+            testID="accounts-filter-btn"
             style={{
               width: 56,
               height: 56,
@@ -276,7 +295,7 @@ export default function BuyerListScreen() {
     </>
   );
 
-  const renderBuyerCard = ({ item }: { item: Buyer }) => {
+  const renderPartyCard = ({ item }: { item: Buyer }) => {
     const daysOld =
       (Date.now() - item.lastTransactionDate) / (1000 * 60 * 60 * 24);
 
@@ -291,14 +310,23 @@ export default function BuyerListScreen() {
       statusLabel = 'Pending / लंबित';
       statusBg = '#ffdad6';
       statusText = '#93000a';
+    } else if (item.outstandingBalance < 0) {
+      statusLabel = 'Advance / अग्रिम';
+      statusBg = '#cfe4ff';
+      statusText = '#004a77';
     }
 
-    const isPending = item.outstandingBalance > 0;
+    const isPending = item.outstandingBalance !== 0;
+    // For agents, negative balance means we owe them (payable). 
+    // Wait, typical accounting: DR (positive) = Receivable (we gave goods), CR (negative) = Payable (we bought goods).
+    // So for an Agent, if we buy goods, we credit them (CR) so balance becomes negative.
+    // Let's display the absolute value.
+    const displayBalance = Math.abs(item.outstandingBalance);
 
     return (
       <Pressable
-        testID={`buyer-row-${item.code}`}
-        onPress={() => router.push(`/buyers/${item.code}` as any)}
+        testID={`account-row-${item.code}`}
+        onPress={() => router.push(`/accounts/${item.code}` as any)}
         style={{
           marginHorizontal: 16,
           marginBottom: Spacing.md,
@@ -353,7 +381,7 @@ export default function BuyerListScreen() {
                 </Text>
               </View>
               <Text style={{ fontSize: FontSize.sm, color: isPending ? '#B91C1C' : '#003D0A', fontWeight: '800', marginLeft: isSmall ? 20 : 8, textAlign: isSmall ? 'left' : 'right' }}>
-                {isPending ? `₹ ${toIndianCurrency(item.outstandingBalance).replace('₹', '')}` : '₹ 0.00'}
+                {isPending ? `₹ ${toIndianCurrency(displayBalance).replace('₹', '')}` : '₹ 0.00'}
               </Text>
             </View>
           </View>
@@ -372,7 +400,7 @@ export default function BuyerListScreen() {
           <>
             {ListHeader}
             <View
-              testID="buyers-loading"
+              testID="accounts-loading"
               style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
             >
               <ActivityIndicator color="#00450d" size="large" />
@@ -380,15 +408,15 @@ export default function BuyerListScreen() {
           </>
         ) : (
           <FlatList
-            testID="buyers-list"
+            testID="accounts-list"
             data={sorted}
             keyExtractor={(b) => b.code}
-            renderItem={renderBuyerCard}
+            renderItem={renderPartyCard}
             ListHeaderComponent={ListHeader}
             contentContainerStyle={{ paddingBottom: 100 }}
             ListEmptyComponent={
               <View
-                testID="buyers-empty"
+                testID="accounts-empty"
                 style={{
                   alignItems: 'center',
                   paddingVertical: 64,
@@ -404,7 +432,7 @@ export default function BuyerListScreen() {
                     marginTop: 16,
                   }}
                 >
-                  कोई ग्राहक नहीं
+                  {activeTab === 0 ? 'कोई ग्राहक नहीं' : 'कोई एजेंट नहीं'}
                 </Text>
                 <Text
                   style={{
@@ -414,7 +442,7 @@ export default function BuyerListScreen() {
                     marginTop: 8,
                   }}
                 >
-                  Customers appear after first UDHAARI sale
+                  {activeTab === 0 ? 'Customers appear after first UDHAARI sale' : 'Agents appear when you add them'}
                 </Text>
               </View>
             }
@@ -423,7 +451,7 @@ export default function BuyerListScreen() {
 
         <DraggableFAB
           onPress={() => setAddVisible(true)}
-          testID="add-buyer-fab"
+          testID="add-account-fab"
           initialBottom={8}
           initialRight={20}
         >
@@ -465,11 +493,11 @@ export default function BuyerListScreen() {
               disableScrollOnKeyboardHide
             >
               <Text style={{ fontSize: 18, fontWeight: '800', color: '#071e27', marginBottom: 14 }}>
-                Add Buyer / ग्राहक जोड़ें
+                {activeTab === 0 ? 'Add Buyer / ग्राहक जोड़ें' : 'Add Agent / एजेंट जोड़ें'}
               </Text>
               <Pressable
-                testID="add-buyer-contact-picker"
-                onPress={pickBuyerContact}
+                testID="add-party-contact-picker"
+                onPress={pickPartyContact}
                 style={{
                   minHeight: 44,
                   borderRadius: 8,
@@ -489,13 +517,13 @@ export default function BuyerListScreen() {
                 </Text>
               </Pressable>
               <TextInput
-                testID="add-buyer-name"
+                testID="add-party-name"
                 value={newName}
                 onChangeText={setNewName}
                 placeholder="Name / नाम"
                 placeholderTextColor="#94A3B8"
                 returnKeyType="next"
-                onSubmitEditing={() => addBuyerPhoneRef.current?.focus()}
+                onSubmitEditing={() => addPartyPhoneRef.current?.focus()}
                 style={modalInputStyle}
               />
               <View style={{ gap: 8 }}>
@@ -512,8 +540,8 @@ export default function BuyerListScreen() {
                       placeholderTextColor="#94A3B8"
                       keyboardType="phone-pad"
                       returnKeyType="next"
-                      ref={index === 0 ? addBuyerPhoneRef : undefined}
-                      onSubmitEditing={() => addBuyerOpeningRef.current?.focus()}
+                      ref={index === 0 ? addPartyPhoneRef : undefined}
+                      onSubmitEditing={() => addPartyOpeningRef.current?.focus()}
                       style={[modalInputStyle, { flex: 1, marginBottom: 0 }]}
                     />
                     {index === Math.max(0, newPhones.length - 1) ? (
@@ -534,15 +562,15 @@ export default function BuyerListScreen() {
               </View>
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 <TextInput
-                  testID="add-buyer-opening"
+                  testID="add-party-opening"
                   value={openingAmount}
                   onChangeText={setOpeningAmount}
                   placeholder="Opening Balance"
                   placeholderTextColor="#94A3B8"
                   keyboardType="decimal-pad"
                   returnKeyType="next"
-                  ref={addBuyerOpeningRef}
-                  onSubmitEditing={() => addBuyerNotesRef.current?.focus()}
+                  ref={addPartyOpeningRef}
+                  onSubmitEditing={() => addPartyNotesRef.current?.focus()}
                   style={{ ...modalInputStyle, flex: 1 }}
                 />
                 {(['DR', 'CR'] as const).map((type) => (
@@ -565,30 +593,30 @@ export default function BuyerListScreen() {
                 ))}
               </View>
               <TextInput
-                testID="add-buyer-notes"
+                testID="add-party-notes"
                 value={notes}
                 onChangeText={setNotes}
                 placeholder="Notes / टिप्पणी"
                 placeholderTextColor="#94A3B8"
                 returnKeyType="done"
-                ref={addBuyerNotesRef}
+                ref={addPartyNotesRef}
                 style={modalInputStyle}
               />
               <Pressable
-                testID="save-add-buyer"
-                onPress={() => addBuyerMutation.mutate()}
-                disabled={addBuyerMutation.isPending}
+                testID="save-add-party"
+                onPress={() => addPartyMutation.mutate()}
+                disabled={addPartyMutation.isPending}
                 style={{
                   height: 52,
                   borderRadius: 8,
-                  backgroundColor: addBuyerMutation.isPending ? '#C8E6C9' : '#1b5e20',
+                  backgroundColor: addPartyMutation.isPending ? '#C8E6C9' : '#1b5e20',
                   alignItems: 'center',
                   justifyContent: 'center',
                   marginTop: 4,
                 }}
               >
                 <Text style={{ color: '#FFF', fontSize: 15, fontWeight: '800' }}>
-                  {addBuyerMutation.isPending ? 'Saving...' : 'Save Buyer'}
+                  {addPartyMutation.isPending ? 'Saving...' : `Save ${activeTab === 0 ? 'Buyer' : 'Agent'}`}
                 </Text>
               </Pressable>
             </KeyboardAwareScrollView>

@@ -384,6 +384,63 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
         });
         if (transactionError) throw new Error(transactionError.message);
       }
+
+      if (inquiry.sourceAgentName && inquiry.agentPurchaseAmount && inquiry.agentPurchaseAmount > 0) {
+        const { data: buyerRows, error: agentFetchError } = await supabase
+          .from('buyers')
+          .select('*')
+          .eq('shop_id', shop.shopId);
+        if (agentFetchError) throw new Error(agentFetchError.message);
+
+        const normalizedName = inquiry.sourceAgentName.trim().toLowerCase();
+        const normalizedPhone = (inquiry.sourceAgentPhone ?? '').trim();
+        const existingAgent = ((buyerRows ?? []) as Record<string, unknown>[]).find((buyer) => {
+          const buyerPhone = String(buyer.phone ?? '').trim();
+          const buyerName = String(buyer.name ?? '').trim().toLowerCase();
+          return (
+            (!!normalizedPhone && buyerPhone === normalizedPhone) ||
+            (!!normalizedName && buyerName === normalizedName)
+          );
+        });
+
+        const agentCode = existingAgent?.code ?? `A${now}`;
+        const agentPurchaseAmount = inquiry.agentPurchaseAmount;
+
+        if (existingAgent) {
+          const { error: agentUpdateError } = await supabase
+            .from('buyers')
+            .update({
+              outstanding_balance: Number(existingAgent.outstanding_balance ?? 0) - agentPurchaseAmount,
+              last_transaction_date: now,
+            })
+            .eq('id', existingAgent.id);
+          if (agentUpdateError) throw new Error(agentUpdateError.message);
+        } else {
+          const { error: agentInsertError } = await supabase.from('buyers').insert({
+            shop_id: shop.shopId,
+            code: agentCode,
+            name: inquiry.sourceAgentName.trim(),
+            phone: (inquiry.sourceAgentPhone ?? '').trim(),
+            party_type: 'AGENT',
+            outstanding_balance: -agentPurchaseAmount,
+            last_transaction_date: now,
+            created_at: now,
+          });
+          if (agentInsertError) throw new Error(agentInsertError.message);
+        }
+
+        const { error: agentTransactionError } = await supabase.from('transactions').insert({
+          shop_id: shop.shopId,
+          buyer_code: agentCode,
+          type: 'PURCHASE',
+          amount: agentPurchaseAmount,
+          date: now,
+          note: `Stock Purchase Bill #${inquiry.slipNumber}`,
+          slip_number: inquiry.slipNumber,
+          created_at: now,
+        });
+        if (agentTransactionError) throw new Error(agentTransactionError.message);
+      }
     },
     onSuccess: () => {
       queryClient.setQueryData(['inquiry', shop?.shopId, inquiry.id], (old: any) => 
@@ -410,9 +467,9 @@ export default function PendingInquiryCard({ inquiry }: { inquiry: Inquiry }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['inquiries', shop?.shopId] });
       queryClient.invalidateQueries({ queryKey: ['trucks', shop?.shopId] });
-      if (inquiry.truck_id) {
-        queryClient.invalidateQueries({ queryKey: ['truck', shop?.shopId, inquiry.truck_id] });
-        queryClient.invalidateQueries({ queryKey: ['inquiries', shop?.shopId, 'truck', inquiry.truck_id] });
+      if (inquiry.truckId) {
+        queryClient.invalidateQueries({ queryKey: ['truck', shop?.shopId, inquiry.truckId] });
+        queryClient.invalidateQueries({ queryKey: ['inquiries', shop?.shopId, 'truck', inquiry.truckId] });
       }
     },
   });

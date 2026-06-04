@@ -10,7 +10,7 @@ const ADMIN_TABS = [
   { key: 'home',    labelEn: 'HOME',    labelHi: 'होम',     icon: Home,          path: '/' },
   { key: 'trucks',  labelEn: 'TRUCKS',  labelHi: 'ट्रक',     icon: Truck,         path: '/trucks' },
   { key: 'bills',   labelEn: 'BILLS',   labelHi: 'बिल',      icon: ClipboardList, path: '/bills' },
-  { key: 'buyers',  labelEn: 'BUYERS',  labelHi: 'खरीदार',  icon: Users,         path: '/buyers' },
+  { key: 'accounts',labelEn: 'PARTIES', labelHi: 'व्यापारी', icon: Users,         path: '/accounts' },
   { key: 'reports', labelEn: 'REPORTS', labelHi: 'रिपोर्ट',  icon: BarChart2,     path: '/reports' },
 ] as const;
 
@@ -31,7 +31,7 @@ export function BottomNavBar() {
   const getActiveKey = (): string => {
     if (pathname === '/reports' || pathname.startsWith('/reports/')) return 'reports';
     if (pathname.startsWith('/bills') || pathname.startsWith('/member-bills')) return 'bills';
-    if (pathname.startsWith('/buyers')) return 'buyers';
+    if (pathname.startsWith('/accounts') || pathname.startsWith('/buyers')) return 'accounts';
     if (pathname.startsWith('/member-profile')) return 'profile';
     if (pathname.startsWith('/member-trucks') || pathname.startsWith('/trucks')) return 'trucks';
     if (pathname === '/' || pathname === '/index' || pathname.startsWith('/member-dashboard')) return 'home';

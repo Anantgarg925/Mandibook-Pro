@@ -16,7 +16,7 @@ import * as Sharing from 'expo-sharing';
 import { captureRef } from 'react-native-view-shot';
 import { supabase } from '@/lib/supabase';
 import { useShop } from '@/context/ShopContext';
-import { useBuyerBills, useBuyers, useBuyerTransactions } from '@/hooks/useBuyers';
+import { useBuyerBills, useBuyers, useBuyerTransactions, useAgentPurchases } from '@/hooks/useBuyers';
 import { shareSlipAsPDF } from '@/utils/printSlip';
 import { generateBalanceMessage, generateCustomerMessage, openWhatsApp } from '@/utils/whatsapp';
 import { toIndianCurrency, toIndianDate } from '@/lib/formatters';
@@ -32,7 +32,14 @@ export default function BuyerLedgerScreen() {
   const { getBuyer } = useBuyers();
   const buyer = getBuyer(code);
   const { transactions, loading } = useBuyerTransactions(code);
-  const { bills, loading: billsLoading } = useBuyerBills(buyer?.name);
+  
+  const isAgent = buyer?.partyType === 'AGENT';
+  
+  const { bills: buyerBills, loading: buyerBillsLoading } = useBuyerBills(isAgent ? undefined : buyer?.name);
+  const { bills: agentBills, loading: agentBillsLoading } = useAgentPurchases(isAgent ? buyer?.name : undefined);
+  
+  const bills = isAgent ? agentBills : buyerBills;
+  const billsLoading = isAgent ? agentBillsLoading : buyerBillsLoading;
   const queryClient = useQueryClient();
   const insets = useSafeAreaInsets();
 
@@ -632,10 +639,10 @@ export default function BuyerLedgerScreen() {
                 backgroundColor: '#F8FAFC',
               }}>
                 <Text style={{ fontSize: FontSize.xs, fontWeight: '800', color: Colors.textSecond, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                  Sales Bills
+                  {isAgent ? 'Agent Purchases' : 'Sales Bills'}
                 </Text>
                 <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 2 }}>
-                  {bills.length} bill{bills.length === 1 ? '' : 's'} generated for this buyer
+                  {bills.length} bill{bills.length === 1 ? '' : 's'} associated with this {isAgent ? 'agent' : 'buyer'}
                 </Text>
               </View>
 
@@ -644,7 +651,7 @@ export default function BuyerLedgerScreen() {
               ) : bills.length === 0 ? (
                 <View style={{ padding: Spacing.md }}>
                   <Text style={{ fontSize: FontSize.sm, color: Colors.textSecond }}>
-                    No sales bills found for this buyer name.
+                    No {isAgent ? 'purchases' : 'sales bills'} found for this {isAgent ? 'agent' : 'buyer'}.
                   </Text>
                 </View>
               ) : bills.map((bill) => (

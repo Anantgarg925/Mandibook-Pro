@@ -80,27 +80,82 @@ export async function processOfflineQueue(supabaseClient: any): Promise<boolean>
       if (operation.type === 'CREATE_INQUIRY') {
         const payload = operation.payload as any;
         
-        // Use the Supabase RPC for atomic stock validation
-        const { data, error } = await supabaseClient.rpc('sync_offline_bill', {
-          bill_payload: payload.inquiry
-        });
+        // Remove the extra properties we added for offline tracking
+        const dbInq = { ...payload.inquiry };
+        delete dbInq.sync_status;
+        delete dbInq.created_offline;
+        delete dbInq.optimistic_stock;
+
+        const { data, error } = await supabaseClient
+          .from('inquiries')
+          .insert(dbInq)
+          .select()
+          .single();
         
+        let isSuccess = false;
+
         if (error) {
-          // If network error, stop sync and try again later
-          if (error.message && error.message.toLowerCase().includes('fetch')) {
-            break;
+          if (error.code === '23505') {
+            // Duplicate key error, treat as success
+            isSuccess = true;
+          } else {
+            const isNetworkError = error.message && (
+              error.message.toLowerCase().includes('fetch') ||
+              error.message.toLowerCase().includes('network') ||
+              error.message.toLowerCase().includes('timeout') ||
+              error.message.toLowerCase().includes('connection')
+            );
+            if (isNetworkError) {
+              break; // Stop sync and try again later
+            }
+            console.error('Error syncing bill permanently:', error);
+            // Drop it if it's a permanent constraint error so the queue isn't blocked forever
+            isSuccess = true; 
           }
-          console.error('Error syncing bill:', error);
+        } else {
+          isSuccess = true;
+          
+          // Process best-effort updates (truck, buyer)
+          try {
+            if (payload.truckUpdate) {
+              await supabaseClient
+                .from('trucks')
+                .update({ grade_inventory: payload.truckUpdate.gradeInventory })
+                .eq('id', payload.truckUpdate.id);
+            }
+          } catch { /* best-effort */ }
+          
+          try {
+            if (payload.buyerUpsert) {
+              const { data: existing } = await supabaseClient
+                .from('buyers')
+                .select('id')
+                .or(`phone.eq.${payload.buyerUpsert.phone},name.ilike.${payload.buyerUpsert.name}`)
+                .eq('shop_id', dbInq.shop_id)
+                .maybeSingle();
+
+              if (!existing) {
+                await supabaseClient.from('buyers').insert({
+                  shop_id: dbInq.shop_id,
+                  name: payload.buyerUpsert.name,
+                  phone: payload.buyerUpsert.phone,
+                  preferred_payment_mode: dbInq.payment_mode,
+                  last_transaction_date: Date.now(),
+                  created_at: Date.now(),
+                });
+              } else {
+                await supabaseClient
+                  .from('buyers')
+                  .update({ preferred_payment_mode: dbInq.payment_mode })
+                  .eq('id', existing.id);
+              }
+            }
+          } catch { /* best-effort */ }
         }
         
-        // If the RPC succeeded (returned accepted or conflict), it's safely in the database.
-        if (data && (data.status === 'accepted' || data.status === 'conflict')) {
+        if (isSuccess) {
           await removeOfflineOperation(operation.id);
           syncedAny = true;
-          
-          if (payload.buyerUpsert) {
-             // Upsert buyer... (simplified)
-          }
         }
       } else {
         await removeOfflineOperation(operation.id);

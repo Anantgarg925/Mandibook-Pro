@@ -114,6 +114,7 @@ export default function NewBillScreen() {
   const [boughtFromAgent, setBoughtFromAgent] = useState(false);
   const [sourceAgentName, setSourceAgentName] = useState('');
   const [sourceAgentPhone, setSourceAgentPhone] = useState('');
+  const [agentPurchaseAmount, setAgentPurchaseAmount] = useState('');
   const [savedSlip, setSavedSlip] = useState<number | null>(null);
   const [savedInquiryId, setSavedInquiryId] = useState<string | null>(null);
   const [applyApmc, setApplyApmc] = useState(true);
@@ -291,6 +292,7 @@ export default function NewBillScreen() {
         source_agent_name: payload.inquiry.sourceAgentName ?? '',
         source_agent_phone: payload.inquiry.sourceAgentPhone ?? '',
         source_agent_hidden: !payload.inquiry.sourceAgentName,
+        agent_purchase_amount: payload.inquiry.agentPurchaseAmount ?? 0,
         customer_name: payload.inquiry.customerName,
         customer_phone: payload.inquiry.customerPhone,
         grade: payload.inquiry.grade,
@@ -403,7 +405,8 @@ export default function NewBillScreen() {
           });
 
           // 2. Optimistically update React Query inquiries cache
-          queryClient.setQueryData(['inquiries', payload.inquiry.shopId], (old: any) => {
+          const { startMs: dateParam, endMs: dateEnd } = getBusinessDateRange(getCurrentBusinessDate());
+          queryClient.setQueryData(['inquiries', payload.inquiry.shopId, dateParam, dateEnd], (old: any) => {
             const list = Array.isArray(old) ? old : [];
             return [offlineInquiry, ...list];
           });
@@ -413,7 +416,7 @@ export default function NewBillScreen() {
           });
 
           // 3. Update trucks cache optimistically
-          const { startMs: dateParam, endMs: dateEnd } = getBusinessDateRange(getCurrentBusinessDate());
+
           queryClient.setQueryData(['trucks', payload.inquiry.shopId, dateParam, dateEnd, shop?.grades], (oldTrucks: any) => {
             if (!oldTrucks) return oldTrucks;
             return oldTrucks.map((truck: any) => {
@@ -550,6 +553,7 @@ export default function NewBillScreen() {
     const e: Record<string, string> = {};
     if (!boughtFromAgent && !selectedTruck) e.truck = 'गाड़ी चुनें';
     if (boughtFromAgent && !sourceAgentName.trim()) e.sourceAgent = 'एजेंट का नाम डालें';
+    if (boughtFromAgent && (!agentPurchaseAmount || parseFloat(agentPurchaseAmount) <= 0)) e.agentPurchaseAmount = 'Please enter purchase amount';
     if (!selectedGrade) e.grade = 'ग्रेड चुनें';
     if (sacks <= 0) e.sacks = 'बोरों की संख्या डालें';
     if (inventoryError) e.stock = inventoryError;
@@ -628,6 +632,7 @@ export default function NewBillScreen() {
           truckNumber: boughtFromAgent ? 'Agent Stock' : selectedTruck?.truckNumber,
           sourceAgentName: boughtFromAgent ? sourceAgentName.trim() : '',
           sourceAgentPhone: boughtFromAgent ? sourceAgentPhone.trim() : '',
+          agentPurchaseAmount: boughtFromAgent ? (parseFloat(agentPurchaseAmount) || 0) : 0,
           customerName: customerName.trim(),
           customerPhone: customerPhone.trim(),
           grade: mainGrade,
@@ -698,6 +703,7 @@ export default function NewBillScreen() {
     setUpiRef('');
     setCustomerName('');
     setCustomerPhone('');
+    setAgentPurchaseAmount('');
     setApplyApmc(true);
     setApplyBardana(true);
     setErrors({});
@@ -918,7 +924,7 @@ export default function NewBillScreen() {
                 setBoughtFromAgent(v);
                 setSelectedTruckId(null);
                 setSelectedGrade(null);
-                if (!v) { setSourceAgentName(''); setSourceAgentPhone(''); }
+                if (!v) { setSourceAgentName(''); setSourceAgentPhone(''); setAgentPurchaseAmount(''); }
               }}
             />
           </View>
@@ -938,6 +944,14 @@ export default function NewBillScreen() {
                 value={sourceAgentPhone}
                 onChangeText={setSourceAgentPhone}
                 keyboardType="phone-pad"
+              />
+              <TextInput
+                style={inputStyle}
+                placeholder="Purchase Amount (₹) *"
+                placeholderTextColor={Colors.textSecond}
+                value={agentPurchaseAmount}
+                onChangeText={(v) => setAgentPurchaseAmount(v.replace(/[^0-9.]/g, ''))}
+                keyboardType="decimal-pad"
               />
             </View>
           ) : (
@@ -1334,12 +1348,13 @@ export default function NewBillScreen() {
                 <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                     <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>Bought from agent?</Text>
-                    <Switch value={boughtFromAgent} onValueChange={(v) => { setBoughtFromAgent(v); setSelectedTruckId(null); setSelectedGrade(null); if (!v) { setSourceAgentName(''); setSourceAgentPhone(''); } }} />
+                    <Switch value={boughtFromAgent} onValueChange={(v) => { setBoughtFromAgent(v); setSelectedTruckId(null); setSelectedGrade(null); if (!v) { setSourceAgentName(''); setSourceAgentPhone(''); setAgentPurchaseAmount(''); } }} />
                   </View>
                   {boughtFromAgent ? (
                     <View style={{ gap: 8 }}>
                       <TextInput ref={sourceAgentNameRef} style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }} placeholder="Agent name *" value={sourceAgentName} onChangeText={setSourceAgentName} returnKeyType="next" onSubmitEditing={() => sourceAgentPhoneRef.current?.focus()} />
-                      <TextInput ref={sourceAgentPhoneRef} style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }} placeholder="Agent phone (optional)" value={sourceAgentPhone} onChangeText={setSourceAgentPhone} keyboardType="phone-pad" returnKeyType="done" onSubmitEditing={() => { setEditingField('grade'); setTimeout(() => scrollToSection('grade'), 100); }} />
+                      <TextInput ref={sourceAgentPhoneRef} style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }} placeholder="Agent phone (optional)" value={sourceAgentPhone} onChangeText={setSourceAgentPhone} keyboardType="phone-pad" returnKeyType="next" />
+                      <TextInput style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }} placeholder="Purchase Amount (₹) *" value={agentPurchaseAmount} onChangeText={(v) => setAgentPurchaseAmount(v.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad" returnKeyType="done" onSubmitEditing={() => { setEditingField('grade'); setTimeout(() => scrollToSection('grade'), 100); }} />
                     </View>
                   ) : (
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
