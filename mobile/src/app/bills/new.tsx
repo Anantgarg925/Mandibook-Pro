@@ -23,6 +23,7 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
 } from 'react-native-reanimated';
+import { Keyboard } from 'react-native';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
 import { useShop } from '@/context/ShopContext';
@@ -93,6 +94,8 @@ export default function NewBillScreen() {
   const selectedTruck = trucks.find(t => t.id === selectedTruckId) || null;
   const [truckPickerVisible, setTruckPickerVisible] = useState(false);
   const [contactPickerVisible, setContactPickerVisible] = useState(false);
+  const generateDraftId = () => `draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const [draftId, setDraftId] = useState(generateDraftId);
   const [phoneContacts, setPhoneContacts] = useState<any[]>([]);
   const [contactsLoading, setContactsLoading] = useState(false);
   const [contactSearchText, setContactSearchText] = useState('');
@@ -280,6 +283,7 @@ export default function NewBillScreen() {
 
       // 2. Create inquiry
       const dbInq: any = {
+        id: payload.inquiry.id,
         shop_id: payload.inquiry.shopId,
         slip_number: realTimeSlip,
         truck_id: payload.inquiry.truckId,
@@ -319,7 +323,19 @@ export default function NewBillScreen() {
           .insert(dbInq)
           .select()
           .single();
-        if (inqErr) throw new Error(inqErr.message);
+        if (inqErr) {
+          if (inqErr.code === '23505') {
+            // Duplicate key error, treat as success
+            const { data: existingInquiry, error: fetchErr } = await supabase
+              .from('inquiries')
+              .select()
+              .eq('id', dbInq.id)
+              .single();
+            if (fetchErr) throw new Error(fetchErr.message);
+            return existingInquiry;
+          }
+          throw new Error(inqErr.message);
+        }
 
         // Update truck inventory (best-effort)
         try {
@@ -371,11 +387,9 @@ export default function NewBillScreen() {
         if (isNetworkError) {
           console.log('Offline/Network error during bill save, queueing offline...');
           
-          // Generate a temp offline ID
-          const offlineId = `offline-${Date.now()}`;
           const offlineInquiry = {
             ...dbInq,
-            id: offlineId,
+            id: dbInq.id,
             sync_status: 'pending',
             created_offline: true,
             optimistic_stock: payload.inquiry.totalWeight || 0,
@@ -544,8 +558,9 @@ export default function NewBillScreen() {
   };
 
   const handleSave = async () => {
+    Keyboard.dismiss();
     // Immediate lock to prevent duplicate clicks (especially during offline/slow saves)
-    if (isSavingRef.current) return;
+    if (isSavingRef.current || success) return;
     if (entries.length === 0 && (!validate() || !shop?.shopId || (!selectedTruck && !boughtFromAgent) || !selectedGrade || saveMutation.isPending)) return;
     if (saveMutation.isPending) return;
     isSavingRef.current = true;
@@ -606,6 +621,7 @@ export default function NewBillScreen() {
 
       const createdInquiry = await saveMutation.mutateAsync({
         inquiry: {
+          id: draftId,
           shopId: shop!.shopId,
           slipNumber: slip,
           truckId: boughtFromAgent ? null : selectedTruck?.id,
@@ -697,6 +713,7 @@ export default function NewBillScreen() {
       const next = await getNextSlipNumber(shop.shopId, offsetBase, isOffline);
       setSlipNumber(next);
     }
+    setDraftId(generateDraftId());
     
     // Scroll back to the top of the form
     setTimeout(() => {
@@ -1206,7 +1223,7 @@ export default function NewBillScreen() {
           <Pressable
             testID="save-bill-button"
             onPress={handleSave}
-            disabled={saveMutation.isPending || isSavingRef.current}
+            disabled={saveMutation.isPending || isSavingRef.current || success}
           >
             {({ pressed }) => (
               <View style={{
@@ -1216,7 +1233,7 @@ export default function NewBillScreen() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 gap: 8,
-                backgroundColor: (saveMutation.isPending || isSavingRef.current) ? Colors.border : pressed ? '#EAB308' : '#FBBF24',
+                backgroundColor: (saveMutation.isPending || isSavingRef.current || success) ? Colors.border : pressed ? '#EAB308' : '#FBBF24',
               }}>
                 {(saveMutation.isPending || isSavingRef.current) ? (
                   <>
@@ -1472,7 +1489,7 @@ export default function NewBillScreen() {
             {/* Action buttons */}
             <View style={{ marginTop: 24, gap: Spacing.sm }}>
               {errors.save ? <Text style={{ color: Colors.danger, fontSize: FontSize.xs, textAlign: 'center' }}>{errors.save}</Text> : null}
-              <Pressable testID="save-bill-button" onPress={handleSave} disabled={saveMutation.isPending || isSavingRef.current} style={{ padding: 16, borderWidth: 2, borderColor: '#111827', backgroundColor: (saveMutation.isPending || isSavingRef.current) ? '#CBD5E1' : '#FBBF24', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
+              <Pressable testID="save-bill-button" onPress={handleSave} disabled={saveMutation.isPending || isSavingRef.current || success} style={{ padding: 16, borderWidth: 2, borderColor: '#111827', backgroundColor: (saveMutation.isPending || isSavingRef.current || success) ? '#CBD5E1' : '#FBBF24', alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
                 {(saveMutation.isPending || isSavingRef.current) && <ActivityIndicator color="#111827" size="small" />}
                 <Text style={{ fontSize: 18, fontWeight: '900', color: '#111827' }}>{(saveMutation.isPending || isSavingRef.current) ? 'SAVING...' : 'SAVE BILL'}</Text>
               </Pressable>
