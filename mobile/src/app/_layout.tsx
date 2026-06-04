@@ -11,10 +11,6 @@ import { Storage as AsyncStorage } from '@/lib/offlineDB';
 import NetInfo from '@react-native-community/netinfo';
 import { supabase } from '@/lib/supabase';
 import { processOfflineQueue } from '@/lib/offlineQueue';
-function KeyboardProvider({ children }: { children: React.ReactNode }) {
-  if (Platform.OS === 'web') return <>{children}</>;
-  return <RNKeyboardProvider>{children}</RNKeyboardProvider>;
-}
 import { SafeAreaProvider, initialWindowMetrics } from 'react-native-safe-area-context';
 import { usePathname } from 'expo-router';
 import { ShopProvider } from '@/context/ShopContext';
@@ -33,6 +29,12 @@ import { patchAlertForWeb } from '@/utils/alertPolyfill';
 
 // Patch Alert.alert for web — must run before any component renders
 patchAlertForWeb();
+
+// KeyboardProvider crashes silently on web — use a passthrough wrapper
+function KeyboardProvider({ children }: { children: React.ReactNode }) {
+  if (Platform.OS === 'web') return <>{children}</>;
+  return <RNKeyboardProvider>{children}</RNKeyboardProvider>;
+}
 
 (Text as any).defaultProps = {
   ...((Text as any).defaultProps ?? {}),
