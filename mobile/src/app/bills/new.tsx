@@ -399,6 +399,13 @@ export default function NewBillScreen() {
             optimistic_stock: payload.inquiry.totalWeight || 0,
           };
 
+          const cacheInquiry = {
+            ...payload.inquiry,
+            sync_status: 'pending',
+            created_offline: true,
+            optimistic_stock: payload.inquiry.totalWeight || 0,
+          };
+
           // 1. Enqueue offline operation
           await enqueueOfflineOperation('CREATE_INQUIRY', {
             inquiry: offlineInquiry,
@@ -410,11 +417,11 @@ export default function NewBillScreen() {
           const { startMs: dateParam, endMs: dateEnd } = getBusinessDateRange(getCurrentBusinessDate());
           queryClient.setQueryData(['inquiries', payload.inquiry.shopId, dateParam, dateEnd], (old: any) => {
             const list = Array.isArray(old) ? old : [];
-            return [offlineInquiry, ...list];
+            return [cacheInquiry, ...list];
           });
           queryClient.setQueryData(['inquiries', payload.inquiry.shopId, 'truck', payload.inquiry.truckId], (old: any) => {
             const list = Array.isArray(old) ? old : [];
-            return [offlineInquiry, ...list];
+            return [cacheInquiry, ...list];
           });
 
           // 3. Update trucks cache optimistically
@@ -447,13 +454,14 @@ export default function NewBillScreen() {
               if (!exists) {
                 const newBuyer = {
                   id: `buyer-offline-${Date.now()}`,
-                  shop_id: payload.inquiry.shopId,
+                  shopId: payload.inquiry.shopId,
+                  code: `B${Date.now()}`,
                   name: buyerData.name,
                   phone: buyerData.phone,
-                  outstanding_balance: 0,
-                  preferred_payment_mode: payload.inquiry.paymentMode,
-                  last_transaction_date: Date.now(),
-                  created_at: Date.now(),
+                  outstandingBalance: 0,
+                  preferredPaymentMode: payload.inquiry.paymentMode,
+                  lastTransactionDate: Date.now(),
+                  createdAt: Date.now(),
                 };
                 return [...list, newBuyer];
               }
