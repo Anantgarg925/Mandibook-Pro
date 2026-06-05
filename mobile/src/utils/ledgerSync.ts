@@ -138,33 +138,65 @@ export const deleteConfirmedBill = async (
   shopId: string,
   inquiry: Pick<Inquiry, 'id' | 'slipNumber' | 'status' | 'paymentMode' | 'netAmount'>
 ) => {
-  if (inquiry.status === 'CONFIRMED' && inquiry.paymentMode === 'UDHAARI') {
-    const { data: tx, error: txErr } = await supabase
+  if (inquiry.status === 'CONFIRMED') {
+    // Reverse SALE transaction if it was UDHAARI
+    if (inquiry.paymentMode === 'UDHAARI') {
+      const { data: tx, error: txErr } = await supabase
+        .from('transactions')
+        .select('*')
+        .eq('shop_id', shopId)
+        .eq('type', 'SALE')
+        .eq('slip_number', inquiry.slipNumber)
+        .maybeSingle();
+      if (txErr) throw new Error(txErr.message);
+
+      if (tx) {
+        const { data: buyer, error: buyerErr } = await supabase
+          .from('buyers')
+          .select('outstanding_balance, id')
+          .eq('shop_id', shopId)
+          .eq('code', tx.buyer_code)
+          .single();
+        if (buyerErr) throw new Error(buyerErr.message);
+
+        const { error: buyerUpdateErr } = await supabase
+          .from('buyers')
+          .update({ outstanding_balance: Number(buyer.outstanding_balance) - Number(tx.amount) })
+          .eq('id', buyer.id);
+        if (buyerUpdateErr) throw new Error(buyerUpdateErr.message);
+
+        const { error: txDeleteErr } = await supabase.from('transactions').delete().eq('id', tx.id);
+        if (txDeleteErr) throw new Error(txDeleteErr.message);
+      }
+    }
+
+    // Reverse PURCHASE transaction (Agent Stock) if it exists
+    const { data: purchaseTx, error: pTxErr } = await supabase
       .from('transactions')
       .select('*')
       .eq('shop_id', shopId)
-      .eq('type', 'SALE')
+      .eq('type', 'PURCHASE')
       .eq('slip_number', inquiry.slipNumber)
       .maybeSingle();
-    if (txErr) throw new Error(txErr.message);
-
-    if (tx) {
-      const { data: buyer, error: buyerErr } = await supabase
+    
+    if (purchaseTx) {
+      const { data: agent, error: agentErr } = await supabase
         .from('buyers')
         .select('outstanding_balance, id')
         .eq('shop_id', shopId)
-        .eq('code', tx.buyer_code)
+        .eq('code', purchaseTx.buyer_code)
         .single();
-      if (buyerErr) throw new Error(buyerErr.message);
 
-      const { error: buyerUpdateErr } = await supabase
-        .from('buyers')
-        .update({ outstanding_balance: Number(buyer.outstanding_balance) - Number(tx.amount) })
-        .eq('id', buyer.id);
-      if (buyerUpdateErr) throw new Error(buyerUpdateErr.message);
+      if (agent && !agentErr) {
+        // Reverse the purchase credit (it was added as a negative value to outstanding_balance, so we add it back)
+        const { error: agentUpdateErr } = await supabase
+          .from('buyers')
+          .update({ outstanding_balance: Number(agent.outstanding_balance) + Number(purchaseTx.amount) })
+          .eq('id', agent.id);
+        if (agentUpdateErr) throw new Error(agentUpdateErr.message);
+      }
 
-      const { error: txDeleteErr } = await supabase.from('transactions').delete().eq('id', tx.id);
-      if (txDeleteErr) throw new Error(txDeleteErr.message);
+      await supabase.from('transactions').delete().eq('id', purchaseTx.id);
     }
   }
 
