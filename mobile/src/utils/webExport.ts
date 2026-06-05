@@ -24,7 +24,10 @@ export async function printHtmlOnWeb(html: string, title: string): Promise<void>
   }
 
   iframeDoc.open();
-  iframeDoc.write(`<!DOCTYPE html><html><head><title>${title}</title></head><body>${html}</body></html>`);
+  const finalHtml = html.trim().toLowerCase().startsWith('<!doctype') || html.trim().toLowerCase().startsWith('<html')
+    ? html
+    : `<!DOCTYPE html><html><head><title>${title}</title></head><body>${html}</body></html>`;
+  iframeDoc.write(finalHtml);
   iframeDoc.close();
 
   // Wait for content to load
@@ -50,8 +53,10 @@ export async function printHtmlOnWeb(html: string, title: string): Promise<void>
  * Fallback: Download HTML as a file that can be opened and printed manually
  */
 function downloadHtmlFile(html: string, title: string): void {
-  const fullHtml = `<!DOCTYPE html><html><head><title>${title}</title></head><body>${html}</body></html>`;
-  const blob = new Blob([fullHtml], { type: 'text/html' });
+  const finalHtml = html.trim().toLowerCase().startsWith('<!doctype') || html.trim().toLowerCase().startsWith('<html')
+    ? html
+    : `<!DOCTYPE html><html><head><title>${title}</title></head><body>${html}</body></html>`;
+  const blob = new Blob([finalHtml], { type: 'text/html' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
