@@ -66,7 +66,14 @@ function downloadHtmlFile(html: string, title: string): void {
  * Download an HTML element as a JPEG/PNG using html2canvas.
  */
 async function elementToDataUrl(element: HTMLElement, format: 'png' | 'jpeg'): Promise<string> {
-  const htmlToImage = await import('html-to-image');
+  // Use require instead of dynamic import to prevent Webpack chunk loading errors on Vercel
+  const htmlToImageModule = require('html-to-image');
+  const toPng = htmlToImageModule.toPng || (htmlToImageModule.default && htmlToImageModule.default.toPng);
+  const toJpeg = htmlToImageModule.toJpeg || (htmlToImageModule.default && htmlToImageModule.default.toJpeg);
+
+  if (!toPng || !toJpeg) {
+    throw new Error('html-to-image exports not found. Keys: ' + Object.keys(htmlToImageModule).join(', '));
+  }
   
   // Create options that explicitly capture the full scrollable area
   const options = {
@@ -83,9 +90,9 @@ async function elementToDataUrl(element: HTMLElement, format: 'png' | 'jpeg'): P
   };
   
   if (format === 'png') {
-    return await htmlToImage.toPng(element, options);
+    return await toPng(element, options);
   }
-  return await htmlToImage.toJpeg(element, { ...options, quality: 0.98 });
+  return await toJpeg(element, { ...options, quality: 0.98 });
 }
 
 export async function downloadElementAsJpeg(element: HTMLElement, filename: string): Promise<void> {
