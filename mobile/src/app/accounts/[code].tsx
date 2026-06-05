@@ -80,19 +80,60 @@ export default function BuyerLedgerScreen() {
     [transactions],
   );
 
+  const flattenedBills = useMemo(() => {
+    if (!isAgent) return bills;
+    return bills.flatMap((inq) => {
+      const entries = (inq.chargeSnapshot as any)?.entries || [inq];
+      const purchaseRate = inq.totalWeight > 0 ? (inq.agentPurchaseAmount || 0) / inq.totalWeight : 0;
+      return entries.map((entry: any, idx: number) => ({
+        ...inq,
+        id: `${inq.id}-${idx}`,
+        grade: entry.grade || 'MIXED',
+        gradeName: entry.gradeName || entry.grade || 'Multiple Items',
+        sacks: entry.sacks || 0,
+        totalWeight: entry.totalWeight || 0,
+        ratePerKg: purchaseRate,
+        grossAmount: (entry.totalWeight || 0) * purchaseRate,
+        apmcAmount: 0,
+        bardanaAmount: 0,
+        cartageAmount: 0,
+        netAmount: (entry.totalWeight || 0) * purchaseRate,
+      }));
+    });
+  }, [bills, isAgent]);
+
   const dailyGroups = useMemo(() => {
-    const groups = new Map<string, typeof bills>();
-    bills.forEach((bill) => {
+    const groups = new Map<string, typeof flattenedBills>();
+    flattenedBills.forEach((bill) => {
       const key = new Date(bill.date).toDateString();
       groups.set(key, [...(groups.get(key) ?? []), bill]);
     });
-    return Array.from(groups.entries()).map(([key, rows]) => ({
-      key,
-      label: toIndianDate(rows[0]?.date ?? Date.now()),
-      rows,
-      total: rows.reduce((sum, bill) => sum + bill.netAmount, 0),
-    }));
-  }, [bills]);
+    return Array.from(groups.entries()).map(([key, rows]) => {
+      const merged = new Map<string, typeof rows[0]>();
+      for (const bill of rows) {
+        const mergeKey = `${bill.grade}_${bill.ratePerKg}`;
+        if (merged.has(mergeKey)) {
+          const existing = merged.get(mergeKey)!;
+          existing.sacks += bill.sacks;
+          existing.totalWeight += bill.totalWeight;
+          existing.grossAmount += bill.grossAmount;
+          existing.apmcAmount += bill.apmcAmount;
+          existing.bardanaAmount += bill.bardanaAmount;
+          existing.cartageAmount += bill.cartageAmount;
+          existing.netAmount += bill.netAmount;
+        } else {
+          merged.set(mergeKey, { ...bill });
+        }
+      }
+      const mergedRows = Array.from(merged.values());
+      return {
+        key,
+        label: toIndianDate(mergedRows[0]?.date ?? Date.now()),
+        rows: mergedRows,
+        total: mergedRows.reduce((sum, bill) => sum + bill.netAmount, 0),
+      };
+    });
+  }, [flattenedBills]);
 
   const activeDailyGroup = dailyGroups.find((g) => g.key === selectedDailyDate) ?? dailyGroups[0];
 
@@ -673,16 +714,60 @@ export default function BuyerLedgerScreen() {
                           : ` · ${toIndianCurrency(bill.netAmount)}`
                         }
                       </Text>
-                      <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 2 }}>
-                        {toIndianDate(bill.date)} · {bill.grade} · {bill.sacks} case
-                      </Text>
+                      
+                      {/* Item Breakdown */}
+                      {Array.isArray((bill as any).chargeSnapshot?.entries) && (bill as any).chargeSnapshot.entries.length > 0 ? (
+                        <View style={{ marginTop: 6, gap: 4 }}>
+                          {(bill as any).chargeSnapshot.entries.map((entry: any, idx: number) => {
+                            const itemBuyRate = entry.agentPurchaseRate 
+                              || (entry.agentPurchaseAmount > 0 && entry.totalWeight > 0 ? entry.agentPurchaseAmount / entry.totalWeight : 0)
+                              || ((bill as any).agentPurchaseAmount > 0 && bill.totalWeight > 0 ? (bill as any).agentPurchaseAmount / bill.totalWeight : 0);
+                            
+                            const itemBuyAmount = entry.agentPurchaseAmount > 0 
+                              ? entry.agentPurchaseAmount 
+                              : (itemBuyRate * entry.totalWeight);
+
+                            return (
+                              <View key={idx} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#F8FAFC', padding: 6, borderRadius: 6 }}>
+                                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.primary, marginRight: 8 }} />
+                                <Text style={{ fontSize: 13, color: Colors.text, flex: 1 }}>
+                                  {entry.gradeName || entry.grade} ({entry.sacks} case, {entry.totalWeight}kg)
+                                  {isAgent && itemBuyRate > 0 ? (
+                                    <Text style={{ fontSize: 12, color: Colors.textSecond }}>
+                                      {' '}@ ₹{Number.isInteger(itemBuyRate) ? itemBuyRate : itemBuyRate.toFixed(1)}/kg
+                                    </Text>
+                                  ) : !isAgent && entry.ratePerKg ? (
+                                    <Text style={{ fontSize: 12, color: Colors.textSecond }}>
+                                      {' '}@ ₹{entry.ratePerKg}/kg
+                                    </Text>
+                                  ) : null}
+                                </Text>
+                                {isAgent && itemBuyAmount > 0 ? (
+                                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#92400E' }}>
+                                    {toIndianCurrency(itemBuyAmount)}
+                                  </Text>
+                                ) : !isAgent && (
+                                  <Text style={{ fontSize: 13, fontWeight: '600', color: Colors.text }}>
+                                    {toIndianCurrency(entry.grossAmount)}
+                                  </Text>
+                                )}
+                              </View>
+                            );
+                          })}
+                        </View>
+                      ) : (
+                        <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 2 }}>
+                          {toIndianDate(bill.date)} · {bill.grade} · {bill.sacks} case
+                        </Text>
+                      )}
+                      
                       {isAgent && (bill as any).agentPurchaseAmount > 0 && (
-                        <Text style={{ fontSize: FontSize.xs, color: Colors.info, marginTop: 2 }}>
+                        <Text style={{ fontSize: FontSize.xs, color: Colors.info, marginTop: 6 }}>
                           Sold for: {toIndianCurrency(bill.netAmount)} · {bill.customerName || 'No buyer'}
                         </Text>
                       )}
-                      <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 2 }}>
-                        {bill.status} · {bill.paymentMode}
+                      <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginTop: 4 }}>
+                        {toIndianDate(bill.date)} · {bill.status} · {bill.paymentMode}
                       </Text>
                     </View>
                     <View style={{

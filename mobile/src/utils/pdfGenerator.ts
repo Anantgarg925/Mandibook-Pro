@@ -375,29 +375,40 @@ export function generateDayReportHTML(params: {
     let agentTotalPurchaseGross = 0;
     let agentTotalSaleGross = 0;
 
-    const rows = bills.sort((a, b) => a.grade.localeCompare(b.grade) || a.createdAt - b.createdAt).map(inq => {
-      agentTotalSacks += inq.sacks;
-      agentTotalWeight += inq.totalWeight;
-      const purchaseGross = inq.agentPurchaseAmount || 0;
-      const purchaseRate = inq.totalWeight > 0 ? purchaseGross / inq.totalWeight : 0;
-      agentTotalPurchaseGross += purchaseGross;
-      agentTotalSaleGross += inq.grossAmount;
+    const allEntries = bills.flatMap(inq => {
+      const entries = (inq.chargeSnapshot as any)?.entries || [inq];
+      const purchaseRate = inq.totalWeight > 0 ? (inq.agentPurchaseAmount || 0) / inq.totalWeight : 0;
+      return entries.map((entry: any) => ({
+        ...entry,
+        createdAt: inq.createdAt,
+        customerName: inq.customerName,
+        paymentMode: inq.paymentMode,
+        purchaseRate,
+        purchaseGross: entry.totalWeight * purchaseRate,
+      }));
+    });
+
+    const rows = allEntries.sort((a, b) => a.grade.localeCompare(b.grade) || a.createdAt - b.createdAt).map(entry => {
+      agentTotalSacks += entry.sacks;
+      agentTotalWeight += entry.totalWeight;
+      agentTotalPurchaseGross += entry.purchaseGross;
+      agentTotalSaleGross += entry.grossAmount;
       
-      const buyerInfo = inq.paymentMode === 'CASH' ? 'CS' : inq.paymentMode === 'UPI' ? 'UPI' : inq.customerName.slice(0, 5).toUpperCase();
+      const buyerInfo = entry.paymentMode === 'CASH' ? 'CS' : entry.paymentMode === 'UPI' ? 'UPI' : (entry.customerName || '').slice(0, 5).toUpperCase();
 
       return `
         <tr>
-          <td>${inq.gradeName || inq.grade}</td>
-          <td style="text-align:right;">${inq.sacks}</td>
-          <td style="text-align:right;">${formatPlainAmount(inq.totalWeight)}</td>
-          <td style="text-align:right;">${purchaseRate.toFixed(2)}</td>
-          <td style="text-align:right;">${formatPlainAmount(purchaseGross)}</td>
+          <td>${entry.gradeName || entry.grade}</td>
+          <td style="text-align:right;">${entry.sacks}</td>
+          <td style="text-align:right;">${formatPlainAmount(entry.totalWeight)}</td>
+          <td style="text-align:right;">${entry.purchaseRate.toFixed(2)}</td>
+          <td style="text-align:right;">${formatPlainAmount(entry.purchaseGross)}</td>
           <td>${buyerInfo}</td>
-          <td>${inq.customerName}</td>
-          <td style="text-align:right;">${inq.sacks}</td>
-          <td style="text-align:right;">${formatPlainAmount(inq.totalWeight)}</td>
-          <td style="text-align:right;">${inq.ratePerKg.toFixed(2)}</td>
-          <td style="text-align:right;">${formatPlainAmount(inq.grossAmount)}</td>
+          <td>${entry.customerName}</td>
+          <td style="text-align:right;">${entry.sacks}</td>
+          <td style="text-align:right;">${formatPlainAmount(entry.totalWeight)}</td>
+          <td style="text-align:right;">${(entry.ratePerKg || 0).toFixed(2)}</td>
+          <td style="text-align:right;">${formatPlainAmount(entry.grossAmount)}</td>
         </tr>
       `;
     }).join('');

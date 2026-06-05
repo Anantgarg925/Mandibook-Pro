@@ -365,24 +365,37 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
       let purchaseGross = 0;
       let saleGross = 0;
 
-      const items = bills.sort((a, b) => a.grade.localeCompare(b.grade) || a.createdAt - b.createdAt).map(inq => {
-        totalSacks += inq.sacks;
-        totalWeight += inq.totalWeight;
-        const pGross = inq.agentPurchaseAmount || 0;
-        purchaseGross += pGross;
-        saleGross += inq.grossAmount;
+      const allEntries = bills.flatMap(inq => {
+        const entries = (inq.chargeSnapshot as any)?.entries || [inq];
+        const purchaseRate = inq.totalWeight > 0 ? (inq.agentPurchaseAmount || 0) / inq.totalWeight : 0;
+        return entries.map((entry: any) => ({
+          ...entry,
+          id: inq.id,
+          createdAt: inq.createdAt,
+          customerName: inq.customerName,
+          paymentMode: inq.paymentMode,
+          purchaseRate,
+          purchaseGross: entry.totalWeight * purchaseRate,
+        }));
+      });
+
+      const items = allEntries.sort((a, b) => a.grade.localeCompare(b.grade) || a.createdAt - b.createdAt).map(entry => {
+        totalSacks += entry.sacks;
+        totalWeight += entry.totalWeight;
+        purchaseGross += entry.purchaseGross;
+        saleGross += entry.grossAmount;
         
         return {
-          id: inq.id,
-          gradeName: inq.gradeName || inq.grade,
-          sacks: inq.sacks,
-          weight: inq.totalWeight,
-          purchaseRate: inq.totalWeight > 0 ? pGross / inq.totalWeight : 0,
-          purchaseGross: pGross,
-          buyerInfo: inq.paymentMode === 'CASH' ? 'CS' : inq.paymentMode === 'UPI' ? 'UPI' : inq.customerName.slice(0, 5).toUpperCase(),
-          buyerName: inq.customerName,
-          saleRate: inq.ratePerKg,
-          saleGross: inq.grossAmount,
+          id: entry.id,
+          gradeName: entry.gradeName || entry.grade,
+          sacks: entry.sacks,
+          weight: entry.totalWeight,
+          purchaseRate: entry.purchaseRate,
+          purchaseGross: entry.purchaseGross,
+          buyerInfo: entry.paymentMode === 'CASH' ? 'CS' : entry.paymentMode === 'UPI' ? 'UPI' : (entry.customerName || '').slice(0, 5).toUpperCase(),
+          buyerName: entry.customerName,
+          saleRate: entry.ratePerKg || 0,
+          saleGross: entry.grossAmount,
         };
       });
 
@@ -935,6 +948,36 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
                             </View>
                           ))}
                         </View>
+
+                        {report.items && report.items.length > 0 && (
+                          <View style={{ borderTopWidth: 1, borderTopColor: '#F1F5F9', backgroundColor: '#F8FAFC' }}>
+                            <View style={{ flexDirection: 'row', padding: 12, borderBottomWidth: 1, borderBottomColor: '#E2E8F0', backgroundColor: '#F1F5F9' }}>
+                              <Text style={{ flex: 2, fontSize: 11, fontWeight: '700', color: '#64748B' }}>Item</Text>
+                              <Text style={{ flex: 1.5, fontSize: 11, fontWeight: '700', color: '#64748B', textAlign: 'center' }}>Qty</Text>
+                              <Text style={{ flex: 2, fontSize: 11, fontWeight: '700', color: '#64748B' }}>Buyer</Text>
+                              <Text style={{ flex: 2, fontSize: 11, fontWeight: '700', color: '#64748B', textAlign: 'right' }}>P.Gross</Text>
+                            </View>
+                            {report.items.map((item, idx) => (
+                              <View key={item.id + '-' + idx} style={{ flexDirection: 'row', padding: 12, borderBottomWidth: idx < report.items.length - 1 ? 1 : 0, borderBottomColor: '#F1F5F9', alignItems: 'center' }}>
+                                <View style={{ flex: 2 }}>
+                                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#0F172A' }}>{item.gradeName}</Text>
+                                </View>
+                                <View style={{ flex: 1.5, alignItems: 'center' }}>
+                                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#334155' }}>{item.sacks}</Text>
+                                  <Text style={{ fontSize: 10, color: '#64748B' }}>{item.weight}kg</Text>
+                                </View>
+                                <View style={{ flex: 2 }}>
+                                  <Text style={{ fontSize: 12, fontWeight: '600', color: '#0F172A' }} numberOfLines={1}>{item.buyerName || 'Cash'}</Text>
+                                  <Text style={{ fontSize: 10, color: '#64748B' }}>{item.buyerInfo}</Text>
+                                </View>
+                                <View style={{ flex: 2, alignItems: 'flex-end' }}>
+                                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#92400E' }}>{toIndianCurrency(item.purchaseGross)}</Text>
+                                  <Text style={{ fontSize: 10, color: '#059669', fontWeight: '600' }}>S: {toIndianCurrency(item.saleGross)}</Text>
+                                </View>
+                              </View>
+                            ))}
+                          </View>
+                        )}
                       </View>
                     ))}
                   </View>

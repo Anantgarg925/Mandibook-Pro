@@ -40,10 +40,10 @@ export default function GradeSelector({ grades, selectedGrade, onSelect, truckIn
             testID={`grade-tile-${item.code}`}
             onPress={() => onSelect(item.code)}
             style={{
-              flex: 1,
-              minWidth: isBoughtFromAgent ? '30%' : '100%',
+              width: isBoughtFromAgent ? '31%' : '100%',
               minHeight: 48,
               paddingVertical: 8,
+              paddingHorizontal: 4,
               borderRadius: Radius.md,
               borderWidth: 1,
               borderColor: isSelected ? Colors.primary : Colors.border,
@@ -55,9 +55,10 @@ export default function GradeSelector({ grades, selectedGrade, onSelect, truckIn
             <View style={{ alignItems: 'center' }}>
               <Text
                 style={{
-                  fontSize: FontSize.md,
+                  fontSize: FontSize.sm,
                   fontWeight: isSelected ? '800' : '600',
                   color: isSelected ? '#FFFFFF' : Colors.text,
+                  textAlign: 'center',
                 }}
               >
                 {displayLabel}

@@ -28,6 +28,7 @@ import {
   Trash2,
 } from 'lucide-react-native';
 
+import PagerView from '@/components/common/PagerView';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { DraggableFAB } from '@/components/common/DraggableFAB';
 import { useBuyers } from '@/hooks/useBuyers';
@@ -49,6 +50,7 @@ export default function AccountsListScreen() {
   
   const [activeTab, setActiveTab] = useState(0); // 0 = Buyers, 1 = Agents
   const currentPartyType = activeTab === 0 ? 'BUYER' : 'AGENT';
+  const pagerRef = useRef<PagerView>(null);
   
   const [search, setSearch] = useState('');
   const [addVisible, setAddVisible] = useState(false);
@@ -86,10 +88,10 @@ export default function AccountsListScreen() {
     }
   };
 
-  const sorted = useMemo(
+  const sortedBuyers = useMemo(
     () =>
       [...buyers]
-        .filter((b) => (b.partyType || 'BUYER') === currentPartyType)
+        .filter((b) => (b.partyType || 'BUYER') === 'BUYER')
         .sort((a, b) => b.outstandingBalance - a.outstandingBalance)
         .filter(
           (b) =>
@@ -98,7 +100,22 @@ export default function AccountsListScreen() {
             b.phone.includes(search) ||
             b.code.toLowerCase().includes(search.toLowerCase())
         ),
-    [buyers, search, currentPartyType]
+    [buyers, search]
+  );
+
+  const sortedAgents = useMemo(
+    () =>
+      [...buyers]
+        .filter((b) => b.partyType === 'AGENT')
+        .sort((a, b) => b.outstandingBalance - a.outstandingBalance)
+        .filter(
+          (b) =>
+            !search ||
+            b.name.toLowerCase().includes(search.toLowerCase()) ||
+            b.phone.includes(search) ||
+            b.code.toLowerCase().includes(search.toLowerCase())
+        ),
+    [buyers, search]
   );
 
   const totalOutstanding = useMemo(() => {
@@ -242,7 +259,11 @@ export default function AccountsListScreen() {
             return (
               <Pressable
                 key={index}
-                onPress={() => { setActiveTab(index); setSearch(''); }}
+                onPress={() => {
+                  setActiveTab(index);
+                  setSearch('');
+                  pagerRef.current?.setPage(index);
+                }}
                 style={{
                   flex: 1,
                   height: 40,
@@ -442,46 +463,71 @@ export default function AccountsListScreen() {
             </View>
           </>
         ) : (
-          <FlatList
-            testID="accounts-list"
-            data={sorted}
-            keyExtractor={(b) => b.code}
-            renderItem={renderPartyCard}
-            ListHeaderComponent={ListHeader}
-            contentContainerStyle={{ paddingBottom: 100 }}
-            ListEmptyComponent={
-              <View
-                testID="accounts-empty"
-                style={{
-                  alignItems: 'center',
-                  paddingVertical: 64,
-                  paddingHorizontal: 32,
-                }}
-              >
-                <Users size={56} color="#9CA3AF" />
-                <Text
-                  style={{
-                    fontSize: 16,
-                    fontWeight: '700',
-                    color: '#071e27',
-                    marginTop: 16,
-                  }}
-                >
-                  {activeTab === 0 ? 'कोई ग्राहक नहीं' : 'कोई एजेंट नहीं'}
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 13,
-                    color: '#64748B',
-                    textAlign: 'center',
-                    marginTop: 8,
-                  }}
-                >
-                  {activeTab === 0 ? 'Customers appear after first UDHAARI sale' : 'Agents appear when you add them'}
-                </Text>
+          <View style={{ flex: 1 }}>
+            {ListHeader}
+            <PagerView
+              ref={pagerRef}
+              style={{ flex: 1 }}
+              initialPage={0}
+              onPageSelected={(e) => {
+                setActiveTab(e.nativeEvent.position);
+                setSearch('');
+              }}
+            >
+              <View key="0" style={{ flex: 1 }}>
+                <FlatList
+                  testID="buyers-list"
+                  data={sortedBuyers}
+                  keyExtractor={(b) => b.code}
+                  renderItem={renderPartyCard}
+                  contentContainerStyle={{ paddingBottom: 100, paddingTop: 10 }}
+                  ListEmptyComponent={
+                    <View
+                      style={{
+                        alignItems: 'center',
+                        paddingVertical: 64,
+                        paddingHorizontal: 32,
+                      }}
+                    >
+                      <Users size={56} color="#9CA3AF" />
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: '#071e27', marginTop: 16 }}>
+                        कोई ग्राहक नहीं
+                      </Text>
+                      <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center', marginTop: 8 }}>
+                        Customers appear after first UDHAARI sale
+                      </Text>
+                    </View>
+                  }
+                />
               </View>
-            }
-          />
+              <View key="1" style={{ flex: 1 }}>
+                <FlatList
+                  testID="agents-list"
+                  data={sortedAgents}
+                  keyExtractor={(b) => b.code}
+                  renderItem={renderPartyCard}
+                  contentContainerStyle={{ paddingBottom: 100, paddingTop: 10 }}
+                  ListEmptyComponent={
+                    <View
+                      style={{
+                        alignItems: 'center',
+                        paddingVertical: 64,
+                        paddingHorizontal: 32,
+                      }}
+                    >
+                      <Users size={56} color="#9CA3AF" />
+                      <Text style={{ fontSize: 16, fontWeight: '700', color: '#071e27', marginTop: 16 }}>
+                        कोई एजेंट नहीं
+                      </Text>
+                      <Text style={{ fontSize: 13, color: '#64748B', textAlign: 'center', marginTop: 8 }}>
+                        Agents appear when you add them
+                      </Text>
+                    </View>
+                  }
+                />
+              </View>
+            </PagerView>
+          </View>
         )}
 
         <DraggableFAB
