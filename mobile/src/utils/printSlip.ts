@@ -34,8 +34,8 @@ export function generateSlipHTML(inquiry: Inquiry, shop: ShopData): string {
   html, body { margin: 0; padding: 0; width: 80mm; min-width: 80mm; background: #fff; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
-    font-family: 'Courier New', Courier, monospace;
-    font-size: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 13px;
     background: #fff;
     color: #000;
     width: 80mm;
@@ -164,7 +164,7 @@ export function generateSlipHTML(inquiry: Inquiry, shop: ShopData): string {
   <hr class="divider-dash">
 
   <div class="small">Payment: <strong>${inquiry.paymentMode}${inquiry.upiRef ? ' [' + inquiry.upiRef + ']' : ''}</strong></div>
-  <div class="small">Truck: ${inquiry.truckNumber}</div>
+  ${inquiry.truckNumber && inquiry.truckNumber !== 'Agent Stock' ? `<div class="small">Truck: ${inquiry.truckNumber}</div>` : ''}
 
   <hr class="divider-dash">
 

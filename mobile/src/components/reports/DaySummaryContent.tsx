@@ -31,6 +31,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useDateInquiries } from '@/hooks/useDateInquiries';
 import { useDateTrucks } from '@/hooks/useDateTrucks';
 import { useCashEntries } from '@/hooks/useCashEntries';
+import { useBuyers } from '@/hooks/useBuyers';
 import { useShop } from '@/context/ShopContext';
 import { supabase, mapInquiry } from '@/lib/supabase';
 import { exportAndShareReport, type CashEntry } from '@/utils/pdfGenerator';
@@ -99,7 +100,11 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
   const [entryType, setEntryType] = useState<'RECEIPT' | 'PAYMENT'>('RECEIPT');
   const [entryDesc, setEntryDesc] = useState('');
   const [entryAmount, setEntryAmount] = useState('');
+  const [selectedAgentCode, setSelectedAgentCode] = useState<string | null>(null);
   const [savingEntry, setSavingEntry] = useState(false);
+  
+  const { buyers } = useBuyers();
+  const agents = useMemo(() => buyers.filter(b => b.partyType === 'AGENT'), [buyers]);
 
   const { inquiries, loading: inqLoading } = useDateInquiries(date);
   const { trucks, loading: trucksLoading } = useDateTrucks(date);
@@ -280,8 +285,8 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
       const weight = rows.reduce((sum, inq) => sum + inq.totalWeight, 0);
       const gross = rows.reduce((sum, inq) => sum + inq.grossAmount, 0);
       const apmc = rows.reduce((sum, inq) => sum + inq.apmcAmount, 0);
-      const cartage = rows.reduce((sum, inq) => sum + inq.cartageAmount, 0);
       const bardana = rows.reduce((sum, inq) => sum + inq.bardanaAmount, 0);
+      const cartage = Math.round(weight * (shop?.charges?.cartagePerKg || 0));
       const commissionAmount = gross * commissionPct / 100;
       const net = gross - truck.freightAmount - commissionAmount - apmc - cartage - bardana - telePostShare;
       const gradeMap = new Map<string, { grade: string; gradeName: string; sacks: number; weight: number; gross: number; avgRate: number }>();
@@ -345,6 +350,54 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
     });
   }, [commissionPct, inquiries, telePost, trucks]);
 
+  const agentReports = useMemo(() => {
+    const agentBills = inquiries.filter(i => i.sourceAgentName);
+    const map = new Map<string, Inquiry[]>();
+    for (const bill of agentBills) {
+      const key = bill.sourceAgentName!;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(bill);
+    }
+    
+    return Array.from(map.entries()).map(([agentName, bills]) => {
+      let totalSacks = 0;
+      let totalWeight = 0;
+      let purchaseGross = 0;
+      let saleGross = 0;
+
+      const items = bills.sort((a, b) => a.grade.localeCompare(b.grade) || a.createdAt - b.createdAt).map(inq => {
+        totalSacks += inq.sacks;
+        totalWeight += inq.totalWeight;
+        const pGross = inq.agentPurchaseAmount || 0;
+        purchaseGross += pGross;
+        saleGross += inq.grossAmount;
+        
+        return {
+          id: inq.id,
+          gradeName: inq.gradeName || inq.grade,
+          sacks: inq.sacks,
+          weight: inq.totalWeight,
+          purchaseRate: inq.totalWeight > 0 ? pGross / inq.totalWeight : 0,
+          purchaseGross: pGross,
+          buyerInfo: inq.paymentMode === 'CASH' ? 'CS' : inq.paymentMode === 'UPI' ? 'UPI' : inq.customerName.slice(0, 5).toUpperCase(),
+          buyerName: inq.customerName,
+          saleRate: inq.ratePerKg,
+          saleGross: inq.grossAmount,
+        };
+      });
+
+      return {
+        agentName,
+        bills: bills.length,
+        totalSacks,
+        totalWeight,
+        purchaseGross,
+        saleGross,
+        items,
+      };
+    });
+  }, [inquiries]);
+
   // Payment breakdown
   const cashInquiries = inquiries.filter(i => i.paymentMode === 'CASH');
   const upiInquiries = inquiries.filter(i => i.paymentMode === 'UPI');
@@ -378,10 +431,36 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
         amount: amt,
         createdAt: Date.now(),
       });
+
+      if (entryType === 'PAYMENT' && selectedAgentCode) {
+        // Find agent
+        const agent = agents.find(a => a.code === selectedAgentCode);
+        if (agent) {
+          // Add transaction to agent ledger
+          await supabase.from('transactions').insert({
+            shop_id: shop!.shopId,
+            buyer_code: agent.code,
+            type: 'PAYMENT',
+            amount: amt,
+            date: Date.now(),
+            payment_method: 'CASH',
+            note: entryDesc.trim(),
+            created_at: Date.now()
+          });
+          // Update agent outstanding balance
+          const newBalance = (agent.outstandingBalance || 0) - amt;
+          await supabase.from('buyers')
+            .update({ outstanding_balance: newBalance })
+            .eq('code', agent.code)
+            .eq('shop_id', shop!.shopId);
+        }
+      }
+
       setShowEntryModal(false);
       setEntryDesc('');
       setEntryAmount('');
       setEntryType('RECEIPT');
+      setSelectedAgentCode(null);
     } finally {
       setSavingEntry(false);
     }
@@ -740,10 +819,126 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
                             </Text>
                           </View>
                         )}
+
+                        {/* Truck-wise Net Settlement */}
+                        <View style={{
+                          backgroundColor: '#cfe6f2',
+                          borderTopWidth: 1,
+                          borderTopColor: '#c0c9bb',
+                          padding: 16,
+                        }}>
+                          <Text style={{ fontSize: 15, fontWeight: '700', color: '#00450d', marginBottom: 12 }}>
+                            Net Settlement
+                          </Text>
+
+                          {/* Line items */}
+                          {[
+                            { label: 'Gross Sale / कुल बिक्री', amount: report.gross, deduct: false },
+                            { label: '- Freight / भाड़ा', amount: report.truck.freightAmount, deduct: true },
+                            { label: `- Commission (${commissionPct}%) / कमीशन`, amount: report.commission, deduct: true },
+                            { label: '- APMC / मंडी शुल्क', amount: report.apmc, deduct: true },
+                            ...(report.cartage > 0 ? [{ label: '- Cartage', amount: report.cartage, deduct: true }] : []),
+                            ...(report.bardana > 0 ? [{ label: '- Bardana', amount: report.bardana, deduct: true }] : []),
+                            ...(report.telePost > 0 ? [{ label: '- Tele/Post', amount: report.telePost, deduct: true }] : []),
+                          ].map(item => (
+                            <View key={item.label} style={{
+                              flexDirection: 'row',
+                              justifyContent: 'space-between',
+                              alignItems: 'center',
+                              paddingVertical: 8,
+                              borderBottomWidth: 1,
+                              borderBottomColor: 'rgba(0,0,0,0.06)',
+                            }}>
+                              <Text style={{ fontSize: 13, color: '#071e27' }}>{item.label}</Text>
+                              <Text style={{
+                                fontSize: 13,
+                                fontWeight: '700',
+                                color: item.deduct ? '#ba1a1a' : '#071e27',
+                              }}>
+                                {toIndianCurrency(item.amount)}
+                              </Text>
+                            </View>
+                          ))}
+
+                          {/* Dashed divider */}
+                          <View style={{ height: 1, backgroundColor: '#717a6d', opacity: 0.4, marginVertical: 10 }} />
+
+                          {/* Net row */}
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                            <View>
+                              <Text style={{ fontSize: 15, fontWeight: '700', color: '#00450d' }}>
+                                Net to Sender
+                              </Text>
+                              <Text style={{ fontSize: 10, color: '#41493e', marginTop: 2 }}>
+                                भेजने वाले को शुद्ध देय
+                              </Text>
+                            </View>
+                            <Text style={{ fontSize: 20, fontWeight: '700', color: '#00450d' }}>
+                              {toIndianCurrency(report.net)}
+                            </Text>
+                          </View>
+                        </View>
                       </View>
                     ))
                   )}
                 </View>
+
+                {/* Agent-wise reports */}
+                {agentReports.length > 0 && (
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={{ fontSize: 17, fontWeight: '800', color: '#00450d', marginBottom: 10 }}>
+                      Agent Purchase Reports / एजेंट खरीदारी रिपोर्ट
+                    </Text>
+                    {agentReports.map((report) => (
+                      <View key={report.agentName} style={{
+                        backgroundColor: '#ffffff',
+                        borderWidth: 1,
+                        borderColor: '#C0C9BB',
+                        borderRadius: 14,
+                        marginBottom: 12,
+                        overflow: 'hidden',
+                      }}>
+                        <View style={{
+                          backgroundColor: '#dbf1fe',
+                          paddingHorizontal: 14,
+                          paddingVertical: 12,
+                          borderLeftWidth: 4,
+                          borderLeftColor: '#00450d',
+                        }}>
+                          <Text style={{ fontSize: 15, fontWeight: '800', color: '#071e27' }}>
+                            [AGENT] {report.agentName.toUpperCase()}
+                          </Text>
+                          <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                            {report.bills} bill{report.bills === 1 ? '' : 's'} · {report.totalSacks} Sacks · {Math.round(report.totalWeight).toLocaleString('en-IN')} kg
+                          </Text>
+                        </View>
+
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', padding: 12, gap: 8 }}>
+                          {[
+                            ['Total Sacks', String(report.totalSacks)],
+                            ['Total Weight', `${Math.round(report.totalWeight).toLocaleString('en-IN')} kg`],
+                            ['Purchase Gross', toIndianCurrency(report.purchaseGross)],
+                            ['Sale Gross', toIndianCurrency(report.saleGross)],
+                          ].map(([label, value]) => (
+                            <View key={label} style={{
+                              width: '48%',
+                              backgroundColor: '#f3faff',
+                              borderRadius: 10,
+                              padding: 10,
+                              borderWidth: 1,
+                              borderColor: '#E5E7EB',
+                            }}>
+                              <Text style={{ fontSize: 11, color: '#64748B', fontWeight: '700' }}>{label}</Text>
+                              <Text numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 15, color: label.includes('Sale') ? '#00450d' : '#071e27', fontWeight: '800', marginTop: 3 }}>
+                                {value}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
 
                 {/* Grade Table Card */}
                 <View style={{
@@ -859,67 +1054,7 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
                     </>
                   )}
                 </View>
-
-                {/* Net Settlement Card */}
-                <View style={{
-                  backgroundColor: '#cfe6f2',
-                  borderWidth: 1,
-                  borderColor: '#c0c9bb',
-                  borderRadius: 14,
-                  padding: 20,
-                  marginBottom: 16,
-                }}>
-                  <Text style={{ fontSize: 16, fontWeight: '700', color: '#00450d', marginBottom: 16 }}>
-                    Net Settlement
-                  </Text>
-
-                  {/* Line items */}
-                  {[
-                    { label: 'Gross Sale / कुल बिक्री', amount: totalGross, deduct: false },
-                    { label: '- Freight / भाड़ा', amount: totalFreight, deduct: true },
-                    { label: `- Commission (${commissionPct}%) / कमीशन`, amount: commission, deduct: true },
-                    { label: '- APMC / मंडी शुल्क', amount: totalApmc, deduct: true },
-                    ...(totalCartage > 0 ? [{ label: '- Cartage', amount: totalCartage, deduct: true }] : []),
-                    ...(totalBardana > 0 ? [{ label: '- Bardana', amount: totalBardana, deduct: true }] : []),
-                  ].map(item => (
-                    <View key={item.label} style={{
-                      flexDirection: 'row',
-                      justifyContent: 'space-between',
-                      alignItems: 'center',
-                      paddingVertical: 10,
-                      borderBottomWidth: 1,
-                      borderBottomColor: 'rgba(0,0,0,0.06)',
-                    }}>
-                      <Text style={{ fontSize: 14, color: '#071e27' }}>{item.label}</Text>
-                      <Text style={{
-                        fontSize: 14,
-                        fontWeight: '700',
-                        color: item.deduct ? '#ba1a1a' : '#071e27',
-                      }}>
-                        {toIndianCurrency(item.amount)}
-                      </Text>
-                    </View>
-                  ))}
-
-                  {/* Dashed divider */}
-                  <View style={{ height: 1, backgroundColor: '#717a6d', opacity: 0.4, marginVertical: 12 }} />
-
-                  {/* Net row */}
-                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
-                    <View>
-                      <Text style={{ fontSize: 16, fontWeight: '700', color: '#00450d' }}>
-                        Net to Sender
-                      </Text>
-                      <Text style={{ fontSize: 11, color: '#41493e', marginTop: 2 }}>
-                        भेजने वाले को शुद्ध देय
-                      </Text>
-                    </View>
-                    <Text style={{ fontSize: 24, fontWeight: '700', color: '#00450d' }}>
-                      {toIndianCurrency(netToSender)}
-                    </Text>
-                  </View>
-                </View>
-
+                {/* Net Settlement moved to truck level */}
                 {/* Export PDF Card */}
                 <View style={{
                   backgroundColor: '#e8f5e9',
@@ -1497,6 +1632,43 @@ export default function DaySummaryContent({ showBottomNav = false }: DaySummaryC
                 marginBottom: Spacing.md,
               }}
             />
+
+            {entryType === 'PAYMENT' && (
+              <View style={{ marginBottom: Spacing.md }}>
+                <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: Colors.textSecond, marginBottom: 6 }}>LINK TO AGENT LEDGER (OPTIONAL)</Text>
+                {agents.length === 0 ? (
+                  <Text style={{ fontSize: 13, color: '#6B7280', fontStyle: 'italic' }}>
+                    No agents available. Add agents in the Accounts tab first.
+                  </Text>
+                ) : (
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                    <Pressable
+                      onPress={() => setSelectedAgentCode(null)}
+                      style={{
+                        paddingVertical: 8, paddingHorizontal: 12, borderRadius: Radius.sm,
+                        backgroundColor: selectedAgentCode === null ? '#E0F2FE' : '#F3F4F6',
+                        borderWidth: 1, borderColor: selectedAgentCode === null ? '#0EA5E9' : '#D1D5DB'
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, fontWeight: '600', color: selectedAgentCode === null ? '#0284C7' : '#4B5563' }}>None</Text>
+                    </Pressable>
+                    {agents.map(a => (
+                      <Pressable
+                        key={a.code}
+                        onPress={() => setSelectedAgentCode(a.code)}
+                        style={{
+                          paddingVertical: 8, paddingHorizontal: 12, borderRadius: Radius.sm,
+                          backgroundColor: selectedAgentCode === a.code ? '#E0F2FE' : '#F3F4F6',
+                          borderWidth: 1, borderColor: selectedAgentCode === a.code ? '#0EA5E9' : '#D1D5DB'
+                        }}
+                      >
+                        <Text style={{ fontSize: 12, fontWeight: '600', color: selectedAgentCode === a.code ? '#0284C7' : '#4B5563' }}>{a.name}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
+              </View>
+            )}
 
             <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: Colors.textSecond, marginBottom: 6 }}>AMOUNT (₹)</Text>
             <TextInput

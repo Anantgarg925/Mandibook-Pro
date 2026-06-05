@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   View, Text, FlatList, Pressable, StyleSheet, BackHandler,
+  Modal, KeyboardAvoidingView, ScrollView, TextInput, Alert
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -19,6 +20,10 @@ import { APP_SESSION_KEY, MEMBER_SESSION_KEY } from '@/lib/session';
 import { useBillNotifications } from '@/context/BillNotificationContext';
 import { getCurrentBusinessDate } from '@/lib/businessDay';
 import { resetToRoute } from '@/utils/navigation';
+import { useUgrai } from '@/hooks/useUgrai';
+import { useBuyers } from '@/hooks/useBuyers';
+import type { Buyer } from '@/types/inquiry';
+import { ThekedaarDashboard } from '@/components/ThekedaarDashboard';
 
 type MemberSession = {
   id: string;
@@ -74,6 +79,47 @@ export default function MemberDashboardScreen() {
   const { launchComplete, setLaunchComplete, sessionHydrated } = useLaunch();
   const [member, setMember] = useState<MemberSession | null>(null);
 
+  const { addCollection } = useUgrai();
+  const { buyers } = useBuyers();
+
+  const [showUgraiModal, setShowUgraiModal] = useState(false);
+  const [ugraiBuyerName, setUgraiBuyerName] = useState('');
+  const [selectedBuyer, setSelectedBuyer] = useState<Buyer | null>(null);
+  const [buyerSuggestions, setBuyerSuggestions] = useState<Buyer[]>([]);
+  const [entryDesc, setEntryDesc] = useState('');
+  const [entryAmount, setEntryAmount] = useState('');
+  const [savingEntry, setSavingEntry] = useState(false);
+
+  const handleSaveUgrai = async () => {
+    const amt = parseFloat(entryAmount);
+    if (!amt || amt <= 0 || !selectedBuyer) {
+      Alert.alert('Error', 'Please select a buyer and enter a valid amount.');
+      return;
+    }
+    setSavingEntry(true);
+    try {
+      await addCollection.mutateAsync({
+        buyer_code: selectedBuyer.code,
+        buyer_name: selectedBuyer.name,
+        member_id: member?.id || 'unknown',
+        member_name: member?.name || 'Unknown',
+        amount: amt,
+        description: entryDesc.trim(),
+      });
+      setShowUgraiModal(false);
+      setEntryDesc('');
+      setEntryAmount('');
+      setUgraiBuyerName('');
+      setSelectedBuyer(null);
+      setBuyerSuggestions([]);
+      Alert.alert('Success', 'Payment collection request sent to Admin.');
+    } catch (err: any) {
+      Alert.alert('Error', err.message);
+    } finally {
+      setSavingEntry(false);
+    }
+  };
+
   useEffect(() => {
     if (sessionHydrated && !launchComplete) {
       router.replace('/access-choice' as any);
@@ -105,6 +151,10 @@ export default function MemberDashboardScreen() {
 
   if (!launchComplete) {
     return <View style={{ flex: 1, backgroundColor: '#F3FAFF' }} />;
+  }
+
+  if (member?.role === 'THEKEDAAR') {
+    return <ThekedaarDashboard memberName={member.name} />;
   }
 
   return (
@@ -212,6 +262,27 @@ export default function MemberDashboardScreen() {
                 )}
               </Pressable>
             </View>
+
+            {/* Quick Action Cards - Row 2 for Manager */}
+            {member?.role === 'MANAGER' ? (
+              <View style={[styles.actionRow, { paddingHorizontal: Math.max(Spacing.md, contentHPad), paddingTop: 0 }]}>
+                <Pressable
+                  testID="member-ugrai-btn"
+                  onPress={() => setShowUgraiModal(true)}
+                  style={{ flex: 1 }}
+                >
+                  {({ pressed }) => (
+                    <View style={[styles.actionCardSecondary, { minHeight: 100, borderColor: Colors.success, backgroundColor: '#F0FDF4' }, pressed && { opacity: 0.9 }]}>
+                      <View style={[styles.actionIconWrapLight, { backgroundColor: '#DCFCE7' }]}>
+                        <MaterialIcons name="account-balance-wallet" size={24} color={Colors.success} />
+                      </View>
+                      <Text style={[styles.actionSecondaryTitle, { color: Colors.success }]}>Collect Payment (Ugrai)</Text>
+                      <Text style={[styles.actionSecondarySub, { color: Colors.success }]}>उघाई (पेमेंट)</Text>
+                    </View>
+                  )}
+                </Pressable>
+              </View>
+            ) : null}
 
             {/* Live Feed */}
             {liveTrucks.length > 0 ? (
@@ -342,6 +413,154 @@ export default function MemberDashboardScreen() {
         }
         contentContainerStyle={{ paddingBottom: 80 + insets.bottom }}
       />
+
+      {/* Ugrai entry modal */}
+      <Modal
+        visible={showUgraiModal}
+        transparent
+        animationType="slide"
+        hardwareAccelerated={true}
+        statusBarTranslucent={true}
+        onRequestClose={() => setShowUgraiModal(false)}
+      >
+        <Pressable
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.4)' }}
+          onPress={() => setShowUgraiModal(false)}
+        >
+          <KeyboardAvoidingView behavior="padding" style={{ flex: 1, justifyContent: 'flex-end' }}>
+            <ScrollView
+              scrollEnabled={true}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ flexGrow: 1 }}
+              style={{ maxHeight: '90%' }}
+            >
+              <Pressable style={{
+                backgroundColor: Colors.surface,
+                borderTopLeftRadius: 20,
+                borderTopRightRadius: 20,
+                padding: Spacing.md,
+                paddingBottom: Math.max(Spacing.xl + 40, insets.bottom + Spacing.md),
+              }}>
+                <Text style={{ fontSize: FontSize.md, fontWeight: '700', marginBottom: Spacing.md }}>Collect Payment (Ugrai)</Text>
+
+            <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: Colors.textSecond, marginBottom: 6 }}>SELECT BUYER / PARTY</Text>
+            <View style={{ zIndex: 10, position: 'relative', marginBottom: Spacing.md }}>
+              <TextInput
+                value={ugraiBuyerName}
+                onChangeText={(val) => {
+                  setUgraiBuyerName(val);
+                  setSelectedBuyer(null);
+                  const lower = val.toLowerCase();
+                  if (lower.length > 0) {
+                    setBuyerSuggestions(buyers.filter((b) => b.name.toLowerCase().includes(lower)).slice(0, 5));
+                  } else {
+                    setBuyerSuggestions([]);
+                  }
+                }}
+                placeholder="Search Buyer Name..."
+                placeholderTextColor={Colors.textSecond}
+                style={{
+                  borderWidth: 1,
+                  borderColor: Colors.border,
+                  borderRadius: Radius.sm,
+                  paddingHorizontal: Spacing.sm,
+                  paddingVertical: 10,
+                  fontSize: FontSize.sm,
+                  color: Colors.text,
+                  backgroundColor: selectedBuyer ? '#F0FDF4' : '#FFF',
+                }}
+              />
+              {buyerSuggestions.length > 0 && !selectedBuyer && (
+                <View style={{
+                  position: 'absolute', top: 48, left: 0, right: 0, backgroundColor: '#FFF',
+                  borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.sm,
+                  shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 4,
+                }}>
+                  {buyerSuggestions.map(b => (
+                    <Pressable
+                      key={b.id}
+                      onPress={() => {
+                        setSelectedBuyer(b);
+                        setUgraiBuyerName(b.name);
+                        setBuyerSuggestions([]);
+                      }}
+                      style={{ padding: 12, borderBottomWidth: 1, borderBottomColor: Colors.border }}
+                    >
+                      <Text style={{ fontSize: FontSize.sm, fontWeight: '600', color: Colors.text }}>{b.name}</Text>
+                      {b.outstandingBalance > 0 ? (
+                        <Text style={{ fontSize: FontSize.xs, color: Colors.danger }}>Bal: {toIndianCurrency(b.outstandingBalance)}</Text>
+                      ) : null}
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: Colors.textSecond, marginBottom: 6 }}>DESCRIPTION (Optional)</Text>
+            <TextInput
+              testID="entry-desc-input"
+              value={entryDesc}
+              onChangeText={setEntryDesc}
+              placeholder="e.g. Cash collected at market"
+              placeholderTextColor={Colors.textSecond}
+              style={{
+                borderWidth: 1,
+                borderColor: Colors.border,
+                borderRadius: Radius.sm,
+                paddingHorizontal: Spacing.sm,
+                paddingVertical: 10,
+                fontSize: FontSize.sm,
+                color: Colors.text,
+                marginBottom: Spacing.md,
+              }}
+            />
+
+            <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: Colors.textSecond, marginBottom: 6 }}>COLLECTED AMOUNT (₹)</Text>
+            <TextInput
+              testID="entry-amount-input"
+              value={entryAmount}
+              onChangeText={setEntryAmount}
+              keyboardType="numeric"
+              placeholder="0"
+              placeholderTextColor={Colors.textSecond}
+              style={{
+                borderWidth: 1,
+                borderColor: Colors.border,
+                borderRadius: Radius.sm,
+                paddingHorizontal: Spacing.sm,
+                paddingVertical: 12,
+                fontSize: FontSize.lg,
+                fontWeight: '700',
+                color: Colors.text,
+                marginBottom: Spacing.lg,
+              }}
+            />
+
+            <Pressable
+              testID="save-entry-btn"
+              onPress={handleSaveUgrai}
+              disabled={savingEntry}
+              style={({ pressed }) => ({
+                opacity: pressed ? 0.85 : 1,
+              })}
+            >
+              <View style={{
+                height: 52,
+                borderRadius: Radius.sm,
+                backgroundColor: savingEntry ? Colors.border : Colors.primary,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <Text style={{ fontSize: FontSize.md, fontWeight: '700', color: '#FFF' }}>
+                  {savingEntry ? 'Saving...' : 'Confirm Collection'}
+                </Text>
+              </View>
+            </Pressable>
+          </Pressable>
+            </ScrollView>
+          </KeyboardAvoidingView>
+        </Pressable>
+      </Modal>
 
     </View>
   );

@@ -187,7 +187,8 @@ function buildTruckReports(inquiries: Inquiry[], trucks: Truck[], shop: ShopData
     const rows = inquiries.filter((inq) => inq.truckId === truck.id);
     const gross = rows.reduce((sum, inq) => sum + inq.grossAmount, 0);
     const apmc = rows.reduce((sum, inq) => sum + inq.apmcAmount, 0);
-    const cartage = rows.reduce((sum, inq) => sum + inq.cartageAmount, 0);
+    const weight = rows.reduce((sum, inq) => sum + inq.totalWeight, 0);
+    const cartage = Math.round(weight * (shop.charges?.cartagePerKg || 0));
     const bardana = rows.reduce((sum, inq) => sum + inq.bardanaAmount, 0);
     const commission = gross * commissionPct / 100;
     const grades = buildGradeSummary(rows);
@@ -196,7 +197,7 @@ function buildTruckReports(inquiries: Inquiry[], trucks: Truck[], shop: ShopData
       truck,
       bills: rows.length,
       sacks: rows.reduce((sum, inq) => sum + inq.sacks, 0),
-      weight: rows.reduce((sum, inq) => sum + inq.totalWeight, 0),
+      weight,
       gross,
       apmc,
       cartage,
@@ -230,7 +231,7 @@ export function generateDayReportHTML(params: {
 
   const totalFreight = trucks.reduce((s, t) => s + t.freightAmount, 0);
   const totalApmc = confirmedInquiries.reduce((s, i) => s + i.apmcAmount, 0);
-  const totalCartage = confirmedInquiries.reduce((s, i) => s + i.cartageAmount, 0);
+  const totalCartage = Math.round(totalWeight * (shop.charges?.cartagePerKg || 0));
   const totalBardana = confirmedInquiries.reduce((s, i) => s + i.bardanaAmount, 0);
   const commissionPct = shop.charges?.agentCommission ?? 0;
   const telePost = shop.charges?.telePost ?? 0;
@@ -359,6 +360,60 @@ export function generateDayReportHTML(params: {
     `;
   }).join('');
 
+  const agentBills = confirmedInquiries.filter(i => i.sourceAgentName);
+  
+  const agentMap = new Map<string, Inquiry[]>();
+  for (const bill of agentBills) {
+    const key = bill.sourceAgentName!;
+    if (!agentMap.has(key)) agentMap.set(key, []);
+    agentMap.get(key)!.push(bill);
+  }
+
+  const agentBookRows = Array.from(agentMap.entries()).map(([agentName, bills]) => {
+    let agentTotalSacks = 0;
+    let agentTotalWeight = 0;
+    let agentTotalPurchaseGross = 0;
+    let agentTotalSaleGross = 0;
+
+    const rows = bills.sort((a, b) => a.grade.localeCompare(b.grade) || a.createdAt - b.createdAt).map(inq => {
+      agentTotalSacks += inq.sacks;
+      agentTotalWeight += inq.totalWeight;
+      const purchaseGross = inq.agentPurchaseAmount || 0;
+      const purchaseRate = inq.totalWeight > 0 ? purchaseGross / inq.totalWeight : 0;
+      agentTotalPurchaseGross += purchaseGross;
+      agentTotalSaleGross += inq.grossAmount;
+      
+      const buyerInfo = inq.paymentMode === 'CASH' ? 'CS' : inq.paymentMode === 'UPI' ? 'UPI' : inq.customerName.slice(0, 5).toUpperCase();
+
+      return `
+        <tr>
+          <td>${inq.gradeName || inq.grade}</td>
+          <td style="text-align:right;">${inq.sacks}</td>
+          <td style="text-align:right;">${formatPlainAmount(inq.totalWeight)}</td>
+          <td style="text-align:right;">${purchaseRate.toFixed(2)}</td>
+          <td style="text-align:right;">${formatPlainAmount(purchaseGross)}</td>
+          <td>${buyerInfo}</td>
+          <td>${inq.customerName}</td>
+          <td style="text-align:right;">${inq.sacks}</td>
+          <td style="text-align:right;">${formatPlainAmount(inq.totalWeight)}</td>
+          <td style="text-align:right;">${inq.ratePerKg.toFixed(2)}</td>
+          <td style="text-align:right;">${formatPlainAmount(inq.grossAmount)}</td>
+        </tr>
+      `;
+    }).join('');
+
+    return `
+      <div class="mandi-truck" style="margin-top: 16px;">
+        <div class="mandi-title">[AGENT] ${agentName.toUpperCase()}</div>
+        <table class="compact">
+          <thead><tr><th>Item Name</th><th style="text-align:right">Case</th><th style="text-align:right">WT (Kg)</th><th style="text-align:right">Rate</th><th style="text-align:right">P-Gross</th><th>Buyer</th><th>Name</th><th style="text-align:right">Case</th><th style="text-align:right">WT (Kg)</th><th style="text-align:right">Rate</th><th style="text-align:right">S-Gross</th></tr></thead>
+          <tbody>${rows}</tbody>
+          <tfoot class="foot"><tr><td>TOTAL</td><td style="text-align:right">${agentTotalSacks}</td><td style="text-align:right">${formatPlainAmount(agentTotalWeight)}</td><td></td><td style="text-align:right">${formatPlainAmount(agentTotalPurchaseGross)}</td><td colspan="2"></td><td style="text-align:right">${agentTotalSacks}</td><td style="text-align:right">${formatPlainAmount(agentTotalWeight)}</td><td></td><td style="text-align:right">${formatPlainAmount(agentTotalSaleGross)}</td></tr></tfoot>
+        </table>
+      </div>
+    `;
+  }).join('');
+
   const buyerRows = buyerSummary.map((r, i) => `
     <tr style="background:${i % 2 === 0 ? '#FFF' : '#F5F5F5'}">
       <td>${i + 1}</td>
@@ -383,24 +438,41 @@ export function generateDayReportHTML(params: {
   return `<!DOCTYPE html><html><head>
     <meta charset="utf-8"/>
     <style>
-      body { font-family: monospace; font-size: 12px; color: #1A1A1A; padding: 16px; }
-      h2 { font-size: 14px; font-weight: 900; color: #1B5E20; margin: 16px 0 8px; border-bottom: 2px solid #1B5E20; padding-bottom: 4px; }
-      table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-      th { background: #1B5E20; color: white; padding: 6px 8px; text-align: left; font-size: 11px; }
-      td { padding: 5px 8px; border-bottom: 1px solid #E0E0E0; font-size: 11px; }
-      .foot td { background: #2E7D32; color: white; font-weight: 900; }
-      .account-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #E0E0E0; }
-      .account-row.net { border-top: 2px solid #1A1A1A; border-bottom: 2px solid #1A1A1A; font-weight: 900; font-size: 14px; color: #2E7D32; margin-top: 4px; }
+      @page {
+        size: A4 landscape;
+        margin: 10mm;
+      }
+      body { 
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+        font-size: 14px; 
+        color: #1A1A1A; 
+        line-height: 1.5;
+      }
+      h2 { font-size: 18px; font-weight: 800; color: #1B5E20; margin: 18px 0 10px; border-bottom: 2px solid #1B5E20; padding-bottom: 6px; }
+      table { 
+        width: 100%; 
+        border-collapse: collapse; 
+        margin-bottom: 18px; 
+        page-break-inside: auto;
+      }
+      tr { page-break-inside: avoid; page-break-after: auto; }
+      thead { display: table-header-group; }
+      tfoot { display: table-footer-group; }
+      th { background: #1B5E20; color: white; padding: 8px 10px; text-align: left; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; }
+      td { padding: 6px 10px; border-bottom: 1px solid #E0E0E0; font-size: 14px; }
+      .foot td { background: #2E7D32; color: white; font-weight: bold; font-size: 14px; }
+      .account-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #E0E0E0; }
+      .account-row.net { border-top: 2px solid #1A1A1A; border-bottom: 2px solid #1A1A1A; font-weight: 900; font-size: 16px; color: #2E7D32; margin-top: 6px; }
       .deduct { color: #C62828; }
       .page-break { page-break-before: always; }
-      .truck-card { border: 1px solid #C8E6C9; border-radius: 8px; padding: 10px; margin-bottom: 12px; page-break-inside: avoid; }
-      .truck-title { font-size: 13px; font-weight: 900; color: #1B5E20; }
-      .truck-meta { font-size: 10px; color: #616161; margin: 2px 0 8px; }
-      .compact th { font-size: 9px; padding: 4px; }
-      .compact td { font-size: 9px; padding: 3px 4px; }
-      .mandi-truck { page-break-inside: avoid; margin-bottom: 14px; }
-      .mandi-title { font-size: 12px; font-weight: 900; margin: 8px 0 2px; }
-      .mandi-meta { font-size: 10px; color: #424242; margin-bottom: 6px; }
+      .truck-card { border: 1px solid #C8E6C9; border-radius: 8px; padding: 14px; margin-bottom: 16px; page-break-inside: avoid; }
+      .truck-title { font-size: 16px; font-weight: 900; color: #1B5E20; }
+      .truck-meta { font-size: 13px; color: #616161; margin: 4px 0 10px; }
+      .compact th { font-size: 12px; padding: 6px; }
+      .compact td { font-size: 12px; padding: 5px 6px; }
+      .mandi-truck { page-break-inside: avoid; margin-bottom: 16px; }
+      .mandi-title { font-size: 16px; font-weight: bold; margin: 10px 0 6px; color: #000; }
+      .mandi-meta { font-size: 13px; color: #424242; margin-bottom: 8px; }
     </style>
   </head><body>
     ${header}
@@ -417,14 +489,31 @@ export function generateDayReportHTML(params: {
       <tfoot class="foot"><tr><td colspan="2">Total</td><td style="text-align:right">${totalSacks}</td><td style="text-align:right">${formatPlainAmount(totalWeight)}</td><td style="text-align:right">${formatPlainAmount(totalGross)}</td><td style="text-align:right">${formatPlainAmount(totalApmc)}</td><td style="text-align:right">${formatPlainAmount(totalBardana)}</td><td style="text-align:right">${formatPlainAmount(dayBookBuyerSummary.reduce((s, r) => s + r.net, 0))}</td></tr></tfoot>
     </table>
 
-    <div class="account-row"><span>${formatPlainAmount(netToSender)} By Fresh</span><span>${totalSacks} Case</span></div>
-    <div class="account-row"><span>${formatPlainAmount(dayBookBuyerSummary.reduce((s, r) => s + r.net, 0))} To Buyer / Cash / UPI</span><span>${totalSacks} Case</span></div>
-    <div class="account-row"><span>${formatPlainAmount(commission)} By Commission</span><span>${formatPlainAmount(totalOther)} By Market Charges</span></div>
+    ${truckReports.map(r => `
+      <div style="margin-top: 18px; margin-bottom: 6px; font-weight: 900; font-size: 15px; color: #1B5E20; text-transform: uppercase;">
+        Net Settlement: ${r.truck.truckNumber}
+      </div>
+      <div class="account-row"><span>Gross Sale</span><span>${formatPlainAmount(r.gross)}</span></div>
+      <div class="account-row"><span>Freight</span><span class="deduct">-${formatPlainAmount(r.truck.freightAmount)}</span></div>
+      <div class="account-row"><span>Commission</span><span class="deduct">-${formatPlainAmount(r.commission)}</span></div>
+      <div class="account-row"><span>APMC</span><span class="deduct">-${formatPlainAmount(r.apmc)}</span></div>
+      ${r.cartage > 0 ? `<div class="account-row"><span>Cartage</span><span class="deduct">-${formatPlainAmount(r.cartage)}</span></div>` : ''}
+      ${r.bardana > 0 ? `<div class="account-row"><span>Bardana</span><span class="deduct">-${formatPlainAmount(r.bardana)}</span></div>` : ''}
+      ${r.telePost > 0 ? `<div class="account-row"><span>Tele/Post</span><span class="deduct">-${formatPlainAmount(r.telePost)}</span></div>` : ''}
+      <div class="account-row net"><span>Net to Sender</span><span>${formatPlainAmount(r.net)}</span></div>
+    `).join('')}
 
     <div class="page-break"></div>
     ${header}
     <h2>Mandi Book</h2>
     ${mandiBookRows || '<div style="color:#616161;">No mandi-book rows for this date</div>'}
+
+    ${agentBookRows ? `
+    <div class="page-break"></div>
+    ${header}
+    <h2>Agent Mandi Book</h2>
+    ${agentBookRows}
+    ` : ''}
 
     <div class="page-break"></div>
     ${header}

@@ -17,7 +17,7 @@ export default function TeamScreen() {
   const { shop, updateShop } = useShop();
   const { data: subscriptionStatus } = useSubscriptionStatus();
   const [members, setMembers] = useState<TeamMember[]>(shop?.teamMembers ?? []);
-  const includedMemberLimit = subscriptionStatus?.included_user_count ?? 3;
+  const includedMemberLimit = subscriptionStatus?.included_user_count ?? 5;
   const extraMemberPrice = subscriptionStatus?.extra_user_price_inr ?? 99;
   const memberLimitReached = members.length >= includedMemberLimit;
   
@@ -250,7 +250,7 @@ export default function TeamScreen() {
 
               <Text style={{ fontSize: 14, fontWeight: '600', color: '#1A1A1A', marginTop: 8 }}>Role</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                {['MANAGER', 'BILLING CLERK', 'STAFF'].map(r => (
+                {['MANAGER', 'BILLING CLERK', 'THEKEDAAR', 'STAFF'].map(r => (
                   <Pressable key={r} onPress={() => setNewRole(r)} style={{
                     paddingVertical: 8, paddingHorizontal: 16, borderRadius: Radius.round,
                     backgroundColor: newRole === r ? '#1A5C1F' : '#E8F5E9'
@@ -330,14 +330,14 @@ export default function TeamScreen() {
             <View style={{ flex: 1 }}>
                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                  <Text style={{ fontSize: 16, fontWeight: '700', color: '#1A1A1A' }}>{item.name}</Text>
-                 <View style={{ backgroundColor: item.role === 'MANAGER' ? '#E8F5E9' : item.role === 'BILLING CLERK' ? '#FFF3E0' : '#E0F2FE', paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.round }}>
+                 <View style={{ backgroundColor: item.role === 'MANAGER' ? '#E8F5E9' : item.role === 'BILLING CLERK' ? '#FFF3E0' : item.role === 'THEKEDAAR' ? '#F3E5F5' : '#E0F2FE', paddingHorizontal: 8, paddingVertical: 4, borderRadius: Radius.round }}>
                     <Text style={{ fontSize: 10, fontWeight: '800', color: '#1A1A1A' }}>{item.role || 'STAFF'}</Text>
                  </View>
                </View>
                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
                  <Text style={{ fontSize: 14, color: '#4A4A4A' }}>+91 {item.phone 	|| 'N/A'}</Text>
                </View>
-               <Text style={{ fontSize: 12, color: '#8A8A8A', marginTop: 2 }}>{item.role === 'MANAGER' ? 'प्रबंधक' : item.role === 'BILLING CLERK' ? 'बिलिंग क्लर्क' : 'स्टाफ'}</Text>
+               <Text style={{ fontSize: 12, color: '#8A8A8A', marginTop: 2 }}>{item.role === 'MANAGER' ? 'प्रबंधक' : item.role === 'BILLING CLERK' ? 'बिलिंग क्लर्क' : item.role === 'THEKEDAAR' ? 'ठेकेदार' : 'स्टाफ'}</Text>
             </View>
             <View style={{ flexDirection: 'row', gap: 12 }}>
               <Pressable

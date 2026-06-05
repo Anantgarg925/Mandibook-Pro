@@ -114,9 +114,7 @@ export default function NewBillScreen() {
   const [boughtFromAgent, setBoughtFromAgent] = useState(false);
   const [sourceAgentName, setSourceAgentName] = useState('');
   const [sourceAgentPhone, setSourceAgentPhone] = useState('');
-  const [agentPurchaseAmount, setAgentPurchaseAmount] = useState('');
-  const [agentSacks, setAgentSacks] = useState('');
-  const [agentRatePerSack, setAgentRatePerSack] = useState('');
+  const [agentPurchaseRate, setAgentPurchaseRate] = useState('');
   const [savedSlip, setSavedSlip] = useState<number | null>(null);
   const [savedInquiryId, setSavedInquiryId] = useState<string | null>(null);
   const [applyApmc, setApplyApmc] = useState(true);
@@ -203,6 +201,21 @@ export default function NewBillScreen() {
           setCustomerPhone(phone);
         }
         setBuyerSuggestions([]);
+      }
+    } catch (error) {
+      console.log('Contact picker error:', error);
+    }
+  };
+
+  const openAgentContactPicker = async () => {
+    try {
+      const contact = await presentContactPicker();
+      if (contact) {
+        setSourceAgentName(contact.name || '');
+        if (contact.phoneNumbers && contact.phoneNumbers.length > 0) {
+          const phone = contact.phoneNumbers[0].number?.replace(/[^\d]/g, '') || '';
+          setSourceAgentPhone(phone.slice(-10));
+        }
       }
     } catch (error) {
       console.log('Contact picker error:', error);
@@ -563,7 +576,7 @@ export default function NewBillScreen() {
     const e: Record<string, string> = {};
     if (!boughtFromAgent && !selectedTruck) e.truck = 'गाड़ी चुनें';
     if (boughtFromAgent && !sourceAgentName.trim()) e.sourceAgent = 'एजेंट का नाम डालें';
-    if (boughtFromAgent && (!(parseFloat(agentSacks) > 0) || !(parseFloat(agentRatePerSack) > 0))) e.agentPurchaseAmount = 'Enter sacks bought from agent and rate paid per sack';
+    if (boughtFromAgent && !(parseFloat(agentPurchaseRate) > 0)) e.agentPurchaseAmount = 'Enter rate paid to agent (₹/kg)';
     if (!selectedGrade) e.grade = 'ग्रेड चुनें';
     if (sacks <= 0) e.sacks = 'बोरों की संख्या डालें';
     if (inventoryError) e.stock = inventoryError;
@@ -639,10 +652,10 @@ export default function NewBillScreen() {
           shopId: shop!.shopId,
           slipNumber: slip,
           truckId: boughtFromAgent ? null : selectedTruck?.id,
-          truckNumber: boughtFromAgent ? 'Agent Stock' : selectedTruck?.truckNumber,
+          truckNumber: boughtFromAgent ? '' : selectedTruck?.truckNumber,
           sourceAgentName: boughtFromAgent ? sourceAgentName.trim() : '',
           sourceAgentPhone: boughtFromAgent ? sourceAgentPhone.trim() : '',
-          agentPurchaseAmount: boughtFromAgent ? (parseFloat(agentSacks) * parseFloat(agentRatePerSack) || 0) : 0,
+          agentPurchaseAmount: boughtFromAgent ? (totalWeight * (parseFloat(agentPurchaseRate) || 0)) : 0,
           customerName: customerName.trim(),
           customerPhone: customerPhone.trim(),
           grade: mainGrade,
@@ -942,21 +955,29 @@ export default function NewBillScreen() {
           </View>
           {boughtFromAgent ? (
             <View style={{ gap: Spacing.sm, marginBottom: Spacing.sm }}>
-              <TextInput
-                style={inputStyle}
-                placeholder="Agent name *"
-                placeholderTextColor={Colors.textSecond}
-                value={sourceAgentName}
-                onChangeText={setSourceAgentName}
-              />
-              <TextInput
-                style={inputStyle}
-                placeholder="Agent phone (optional)"
-                placeholderTextColor={Colors.textSecond}
-                value={sourceAgentPhone}
-                onChangeText={setSourceAgentPhone}
-                keyboardType="phone-pad"
-              />
+              <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+                <View style={{ flex: 1, gap: Spacing.sm }}>
+                  <TextInput
+                    style={inputStyle}
+                    placeholder="Agent name *"
+                    placeholderTextColor={Colors.textSecond}
+                    value={sourceAgentName}
+                    onChangeText={setSourceAgentName}
+                  />
+                  <TextInput
+                    style={inputStyle}
+                    placeholder="Agent phone (optional)"
+                    placeholderTextColor={Colors.textSecond}
+                    value={sourceAgentPhone}
+                    onChangeText={setSourceAgentPhone}
+                    keyboardType="phone-pad"
+                  />
+                </View>
+                <Pressable onPress={openAgentContactPicker} style={{ width: 56, height: 110, borderRadius: Radius.sm, backgroundColor: '#E0F2FE', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#BAE6FD' }}>
+                  <User size={24} color="#0EA5E9" />
+                  <Text style={{ fontSize: 10, color: '#0EA5E9', fontWeight: '700', marginTop: 4 }}>Contacts</Text>
+                </Pressable>
+              </View>
               {/* Separate purchase fields — how many sacks you BOUGHT from the agent and at what rate */}
               <View style={{ backgroundColor: '#FFF8E1', borderRadius: Radius.sm, padding: Spacing.sm, borderWidth: 1, borderColor: '#FDE68A' }}>
                 <Text style={{ fontSize: FontSize.xs, fontWeight: '800', color: '#92400E', marginBottom: Spacing.sm, textTransform: 'uppercase' }}>
@@ -1392,57 +1413,36 @@ export default function NewBillScreen() {
                 <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                     <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>Bought from agent?</Text>
-                    <Switch value={boughtFromAgent} onValueChange={(v) => { setBoughtFromAgent(v); setSelectedTruckId(null); setSelectedGrade(null); if (!v) { setSourceAgentName(''); setSourceAgentPhone(''); setAgentPurchaseAmount(''); } }} />
+                    <Switch value={boughtFromAgent} onValueChange={(v) => { setBoughtFromAgent(v); setSelectedTruckId(null); setSelectedGrade(null); if (!v) { setSourceAgentName(''); setSourceAgentPhone(''); setAgentPurchaseRate(''); } }} />
                   </View>
                   {boughtFromAgent ? (
                     <View style={{ gap: 8 }}>
-                      <TextInput ref={sourceAgentNameRef} style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }} placeholder="Agent name *" value={sourceAgentName} onChangeText={setSourceAgentName} returnKeyType="next" onSubmitEditing={() => sourceAgentPhoneRef.current?.focus()} />
-                      <TextInput ref={sourceAgentPhoneRef} style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }} placeholder="Agent phone (optional)" value={sourceAgentPhone} onChangeText={setSourceAgentPhone} keyboardType="phone-pad" returnKeyType="next" />
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <View style={{ flex: 1, gap: 8 }}>
+                          <TextInput ref={sourceAgentNameRef} style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }} placeholder="Agent name *" value={sourceAgentName} onChangeText={setSourceAgentName} returnKeyType="next" onSubmitEditing={() => sourceAgentPhoneRef.current?.focus()} />
+                          <TextInput ref={sourceAgentPhoneRef} style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 16, color: '#111827' }} placeholder="Agent phone (optional)" value={sourceAgentPhone} onChangeText={setSourceAgentPhone} keyboardType="phone-pad" returnKeyType="next" />
+                        </View>
+                        <Pressable onPress={openAgentContactPicker} style={{ width: 50, borderRadius: 6, backgroundColor: '#E0F2FE', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#BAE6FD' }}>
+                          <User size={20} color="#0EA5E9" />
+                        </Pressable>
+                      </View>
                       {/* Purchase from agent fields */}
                       <View style={{ backgroundColor: '#FFF8E1', padding: 10, borderWidth: 1, borderColor: '#FDE68A', borderRadius: 6 }}>
                         <Text style={{ fontSize: 11, fontWeight: '800', color: '#92400E', marginBottom: 8, textTransform: 'uppercase' }}>
                           ℹ️ What you PAID the agent (purchase cost)
                         </Text>
-                        <View style={{ flexDirection: 'row', gap: 8 }}>
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 11, color: '#92400E', marginBottom: 4, fontWeight: '600' }}>Sacks bought</Text>
-                            <TextInput
-                              style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 15, color: '#111827' }}
-                              placeholder="Sacks *"
-                              value={agentSacks}
-                              onChangeText={(v) => {
-                                const cleaned = v.replace(/[^0-9.]/g, '');
-                                setAgentSacks(cleaned);
-                                const total = (parseFloat(cleaned) || 0) * (parseFloat(agentRatePerSack) || 0);
-                                setAgentPurchaseAmount(total > 0 ? String(total) : '');
-                              }}
-                              keyboardType="decimal-pad"
-                              returnKeyType="next"
-                            />
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 11, color: '#92400E', marginBottom: 4, fontWeight: '600' }}>Rate paid/sack (₹)</Text>
-                            <TextInput
-                              style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 15, color: '#111827' }}
-                              placeholder="Rate *"
-                              value={agentRatePerSack}
-                              onChangeText={(v) => {
-                                const cleaned = v.replace(/[^0-9.]/g, '');
-                                setAgentRatePerSack(cleaned);
-                                const total = (parseFloat(agentSacks) || 0) * (parseFloat(cleaned) || 0);
-                                setAgentPurchaseAmount(total > 0 ? String(total) : '');
-                              }}
-                              keyboardType="decimal-pad"
-                              returnKeyType="done"
-                              onSubmitEditing={() => { setEditingField('grade'); setTimeout(() => scrollToSection('grade'), 100); }}
-                            />
-                          </View>
-                        </View>
-                        {agentPurchaseAmount && parseFloat(agentPurchaseAmount) > 0 && (
-                          <Text style={{ fontSize: 12, fontWeight: '800', color: '#92400E', marginTop: 6 }}>
-                            Total paid: ₹{parseFloat(agentPurchaseAmount).toLocaleString('en-IN')}
-                          </Text>
-                        )}
+                        <TextInput
+                          style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 15, color: '#111827' }}
+                          placeholder="Rate paid to agent (₹/kg) *"
+                          value={agentPurchaseRate}
+                          onChangeText={(v) => {
+                            const cleaned = v.replace(/[^0-9.]/g, '');
+                            setAgentPurchaseRate(cleaned);
+                          }}
+                          keyboardType="decimal-pad"
+                          returnKeyType="done"
+                          onSubmitEditing={() => { setEditingField('grade'); setTimeout(() => scrollToSection('grade'), 100); }}
+                        />
                       </View>
                       {errors.agentPurchaseAmount ? <Text style={{ fontSize: 11, color: Colors.danger }}>{errors.agentPurchaseAmount}</Text> : null}
                     </View>

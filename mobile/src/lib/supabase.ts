@@ -32,6 +32,8 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
             upsert: () => builder,
             delete: () => builder,
             eq: () => builder,
+            on: () => builder,
+            subscribe: () => ({ unsubscribe: () => {} }),
             single: () => Promise.resolve({ data: null, error: new Error('Supabase credentials missing') }),
             then: (resolve: any) => resolve({ data: null, error: new Error('Supabase credentials missing') }),
           };
@@ -39,6 +41,10 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
         };
       }
     });
+
+if (!supabase.removeChannel) {
+  (supabase as any).removeChannel = () => {};
+}
 
 // ─── helpers to map DB snake_case → app camelCase ────────────────────────────
 

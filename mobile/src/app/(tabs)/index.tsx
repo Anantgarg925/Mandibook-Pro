@@ -23,6 +23,7 @@ import type { Inquiry } from '@/types/inquiry';
 import { SplashScreenView } from '@/components/SplashScreenView';
 import { LaunchView } from '@/components/LaunchView';
 import { AdminPinView } from '@/components/AdminPinView';
+import { useUgrai } from '@/hooks/useUgrai';
 import { DraggableFAB } from '@/components/common/DraggableFAB';
 import { useBillNotifications } from '@/context/BillNotificationContext';
 import { useResponsive } from '@/hooks/useResponsive';
@@ -421,6 +422,7 @@ export default function HomeScreen() {
   const { unreadCount } = useBillNotifications();
   const { inquiries, pending, confirmed, loading: billsLoading } = useInquiries();
   const { trucks } = useTodayTrucks();
+  const { pendingCollections, confirmCollection } = useUgrai();
   const [search, setSearch] = useState('');
   const [splashGone, setSplashGone] = useState(launchComplete);
   const [minTimeElapsed, setMinTimeElapsed] = useState(launchComplete);
@@ -856,6 +858,37 @@ export default function HomeScreen() {
               </View>
 
             </SectionCard>
+
+            {/* ── Pending Ugrai Collections ── */}
+            {pendingCollections.length > 0 ? (
+              <SectionCard>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: Spacing.md }}>
+                  <View>
+                    <Text style={{ fontSize: FontSize.lg, fontWeight: '800', color: UI.text }}>Pending Collections</Text>
+                    <Text style={{ fontSize: FontSize.xs, color: UI.muted }}>लंबित उघाई</Text>
+                  </View>
+                </View>
+                {pendingCollections.map((col) => (
+                  <View key={col.id} style={{ flexDirection: 'row', alignItems: 'center', padding: Spacing.md, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, marginBottom: Spacing.sm }}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: UI.text }}>{col.buyer_name}</Text>
+                      <Text style={{ fontSize: FontSize.xs, color: UI.muted }}>Collected by: {col.member_name}</Text>
+                    </View>
+                    <View style={{ alignItems: 'flex-end', gap: 6 }}>
+                      <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: UI.primary }}>{toIndianCurrency(col.amount)}</Text>
+                      <Pressable
+                        onPress={() => confirmCollection.mutateAsync(col).then(() => {
+                          router.push(`/voucher/${col.id}` as any);
+                        })}
+                        style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: '#F0FDF4', borderRadius: Radius.round, borderWidth: 1, borderColor: '#16A34A' }}
+                      >
+                        <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: '#16A34A' }}>Confirm</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+              </SectionCard>
+            ) : null}
 
             {/* ── Today's Trucks (vertical cards) ── */}
             {trucks.length > 0 ? (

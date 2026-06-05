@@ -10,6 +10,8 @@ import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { toIndianCurrency, toIndianDate, toIndianWeight } from '@/lib/formatters';
 import { useMemberMode } from '@/hooks/useMemberMode';
 import { archiveQueryOptions } from '@/lib/queryOptions';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MEMBER_SESSION_KEY } from '@/lib/session';
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: Colors.warning,
@@ -25,6 +27,16 @@ export default function BillDetailScreen() {
   const isMemberMode = useMemberMode();
   const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
+  const [memberRole, setMemberRole] = React.useState<string>('MEMBER');
+
+  useEffect(() => {
+    AsyncStorage.getItem(MEMBER_SESSION_KEY)
+      .then((raw) => {
+        if (raw) setMemberRole(JSON.parse(raw).role);
+      })
+      .catch(() => {});
+  }, []);
+
   const goBack = () => {
     if (router.canGoBack()) {
       router.back();
@@ -257,7 +269,7 @@ export default function BillDetailScreen() {
           </Pressable>
         ) : null}
 
-        {isMemberMode === true && inquiry.status === 'PENDING' ? (
+        {isMemberMode === true && inquiry.status === 'PENDING' && memberRole !== 'THEKEDAAR' ? (
           <Pressable
             testID="edit-bill-button"
             onPress={() => router.push(`/bills/edit/${id}` as any)}
