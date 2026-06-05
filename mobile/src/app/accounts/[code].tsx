@@ -523,7 +523,7 @@ export default function BuyerLedgerScreen() {
             <View style={{ flexDirection: 'row', gap: Spacing.sm, paddingHorizontal: Spacing.md, marginBottom: Spacing.md }}>
               <Pressable
                 testID="record-payment-btn"
-                onPress={() => router.push(`/buyers/payment?code=${buyer.code}`)}
+                onPress={() => router.push(`/accounts/payment?code=${buyer.code}`)}
                 style={{ flex: 1 }}
               >
                 {({ pressed }) => (

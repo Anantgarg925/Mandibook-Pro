@@ -873,6 +873,11 @@ export default function HomeScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: UI.text }}>{col.buyer_name}</Text>
                       <Text style={{ fontSize: FontSize.xs, color: UI.muted }}>Collected by: {col.member_name}</Text>
+                      {col.payment_method && (
+                        <Text style={{ fontSize: FontSize.xs, color: col.payment_method === 'UPI' ? '#0284C7' : UI.muted, fontWeight: '600', marginTop: 2 }}>
+                          Mode: {col.payment_method} {col.upi_ref ? `(${col.upi_ref})` : ''}
+                        </Text>
+                      )}
                     </View>
                     <View style={{ alignItems: 'flex-end', gap: 6 }}>
                       <Text style={{ fontSize: FontSize.md, fontWeight: '800', color: UI.primary }}>{toIndianCurrency(col.amount)}</Text>

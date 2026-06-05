@@ -67,12 +67,18 @@ function downloadHtmlFile(html: string, title: string): void {
  */
 async function elementToDataUrl(element: HTMLElement, format: 'png' | 'jpeg'): Promise<string> {
   const htmlToImage = await import('html-to-image');
+  
+  // Create options that explicitly capture the full scrollable area
   const options = {
     backgroundColor: '#FFFFFF',
     pixelRatio: 2,
+    width: element.scrollWidth,
+    height: element.scrollHeight,
     style: {
       transform: 'scale(1)',
       transformOrigin: 'top left',
+      width: `${element.scrollWidth}px`,
+      height: `${element.scrollHeight}px`,
     }
   };
   

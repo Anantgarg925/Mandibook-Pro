@@ -611,9 +611,11 @@ export default function SlipPreviewScreen() {
                   Status: Pending Authorization
                 </Text>
               )}
-              <Text style={{ fontSize: 12, color: '#64748B' }}>
-                Truck: {inquiry.truckNumber}
-              </Text>
+              {inquiry.truckNumber && inquiry.truckNumber !== 'Agent Stock' ? (
+                <Text style={{ fontSize: 12, color: '#64748B' }}>
+                  Truck: {inquiry.truckNumber}
+                </Text>
+              ) : null}
             </View>
 
             {/* Dashed divider */}

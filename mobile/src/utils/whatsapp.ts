@@ -8,14 +8,19 @@ export function generateCustomerMessage(inquiry: Inquiry, shop: ShopData): strin
     shop.upiApps.length > 0 || shop.upiId
       ? `\nUPI: ${shop.upiId || shop.upiApps.join('/')}` : '';
 
+  const entries = (inquiry.chargeSnapshot as any)?.entries || [inquiry];
+  const itemsText = entries.map((entry: any) => 
+    `माल: ${entry.gradeName || entry.grade}\n` +
+    `${entry.sacks} बोरी × ${entry.weightPerSack} kg = *${entry.totalWeight} kg*\n` +
+    `रेट: ₹${entry.ratePerKg}/kg\n` +
+    `*कुल: ${toIndianCurrency(entry.grossAmount)}*`
+  ).join('\n\n');
+
   return (
     `🍊 *${shop.firmName}* - बिल कन्फर्म ✅\n\n` +
     `बिल नं: #${inquiry.slipNumber}\n` +
     `नाम: ${inquiry.customerName}\n\n` +
-    `माल: ${inquiry.gradeName}\n` +
-    `${inquiry.sacks} बोरी × ${inquiry.weightPerSack} kg = *${inquiry.totalWeight} kg*\n` +
-    `रेट: ₹${inquiry.ratePerKg}/kg\n` +
-    `*कुल: ${toIndianCurrency(inquiry.grossAmount)}*\n\n` +
+    `${itemsText}\n\n` +
     `APMC: ${toIndianCurrency(inquiry.apmcAmount)}\n` +
     `बरदाना: ${toIndianCurrency(inquiry.bardanaAmount)}\n` +
     `*जमा: ${toIndianCurrency(inquiry.netAmount)}*\n\n` +
@@ -27,12 +32,22 @@ export function generateCustomerMessage(inquiry: Inquiry, shop: ShopData): strin
 }
 
 export function generateThekedaarMessage(inquiry: Inquiry, shop: ShopData): string {
+  const entries = (inquiry.chargeSnapshot as any)?.entries || [inquiry];
+  const itemsText = entries.map((entry: any) => 
+    `ग्रेड: ${entry.gradeName || entry.grade}\n` +
+    `${entry.sacks} बोरी × ${entry.weightPerSack} kg = ${entry.totalWeight} kg\n` +
+    `रेट: ₹${entry.ratePerKg}/kg`
+  ).join('\n\n');
+
+  const truckLine = inquiry.truckNumber && inquiry.truckNumber !== 'Agent Stock' 
+    ? ` | ${inquiry.truckNumber}` 
+    : '';
+
   return (
     `*${shop.firmName}* — माल पहुंचने की सूचना\n\n` +
-    `Slip #${inquiry.slipNumber} | ${inquiry.truckNumber}\n` +
-    `ग्रेड: ${inquiry.grade} (${inquiry.gradeName})\n` +
-    `${inquiry.sacks} बोरी × ${inquiry.weightPerSack} kg = ${inquiry.totalWeight} kg\n` +
-    `रेट: ₹${inquiry.ratePerKg}/kg | नेट: ${toIndianCurrency(inquiry.netAmount)}\n\n` +
+    `Slip #${inquiry.slipNumber}${truckLine}\n` +
+    `${itemsText}\n\n` +
+    `नेट: ${toIndianCurrency(inquiry.netAmount)}\n` +
     `भुगतान: ${inquiry.paymentMode}${inquiry.upiRef ? ` [${inquiry.upiRef}]` : ''}\n` +
     `धन्यवाद!`
   );

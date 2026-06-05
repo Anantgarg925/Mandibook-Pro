@@ -83,6 +83,8 @@ export default function MemberDashboardScreen() {
   const { buyers } = useBuyers();
 
   const [showUgraiModal, setShowUgraiModal] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<'CASH' | 'UPI'>('CASH');
+  const [upiRef, setUpiRef] = useState('');
   const [ugraiBuyerName, setUgraiBuyerName] = useState('');
   const [selectedBuyer, setSelectedBuyer] = useState<Buyer | null>(null);
   const [buyerSuggestions, setBuyerSuggestions] = useState<Buyer[]>([]);
@@ -105,6 +107,8 @@ export default function MemberDashboardScreen() {
         member_name: member?.name || 'Unknown',
         amount: amt,
         description: entryDesc.trim(),
+        payment_method: paymentMethod,
+        upi_ref: paymentMethod === 'UPI' ? upiRef.trim() : undefined,
       });
       setShowUgraiModal(false);
       setEntryDesc('');
@@ -112,6 +116,8 @@ export default function MemberDashboardScreen() {
       setUgraiBuyerName('');
       setSelectedBuyer(null);
       setBuyerSuggestions([]);
+      setPaymentMethod('CASH');
+      setUpiRef('');
       Alert.alert('Success', 'Payment collection request sent to Admin.');
     } catch (err: any) {
       Alert.alert('Error', err.message);
@@ -495,6 +501,45 @@ export default function MemberDashboardScreen() {
                 </View>
               )}
             </View>
+
+            <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: Colors.textSecond, marginBottom: 6 }}>PAYMENT METHOD</Text>
+            <View style={{ flexDirection: 'row', gap: Spacing.sm, marginBottom: Spacing.md }}>
+              {(['CASH', 'UPI'] as const).map(m => (
+                <Pressable
+                  key={m}
+                  onPress={() => setPaymentMethod(m)}
+                  style={{
+                    flex: 1, height: 40, borderRadius: Radius.sm,
+                    alignItems: 'center', justifyContent: 'center',
+                    backgroundColor: paymentMethod === m ? Colors.info : Colors.background,
+                    borderWidth: 1, borderColor: paymentMethod === m ? Colors.info : Colors.border,
+                  }}
+                >
+                  <Text style={{
+                    fontSize: FontSize.xs, fontWeight: '700',
+                    color: paymentMethod === m ? '#FFF' : Colors.textSecond,
+                  }}>{m}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {paymentMethod === 'UPI' && (
+              <>
+                <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: Colors.textSecond, marginBottom: 6 }}>UPI REFERENCE (Optional)</Text>
+                <TextInput
+                  value={upiRef}
+                  onChangeText={setUpiRef}
+                  placeholder="Transaction ID"
+                  placeholderTextColor={Colors.textSecond}
+                  style={{
+                    borderWidth: 1, borderColor: Colors.border, borderRadius: Radius.sm,
+                    paddingHorizontal: Spacing.sm, paddingVertical: 10,
+                    fontSize: FontSize.sm, color: Colors.text,
+                    marginBottom: Spacing.md,
+                  }}
+                />
+              </>
+            )}
 
             <Text style={{ fontSize: FontSize.xs, fontWeight: '700', color: Colors.textSecond, marginBottom: 6 }}>DESCRIPTION (Optional)</Text>
             <TextInput

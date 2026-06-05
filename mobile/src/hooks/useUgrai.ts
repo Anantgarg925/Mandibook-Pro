@@ -14,6 +14,8 @@ export type UgraiCollection = {
   description: string;
   status: 'PENDING' | 'CONFIRMED' | 'REJECTED';
   created_at: number;
+  payment_method?: string;
+  upi_ref?: string;
 };
 
 export function useUgrai() {
@@ -71,8 +73,8 @@ export function useUgrai() {
           type: 'PAYMENT',
           amount: collection.amount,
           date: Date.now(),
-          payment_method: 'CASH',
-          note: `Ugrai collected by ${collection.member_name}`,
+          payment_method: collection.payment_method || 'CASH',
+          note: `Ugrai collected by ${collection.member_name}${collection.upi_ref ? ` (Ref: ${collection.upi_ref})` : ''}`,
           created_at: Date.now()
         });
       if (txError) throw new Error(txError.message);
@@ -85,8 +87,8 @@ export function useUgrai() {
           type: 'RECEIPT',
           amount: collection.amount,
           date: Date.now(),
-          payment_method: 'CASH',
-          note: `Ugrai collected from ${collection.buyer_name} by ${collection.member_name}`,
+          payment_method: collection.payment_method || 'CASH',
+          note: `Ugrai collected from ${collection.buyer_name} by ${collection.member_name}${collection.upi_ref ? ` (Ref: ${collection.upi_ref})` : ''}`,
           created_at: Date.now()
         });
       if (cbError) throw new Error(cbError.message);

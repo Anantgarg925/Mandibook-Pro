@@ -114,7 +114,9 @@ export default function NewBillScreen() {
   const [boughtFromAgent, setBoughtFromAgent] = useState(false);
   const [sourceAgentName, setSourceAgentName] = useState('');
   const [sourceAgentPhone, setSourceAgentPhone] = useState('');
-  const [agentPurchaseRate, setAgentPurchaseRate] = useState('');
+  const [agentSacks, setAgentSacks] = useState('');
+  const [agentRatePerSack, setAgentRatePerSack] = useState('');
+  const [agentPurchaseAmount, setAgentPurchaseAmount] = useState('');
   const [savedSlip, setSavedSlip] = useState<number | null>(null);
   const [savedInquiryId, setSavedInquiryId] = useState<string | null>(null);
   const [applyApmc, setApplyApmc] = useState(true);
@@ -576,7 +578,7 @@ export default function NewBillScreen() {
     const e: Record<string, string> = {};
     if (!boughtFromAgent && !selectedTruck) e.truck = 'गाड़ी चुनें';
     if (boughtFromAgent && !sourceAgentName.trim()) e.sourceAgent = 'एजेंट का नाम डालें';
-    if (boughtFromAgent && !(parseFloat(agentPurchaseRate) > 0)) e.agentPurchaseAmount = 'Enter rate paid to agent (₹/kg)';
+    if (boughtFromAgent && !(parseFloat(agentPurchaseAmount) > 0)) e.agentPurchaseAmount = 'Enter agent purchase details';
     if (!selectedGrade) e.grade = 'ग्रेड चुनें';
     if (sacks <= 0) e.sacks = 'बोरों की संख्या डालें';
     if (inventoryError) e.stock = inventoryError;
@@ -1413,7 +1415,7 @@ export default function NewBillScreen() {
                 <View style={{ padding: Spacing.sm, backgroundColor: '#F3F4F6', borderBottomWidth: 1, borderBottomColor: '#D1D5DB' }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                     <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>Bought from agent?</Text>
-                    <Switch value={boughtFromAgent} onValueChange={(v) => { setBoughtFromAgent(v); setSelectedTruckId(null); setSelectedGrade(null); if (!v) { setSourceAgentName(''); setSourceAgentPhone(''); setAgentPurchaseRate(''); } }} />
+                    <Switch value={boughtFromAgent} onValueChange={(v) => { setBoughtFromAgent(v); setSelectedTruckId(null); setSelectedGrade(null); if (!v) { setSourceAgentName(''); setSourceAgentPhone(''); setAgentPurchaseAmount(''); setAgentSacks(''); setAgentRatePerSack(''); } }} />
                   </View>
                   {boughtFromAgent ? (
                     <View style={{ gap: 8 }}>
@@ -1429,20 +1431,39 @@ export default function NewBillScreen() {
                       {/* Purchase from agent fields */}
                       <View style={{ backgroundColor: '#FFF8E1', padding: 10, borderWidth: 1, borderColor: '#FDE68A', borderRadius: 6 }}>
                         <Text style={{ fontSize: 11, fontWeight: '800', color: '#92400E', marginBottom: 8, textTransform: 'uppercase' }}>
-                          ℹ️ What you PAID the agent (purchase cost)
+                          ℹ️ Purchase from agent (what you paid)
                         </Text>
-                        <TextInput
-                          style={{ backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 15, color: '#111827' }}
-                          placeholder="Rate paid to agent (₹/kg) *"
-                          value={agentPurchaseRate}
-                          onChangeText={(v) => {
-                            const cleaned = v.replace(/[^0-9.]/g, '');
-                            setAgentPurchaseRate(cleaned);
-                          }}
-                          keyboardType="decimal-pad"
-                          returnKeyType="done"
-                          onSubmitEditing={() => { setEditingField('grade'); setTimeout(() => scrollToSection('grade'), 100); }}
-                        />
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          <TextInput
+                            style={{ flex: 1, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 15, color: '#111827' }}
+                            placeholder="Sacks bought *"
+                            value={agentSacks}
+                            onChangeText={(v) => {
+                              const cleaned = v.replace(/[^0-9.]/g, '');
+                              setAgentSacks(cleaned);
+                              const total = (parseFloat(cleaned) || 0) * (parseFloat(agentRatePerSack) || 0);
+                              setAgentPurchaseAmount(total > 0 ? String(total) : '');
+                            }}
+                            keyboardType="decimal-pad"
+                          />
+                          <TextInput
+                            style={{ flex: 1, backgroundColor: '#FFF', borderWidth: 1, borderColor: '#CBD5E1', padding: 10, fontSize: 15, color: '#111827' }}
+                            placeholder="Rate paid/sack *"
+                            value={agentRatePerSack}
+                            onChangeText={(v) => {
+                              const cleaned = v.replace(/[^0-9.]/g, '');
+                              setAgentRatePerSack(cleaned);
+                              const total = (parseFloat(agentSacks) || 0) * (parseFloat(cleaned) || 0);
+                              setAgentPurchaseAmount(total > 0 ? String(total) : '');
+                            }}
+                            keyboardType="decimal-pad"
+                          />
+                        </View>
+                        {agentPurchaseAmount && parseFloat(agentPurchaseAmount) > 0 && (
+                          <Text style={{ fontSize: 11, fontWeight: '800', color: '#92400E', marginTop: 8 }}>
+                            Total paid: ₹{parseFloat(agentPurchaseAmount).toLocaleString('en-IN')}
+                          </Text>
+                        )}
                       </View>
                       {errors.agentPurchaseAmount ? <Text style={{ fontSize: 11, color: Colors.danger }}>{errors.agentPurchaseAmount}</Text> : null}
                     </View>
