@@ -23,7 +23,7 @@ import { printSlip, shareSlipAsPDF } from '@/utils/printSlip';
 import { useMemberMode } from '@/hooks/useMemberMode';
 import { archiveQueryOptions } from '@/lib/queryOptions';
 import { deleteConfirmedBill } from '@/utils/ledgerSync';
-import { downloadTestIdAsJpeg } from '@/utils/webExport';
+import { downloadIdAsJpeg } from '@/utils/webExport';
 import {
   generateCustomerMessage,
   generateThekedaarMessage,
@@ -109,7 +109,7 @@ export default function SlipPreviewScreen() {
     setPrinting(true);
     try {
       if (Platform.OS === 'web') {
-        await downloadTestIdAsJpeg('slip-card-web', `slip-${inquiry!.slipNumber}.jpg`);
+        await downloadIdAsJpeg('slip-card-web', `slip-${inquiry!.slipNumber}.jpg`);
         return;
       }
       const available = await Sharing.isAvailableAsync();
@@ -129,8 +129,9 @@ export default function SlipPreviewScreen() {
         UTI: 'public.jpeg',
         dialogTitle: `Share slip #${inquiry?.slipNumber ?? ''} image`,
       });
-    } catch {
-      Alert.alert('Share Error', 'Could not create slip image. Please try again.');
+    } catch (err: any) {
+      console.error(err);
+      Alert.alert('Share Error', `Could not create slip image: ${err.message || 'Unknown error'}`);
     } finally {
       setPrinting(false);
     }
@@ -236,6 +237,7 @@ export default function SlipPreviewScreen() {
         {/* Thermal Receipt Card */}
         <View
           ref={slipCardRef}
+          nativeID="slip-card-web"
           testID="slip-card-web"
           collapsable={false}
           style={{

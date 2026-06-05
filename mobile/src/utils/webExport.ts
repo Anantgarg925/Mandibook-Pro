@@ -106,3 +106,10 @@ export async function downloadTestIdAsJpeg(testId: string, filename: string): Pr
   if (!element) throw new Error(`Could not find element ${testId}`);
   await downloadElementAsJpeg(element, filename);
 }
+
+export async function downloadIdAsJpeg(id: string, filename: string): Promise<void> {
+  if (Platform.OS !== 'web') return;
+  const element = document.getElementById(id) as HTMLElement | null;
+  if (!element) throw new Error(`Could not find element with id ${id}`);
+  await downloadElementAsJpeg(element, filename);
+}

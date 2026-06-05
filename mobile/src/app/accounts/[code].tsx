@@ -23,7 +23,7 @@ import { toIndianCurrency, toIndianDate } from '@/lib/formatters';
 import { Colors, FontSize, Spacing, Radius } from '@/lib/theme';
 import { computeRunningBalances, type EnrichedTransaction } from '@/lib/ledger';
 import type { PaymentMethod, Transaction } from '@/types/inquiry';
-import { downloadTestIdAsJpeg, printHtmlOnWeb } from '@/utils/webExport';
+import { downloadIdAsJpeg, printHtmlOnWeb } from '@/utils/webExport';
 
 export default function BuyerLedgerScreen() {
   const router = useRouter();
@@ -299,7 +299,7 @@ export default function BuyerLedgerScreen() {
     if (!reminderCardRef.current) return;
     try {
       if (Platform.OS === 'web') {
-        await downloadTestIdAsJpeg('balance-reminder-web', `balance-reminder-${buyer!.code}.jpg`);
+        await downloadIdAsJpeg('balance-reminder-web', `balance-reminder-${buyer!.code}.jpg`);
         return;
       }
       const available = await Sharing.isAvailableAsync();
@@ -338,7 +338,7 @@ export default function BuyerLedgerScreen() {
     if (!combinedBillRef.current) return;
     try {
       if (Platform.OS === 'web') {
-        await downloadTestIdAsJpeg('daily-combined-bill-web', `daily-bill-${buyer!.code}.jpg`);
+        await downloadIdAsJpeg('daily-combined-bill-web', `daily-bill-${buyer!.code}.jpg`);
         return;
       }
       const available = await Sharing.isAvailableAsync();
@@ -988,6 +988,7 @@ export default function BuyerLedgerScreen() {
 
       <View
         ref={reminderCardRef}
+        nativeID="balance-reminder-web"
         testID="balance-reminder-web"
         collapsable={false}
         style={{
@@ -1030,6 +1031,7 @@ export default function BuyerLedgerScreen() {
       {activeDailyGroup ? (
         <View
           ref={combinedBillRef}
+          nativeID="daily-combined-bill-web"
           testID="daily-combined-bill-web"
           collapsable={false}
           style={{
