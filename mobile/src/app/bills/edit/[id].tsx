@@ -213,6 +213,7 @@ export default function EditBillScreen() {
         bardana_amount: calc.bardana,
         cartage_amount: calc.cartage,
         net_amount: newNetAmount,
+        agent_purchase_amount: boughtFromAgent && inquiry.sourceAgentName === sourceAgentName.trim() ? inquiry.agentPurchaseAmount : (boughtFromAgent ? null : null),
         payment_mode: paymentMode,
         upi_ref: upiRef,
         apply_apmc: applyApmc,
