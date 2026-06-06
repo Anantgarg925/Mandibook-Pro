@@ -1276,7 +1276,7 @@ export default function NewBillScreen() {
               <CalcRow label="Gross Amount" value={toIndianCurrency(entries.reduce((s, e) => s + e.grossAmount, 0) + (calc?.gross ?? 0))} />
               {(entries.reduce((s, e) => s + e.apmcAmount, 0) + (calc?.apmc ?? 0)) > 0 ? <CalcRow label="APMC" value={`+${toIndianCurrency(entries.reduce((s, e) => s + e.apmcAmount, 0) + (calc?.apmc ?? 0))}`} color={Colors.text} /> : null}
               {(entries.reduce((s, e) => s + e.bardanaAmount, 0) + (calc?.bardana ?? 0)) > 0 ? <CalcRow label="Bardana" value={`+${toIndianCurrency(entries.reduce((s, e) => s + e.bardanaAmount, 0) + (calc?.bardana ?? 0))}`} color={Colors.text} /> : null}
-              {(entries.reduce((s, e) => s + e.cartageAmount, 0) + (calc?.cartage ?? 0)) > 0 ? <CalcRow label="Cartage" value={`+${toIndianCurrency(entries.reduce((s, e) => s + e.cartageAmount, 0) + (calc?.cartage ?? 0))}`} color={Colors.text} /> : null}
+
               <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: Spacing.xs }} />
               <CalcRow label="Calculated Net Amount" value={toIndianCurrency(entries.reduce((s, e) => s + e.netAmount, 0) + (calc?.net ?? 0))} bold />
               

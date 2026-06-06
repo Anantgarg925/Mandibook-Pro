@@ -554,22 +554,8 @@ export default function SlipPreviewScreen() {
               </View>
             ) : null}
 
-            {/* Cartage charge */}
-            {showFinalAmounts && inquiry.cartageAmount > 0 ? (
-              <View
-                style={{
-                  flexDirection: 'row',
-                  paddingVertical: 6,
-                  borderBottomWidth: 1,
-                  borderBottomColor: '#f1f5f9',
-                }}
-              >
-                <Text style={{ flex: 1, fontSize: 12, color: '#64748B' }}>Cartage</Text>
-                <Text style={{ width: 70, fontSize: 12, color: '#071e27', textAlign: 'right' }}>
-                  +{Math.round(inquiry.cartageAmount)}
-                </Text>
-              </View>
-            ) : null}
+
+
 
             {/* Net Amount box */}
             {showFinalAmounts ? (

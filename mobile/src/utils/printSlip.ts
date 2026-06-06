@@ -7,10 +7,7 @@ import { printHtmlOnWeb } from '@/utils/webExport';
 
 export function generateSlipHTML(inquiry: Inquiry, shop: ShopData): string {
   const upiInfo = shop.upiId ? `GPay/Paytm: ${shop.upiId}` : shop.upiApps.join('/');
-  const cartageRow =
-    inquiry.cartageAmount > 0
-      ? `<tr><td colspan="5">Cartage</td><td class="right">${inquiry.cartageAmount.toFixed(0)}</td></tr>`
-      : '';
+
   const bardanaRow =
     inquiry.bardanaAmount > 0
       ? `<tr><td colspan="5">Bardana</td><td class="right">${inquiry.bardanaAmount.toFixed(0)}</td></tr>`
@@ -154,7 +151,7 @@ export function generateSlipHTML(inquiry: Inquiry, shop: ShopData): string {
     </tr>
     <tr><td colspan="5">APMC</td><td class="right">${inquiry.apmcAmount.toFixed(0)}</td></tr>
     ${bardanaRow}
-    ${cartageRow}
+
     <tr class="net-row">
       <td colspan="5">NET AMOUNT / कुल राशि</td>
       <td class="right">&#8377;${inquiry.netAmount.toFixed(0)}</td>

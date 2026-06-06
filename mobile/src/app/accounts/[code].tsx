@@ -1097,7 +1097,7 @@ export default function BuyerLedgerScreen() {
           <View style={{ marginTop: 12, gap: 6 }}>
             <CombinedTotalRow label="Total Amt" value={activeDailyGroup.rows.reduce((sum, bill) => sum + bill.grossAmount, 0)} />
             <CombinedTotalRow label="A.P.M.C." value={activeDailyGroup.rows.reduce((sum, bill) => sum + bill.apmcAmount, 0)} />
-            <CombinedTotalRow label="BARDANA" value={activeDailyGroup.rows.reduce((sum, bill) => sum + bill.bardanaAmount + bill.cartageAmount, 0)} />
+            <CombinedTotalRow label="BARDANA" value={activeDailyGroup.rows.reduce((sum, bill) => sum + bill.bardanaAmount, 0)} />
           </View>
           <Text style={{ color: '#CBD5E1', fontSize: 12, letterSpacing: 3, marginVertical: 12, textAlign: 'center' }} numberOfLines={1}>
             - - - - - - - - - - - - - - - - - - -
@@ -1470,7 +1470,7 @@ function generateCombinedBillHTML({
   const firstBill = group.rows[0];
   const grossTotal = group.rows.reduce((sum, bill) => sum + bill.grossAmount, 0);
   const apmcTotal = group.rows.reduce((sum, bill) => sum + bill.apmcAmount, 0);
-  const bardanaTotal = group.rows.reduce((sum, bill) => sum + bill.bardanaAmount + bill.cartageAmount, 0);
+  const bardanaTotal = group.rows.reduce((sum, bill) => sum + bill.bardanaAmount, 0);
   const totalSacks = group.rows.reduce((sum, bill) => sum + bill.sacks, 0);
   const totalWeight = group.rows.reduce((sum, bill) => sum + bill.totalWeight, 0);
   const previousBalance = Math.max(0, balance - group.total);

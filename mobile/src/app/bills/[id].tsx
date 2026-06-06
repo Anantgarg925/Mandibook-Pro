@@ -208,9 +208,8 @@ export default function BillDetailScreen() {
             <Row label="Total Gross" value={toIndianCurrency(inquiry.grossAmount)} />
             <Row label="APMC" value={`+${toIndianCurrency(inquiry.apmcAmount)}`} valueColor={Colors.text} />
             <Row label="Bardana" value={`+${toIndianCurrency(inquiry.bardanaAmount)}`} valueColor={Colors.text} />
-            {inquiry.cartageAmount > 0 ? (
-              <Row label="Cartage" value={`+${toIndianCurrency(inquiry.cartageAmount)}`} valueColor={Colors.text} />
-            ) : null}
+
+
             <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: Spacing.xs }} />
             <Row label="Net Amount" value={toIndianCurrency(inquiry.netAmount)} bold />
           </View>

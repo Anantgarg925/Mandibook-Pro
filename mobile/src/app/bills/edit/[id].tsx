@@ -6,7 +6,7 @@ import {
 import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
-import { ArrowLeft, Check } from 'lucide-react-native';
+import { ArrowLeft, Check, Trash2, Plus } from 'lucide-react-native';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase, mapInquiry } from '@/lib/supabase';
 import { useShop } from '@/context/ShopContext';
@@ -89,6 +89,7 @@ export default function EditBillScreen() {
   const [sacks, setSacks] = useState('');
   const [weightPerSack, setWeightPerSack] = useState('');
   const [rate, setRate] = useState('');
+  const [entries, setEntries] = useState<any[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [initialized, setInitialized] = useState(false);
   const isSavingRef = useRef(false);
@@ -120,10 +121,39 @@ export default function EditBillScreen() {
       
       setCustomerName(inquiry.customerName);
       setCustomerPhone(inquiry.customerPhone);
-      setGrade(inquiry.grade);
-      setSacks(String(inquiry.sacks));
-      setWeightPerSack(String(inquiry.weightPerSack));
-      setRate(inquiry.ratePerKg > 0 ? String(inquiry.ratePerKg) : '');
+
+      // Check if this is a multi-item bill with entries in chargeSnapshot
+      const snapshot = inquiry.chargeSnapshot as any;
+      const savedEntries = snapshot?.entries;
+      if (Array.isArray(savedEntries) && savedEntries.length > 0) {
+        // Multi-item bill: restore all entries, clear the current-item fields
+        setEntries(savedEntries.map((e: any) => ({
+          grade: e.grade,
+          gradeName: e.gradeName,
+          sacks: e.sacks,
+          weightPerSack: e.weightPerSack,
+          totalWeight: e.totalWeight,
+          ratePerKg: e.ratePerKg,
+          grossAmount: e.grossAmount,
+          apmcAmount: e.apmcAmount,
+          bardanaAmount: e.bardanaAmount,
+          cartageAmount: e.cartageAmount,
+          netAmount: e.netAmount,
+          agentPurchaseRate: e.agentPurchaseRate ?? 0,
+          agentPurchaseAmount: e.agentPurchaseAmount ?? 0,
+        })));
+        // Leave current-item fields empty for adding new items
+        setGrade(null);
+        setSacks('');
+        setWeightPerSack('');
+        setRate('');
+      } else {
+        // Single-item bill: populate the current-item fields directly
+        setGrade(inquiry.grade);
+        setSacks(String(inquiry.sacks));
+        setWeightPerSack(String(inquiry.weightPerSack));
+        setRate(inquiry.ratePerKg > 0 ? String(inquiry.ratePerKg) : '');
+      }
 
       setBoughtFromAgent(!inquiry.truckId);
       setSelectedTruckId(inquiry.truckId);
@@ -134,7 +164,8 @@ export default function EditBillScreen() {
       setApplyApmc(inquiry.applyApmc ?? true);
       setApplyBardana(inquiry.applyBardana ?? false);
       
-      const calcNet = inquiry.grossAmount + inquiry.apmcAmount + inquiry.bardanaAmount + inquiry.cartageAmount;
+      // Fix: net = gross + apmc + bardana (cartage is excluded from net in calculateCharges)
+      const calcNet = inquiry.grossAmount + inquiry.apmcAmount + inquiry.bardanaAmount;
       if (Math.abs(inquiry.netAmount - calcNet) > 0.1) {
         setManualTotal(String(inquiry.netAmount));
       }
@@ -147,7 +178,7 @@ export default function EditBillScreen() {
   const sacksNum = parseInt(sacks, 10) || 0;
   const weightPerSackNum = parseFloat(weightPerSack) || 0;
   const rateNum = parseFloat(rate) || 0;
-  const totalWeight = sacksNum * weightPerSackNum;
+  const currentItemWeight = sacksNum * weightPerSackNum;
 
   const selectedTruck = trucks.find(t => t.id === selectedTruckId) ?? null;
   const gradeOptions = selectedTruck?.gradeInventory.length
@@ -174,26 +205,112 @@ export default function EditBillScreen() {
         },
         applyApmc,
         applyBardana,
-        bardanaSacks: inquiry?.bardanaSacks ?? sacksNum,
-        bardanaRate: inquiry?.bardanaRate ?? shop.charges.bardanaPerSack ?? 0,
       })
     : null;
 
+  // Totals from entries + current item
+  const entriesTotalWeight = entries.reduce((s: number, e: any) => s + e.totalWeight, 0);
+  const entriesTotalGross = entries.reduce((s: number, e: any) => s + e.grossAmount, 0);
+  const entriesTotalApmc = entries.reduce((s: number, e: any) => s + e.apmcAmount, 0);
+  const entriesTotalBardana = entries.reduce((s: number, e: any) => s + e.bardanaAmount, 0);
+  const entriesTotalCartage = entries.reduce((s: number, e: any) => s + e.cartageAmount, 0);
+  const entriesTotalNet = entries.reduce((s: number, e: any) => s + e.netAmount, 0);
+  const totalWeight = entriesTotalWeight + (calc?.totalWeight ?? 0);
+  const totalGross = entriesTotalGross + (calc?.gross ?? 0);
+  const totalApmc = entriesTotalApmc + (calc?.apmc ?? 0);
+  const totalBardana = entriesTotalBardana + (calc?.bardana ?? 0);
+  const totalCartage = entriesTotalCartage + (calc?.cartage ?? 0);
+  const totalNet = entriesTotalNet + (calc?.net ?? 0);
+
+  const handleAddEntry = () => {
+    if (!grade || sacksNum <= 0 || weightPerSackNum <= 0) return;
+    const gradeInfo = gradeOptions.find(g => g.code === grade);
+    const gName = gradeInfo?.name ?? shop?.grades?.find(g => g.code === grade)?.name ?? grade;
+    const result = calc ?? calculateCharges({ sacks: sacksNum, weightPerSack: weightPerSackNum, ratePerKg: 0, charges: { apmcPct: 0, bardanaPerSack: 0, cartagePerKg: 0 }, applyApmc, applyBardana });
+    
+    setEntries([...entries, {
+      grade,
+      gradeName: gName,
+      sacks: sacksNum,
+      weightPerSack: weightPerSackNum,
+      totalWeight: result.totalWeight,
+      ratePerKg: rateNum,
+      grossAmount: result.gross,
+      apmcAmount: result.apmc,
+      bardanaAmount: result.bardana,
+      cartageAmount: result.cartage,
+      netAmount: result.net,
+      agentPurchaseRate: 0,
+      agentPurchaseAmount: 0,
+    }]);
+    setGrade(null);
+    setSacks('');
+    setWeightPerSack('');
+    setRate('');
+  };
+
+  const handleEditEntry = (idx: number, item: any) => {
+    setGrade(item.grade);
+    setSacks(String(item.sacks));
+    setWeightPerSack(String(item.weightPerSack));
+    setRate(item.ratePerKg > 0 ? String(item.ratePerKg) : '');
+    setEntries(entries.filter((_: any, i: number) => i !== idx));
+  };
+
   const validate = () => {
     const e: Record<string, string> = {};
-    if (!grade) e.grade = 'ग्रेड चुनें / Select grade';
-    if (sacksNum <= 0) e.sacks = 'बोरे डालें / Enter sacks';
-    if (weightPerSackNum <= 0) e.weight = 'वजन डालें / Enter weight';
-    if (!rate.trim() || rateNum <= 0) e.rate = 'रेट डालें / Enter rate';
+    // If there are no entries yet, require current item fields
+    if (entries.length === 0) {
+      if (!grade) e.grade = 'ग्रेड चुनें / Select grade';
+      if (sacksNum <= 0) e.sacks = 'बोरे डालें / Enter sacks';
+      if (weightPerSackNum <= 0) e.weight = 'वजन डालें / Enter weight';
+    }
+    // If there are entries OR current item, at least one must have data
+    if (entries.length === 0 && sacksNum <= 0) e.sacks = 'बोरे डालें / Enter sacks';
     setErrors(e);
     return e;
   };
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      if (!shop?.shopId || !calc || !inquiry) throw new Error('Missing data');
+      if (!shop?.shopId || !inquiry) throw new Error('Missing data');
 
-      const newNetAmount = manualTotal ? (parseFloat(manualTotal) || calc.net) : calc.net;
+      // Combine existing entries with the current one if valid
+      const allEntries = [...entries];
+      if (grade && sacksNum > 0 && weightPerSackNum > 0) {
+        const gradeInfo = gradeOptions.find(g => g.code === grade);
+        const gName = gradeInfo?.name ?? shop?.grades?.find(g => g.code === grade)?.name ?? grade;
+        const result = calc ?? calculateCharges({ sacks: sacksNum, weightPerSack: weightPerSackNum, ratePerKg: 0, charges: { apmcPct: 0, bardanaPerSack: 0, cartagePerKg: 0 }, applyApmc, applyBardana });
+        allEntries.push({
+          grade,
+          gradeName: gName,
+          sacks: sacksNum,
+          weightPerSack: weightPerSackNum,
+          totalWeight: result.totalWeight,
+          ratePerKg: rateNum,
+          grossAmount: result.gross,
+          apmcAmount: result.apmc,
+          bardanaAmount: result.bardana,
+          cartageAmount: result.cartage,
+          netAmount: result.net,
+          agentPurchaseRate: 0,
+          agentPurchaseAmount: 0,
+        });
+      }
+
+      if (allEntries.length === 0) throw new Error('कम से कम एक आइटम जोड़ें / Add at least one item');
+
+      const finalTotalSacks = allEntries.reduce((sum: number, e: any) => sum + e.sacks, 0);
+      const finalTotalWeight = allEntries.reduce((sum: number, e: any) => sum + e.totalWeight, 0);
+      const finalTotalGross = allEntries.reduce((sum: number, e: any) => sum + e.grossAmount, 0);
+      const finalTotalApmc = allEntries.reduce((sum: number, e: any) => sum + e.apmcAmount, 0);
+      const finalTotalBardana = allEntries.reduce((sum: number, e: any) => sum + e.bardanaAmount, 0);
+      const finalTotalCartage = allEntries.reduce((sum: number, e: any) => sum + e.cartageAmount, 0);
+      const finalTotalNet = allEntries.reduce((sum: number, e: any) => sum + e.netAmount, 0);
+      const finalNet = manualTotal ? (parseFloat(manualTotal) || finalTotalNet) : finalTotalNet;
+
+      const mainGrade = allEntries.length > 1 ? 'MIXED' : allEntries[0].grade;
+      const mainGradeName = allEntries.length > 1 ? 'Multiple Items' : allEntries[0].gradeName;
 
       const nextInquiryUpdate = {
         truck_id: boughtFromAgent ? null : selectedTruckId,
@@ -202,23 +319,31 @@ export default function EditBillScreen() {
         source_agent_phone: boughtFromAgent ? sourceAgentPhone.trim() : '',
         customer_name: customerName.trim(),
         customer_phone: customerPhone.trim(),
-        grade,
-        grade_name: gradeName,
-        sacks: sacksNum,
-        weight_per_sack: weightPerSackNum,
-        total_weight: calc.totalWeight,
-        rate_per_kg: rateNum,
-        gross_amount: calc.gross,
-        apmc_amount: calc.apmc,
-        bardana_amount: calc.bardana,
-        cartage_amount: calc.cartage,
-        net_amount: newNetAmount,
-        agent_purchase_amount: boughtFromAgent && inquiry.sourceAgentName === sourceAgentName.trim() ? inquiry.agentPurchaseAmount : (boughtFromAgent ? null : null),
+        grade: mainGrade,
+        grade_name: mainGradeName,
+        sacks: finalTotalSacks,
+        weight_per_sack: allEntries.length === 1 ? allEntries[0].weightPerSack : 0,
+        total_weight: finalTotalWeight,
+        rate_per_kg: allEntries.length === 1 ? allEntries[0].ratePerKg : 0,
+        gross_amount: finalTotalGross,
+        apmc_amount: finalTotalApmc,
+        bardana_amount: finalTotalBardana,
+        cartage_amount: finalTotalCartage,
+        net_amount: finalNet,
+        agent_purchase_amount: boughtFromAgent ? allEntries.reduce((sum: number, e: any) => sum + (e.agentPurchaseAmount || 0), 0) : 0,
         payment_mode: paymentMode,
         upi_ref: upiRef,
         apply_apmc: applyApmc,
         apply_bardana: applyBardana,
-        charge_snapshot: inquiry.chargeSnapshot,
+        charge_snapshot: {
+          ...(inquiry.chargeSnapshot as any),
+          apmcCommission: shop!.charges?.apmcCommission ?? 0,
+          bardanaPerSack: shop!.charges?.bardanaPerSack ?? 0,
+          cartagePerKg: shop!.charges?.cartagePerKg ?? 0,
+          applyApmc,
+          applyBardana,
+          entries: allEntries,
+        },
       };
 
       const { error } = await supabase.from('inquiries').update(nextInquiryUpdate).eq('id', inquiry.id);
@@ -235,7 +360,7 @@ export default function EditBillScreen() {
           inquiry.customerPhone,
           inquiry.status,
           paymentMode,
-          newNetAmount,
+          finalNet,
           customerName,
           customerPhone
         );
@@ -508,9 +633,39 @@ export default function EditBillScreen() {
             style={inputStyle}
           />
 
+          {/* Added Items List */}
+          {entries.length > 0 && (
+            <View style={{ marginTop: Spacing.md, marginBottom: Spacing.sm }}>
+              <SectionHeader title="Added Items / जुड़े हुए आइटम" />
+              <View style={{ backgroundColor: '#FFF', borderRadius: Radius.md, borderWidth: 1, borderColor: Colors.border, overflow: 'hidden' }}>
+                {entries.map((item: any, idx: number) => (
+                  <Pressable key={idx} onPress={() => handleEditEntry(idx, item)} style={({pressed}) => ({ flexDirection: 'row', justifyContent: 'space-between', padding: Spacing.md, borderBottomWidth: idx < entries.length - 1 ? 1 : 0, borderBottomColor: '#F3F4F6', alignItems: 'center', backgroundColor: pressed ? '#F8FAFC' : 'transparent' })}>
+                    <View>
+                      <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>{item.grade} - {item.gradeName} • {item.sacks} qty</Text>
+                      <Text style={{ fontSize: 13, color: '#6B7280' }}>
+                        {item.totalWeight}kg{item.ratePerKg ? ` @ ₹${item.ratePerKg}/kg` : ''}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+                      <Text style={{ fontSize: 15, fontWeight: '800', color: '#166534' }}>₹{Math.round(item.grossAmount)}</Text>
+                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                        <Pressable onPress={() => handleEditEntry(idx, item)} style={{ padding: 6, backgroundColor: '#EFF6FF', borderRadius: 6 }}>
+                          <Text style={{ fontSize: 16 }}>✏️</Text>
+                        </Pressable>
+                        <Pressable onPress={() => setEntries(entries.filter((_: any, i: number) => i !== idx))} style={{ padding: 6, backgroundColor: '#FEF2F2', borderRadius: 6 }}>
+                          <Trash2 size={20} color="#DC2626" />
+                        </Pressable>
+                      </View>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+          )}
+
           {/* Grade Section */}
           <View onLayout={rememberSection('grade')}>
-            <SectionHeader title="ग्रेड चुनें / Select Grade" />
+            <SectionHeader title={entries.length > 0 ? "Add Another Item - Grade" : "ग्रेड चुनें / Select Grade"} />
           </View>
           {errors.grade ? (
             <Text style={{ fontSize: FontSize.xs, color: Colors.danger, marginBottom: 6 }}>
@@ -594,9 +749,20 @@ export default function EditBillScreen() {
                 value={rate}
                 onChangeText={(v) => { setRate(v); if (errors.rate) setErrors(prev => { const { rate: _, ...rest } = prev; return rest; }); }}
                 keyboardType="decimal-pad"
+                returnKeyType="done"
+                onSubmitEditing={handleAddEntry}
                 style={[inputStyle, errors.rate ? { borderColor: Colors.danger } : {}]}
               />
               {errors.rate ? <Text style={{ fontSize: 11, color: Colors.danger, marginTop: 2 }}>{errors.rate}</Text> : null}
+            </View>
+            <View style={{ marginTop: 20 }}>
+              <Pressable
+                onPress={handleAddEntry}
+                style={{ height: 52, backgroundColor: Colors.primary, paddingHorizontal: 20, borderRadius: Radius.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+              >
+                <Plus size={20} color="#FFF" />
+                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: 16 }}>ADD</Text>
+              </Pressable>
             </View>
           </View>
 
@@ -625,7 +791,7 @@ export default function EditBillScreen() {
 
           {/* Calculation Preview */}
 
-          {calc ? (
+          {totalNet > 0 ? (
             <View
               style={{
                 marginTop: Spacing.lg,
@@ -641,14 +807,15 @@ export default function EditBillScreen() {
               <Text style={{ fontSize: FontSize.sm, fontWeight: '800', color: Colors.text, marginBottom: Spacing.sm }}>
                 Bill Preview / बिल पूर्वावलोकन
               </Text>
-              <CalcRow label="Total Weight" value={toIndianWeight(calc.totalWeight)} />
-              <CalcRow label="Gross Amount" value={toIndianCurrency(calc.gross)} />
-              {calc.apmc > 0 ? <CalcRow label="APMC" value={`+${toIndianCurrency(calc.apmc)}`} color={Colors.text} /> : null}
-              {calc.bardana > 0 ? <CalcRow label="Bardana" value={`+${toIndianCurrency(calc.bardana)}`} color={Colors.text} /> : null}
-              {calc.cartage > 0 ? <CalcRow label="Cartage" value={`+${toIndianCurrency(calc.cartage)}`} color={Colors.text} /> : null}
+              <CalcRow label="Total Weight" value={toIndianWeight(totalWeight)} />
+              <CalcRow label="Gross Amount" value={toIndianCurrency(totalGross)} />
+              {totalApmc > 0 ? <CalcRow label="APMC" value={`+${toIndianCurrency(totalApmc)}`} color={Colors.text} /> : null}
+              {totalBardana > 0 ? <CalcRow label="Bardana" value={`+${toIndianCurrency(totalBardana)}`} color={Colors.text} /> : null}
+
+
               <View style={{ height: 1, backgroundColor: Colors.border, marginVertical: Spacing.xs }} />
               
-              <CalcRow label="Calculated Net Amount" value={toIndianCurrency(calc.net)} bold />
+              <CalcRow label="Calculated Net Amount" value={toIndianCurrency(totalNet)} bold />
               
               <View style={{ marginTop: Spacing.sm }}>
                 <Text style={{ fontSize: FontSize.xs, color: Colors.textSecond, marginBottom: 4 }}>
