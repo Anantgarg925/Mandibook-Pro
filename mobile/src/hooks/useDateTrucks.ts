@@ -89,12 +89,17 @@ export function useDateTrucks(date: Date) {
         .order('created_at', { ascending: false });
       if (error) throw new Error(error.message);
       const trucks = (data ?? []).map((r: unknown) => mapTruck(r as Record<string, unknown>)) as Truck[];
+      if (trucks.length === 0) {
+        return trucks;
+      }
+      
+      const truckIds = trucks.map(t => t.id);
+
       const { data: inquiryRows, error: inquiryError } = await supabase
         .from('inquiries')
         .select('truck_id, grade, grade_name, total_weight, status')
         .eq('shop_id', shop!.shopId)
-        .gte('date', dateParam)
-        .lte('date', dateEnd);
+        .in('truck_id', truckIds);
       if (inquiryError) throw new Error(inquiryError.message);
       return attachBillSummary(trucks, (inquiryRows ?? []) as InquiryRow[], shop?.grades ?? []);
     },
