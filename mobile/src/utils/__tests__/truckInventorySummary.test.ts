@@ -1,4 +1,4 @@
-import { attachBillSummaryToTrucks, getTruckSoldKg } from '../truckInventorySummary';
+import { attachBillSummaryToTrucks, getTruckAvailableKg, getTruckSoldKg } from '../truckInventorySummary';
 import type { Truck } from '@/types/truck';
 
 const baseTruck: Truck = {
@@ -82,5 +82,17 @@ describe('truckInventorySummary', () => {
     expect(truck.gradeInventory.find((grade) => grade.code === 'V')?.confirmedKg).toBe(2000);
     expect(truck.gradeInventory.find((grade) => grade.code === 'CHURA')?.confirmedKg).toBe(840);
     expect(truck.gradeInventory.find((grade) => grade.code === 'MIXED')).toBeUndefined();
+  });
+
+  it('subtracts wastage from available stock', () => {
+    const truck = {
+      ...baseTruck,
+      wastageKg: 2739,
+      gradeInventory: [
+        { code: 'III', name: 'Small', totalKg: 17140, confirmedKg: 11587, provisionalKg: 0 },
+      ],
+    };
+
+    expect(getTruckAvailableKg(truck)).toBe(2814);
   });
 });

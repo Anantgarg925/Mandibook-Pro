@@ -97,3 +97,7 @@ export function attachBillSummaryToTrucks(
 export function getTruckSoldKg(truck: Truck) {
   return truck.gradeInventory.reduce((sum, grade) => sum + grade.confirmedKg + grade.provisionalKg, 0);
 }
+
+export function getTruckAvailableKg(truck: Truck) {
+  return Math.max(0, truck.totalKg - getTruckSoldKg(truck) - (truck.wastageKg || 0));
+}

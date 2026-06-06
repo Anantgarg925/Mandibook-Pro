@@ -31,7 +31,7 @@ import { APP_SESSION_KEY, MEMBER_SESSION_KEY, IMPERSONATION_KEY } from '@/lib/se
 import { getCurrentBusinessDate } from '@/lib/businessDay';
 import { mapShop, supabase } from '@/lib/supabase';
 import { resetToRoute } from '@/utils/navigation';
-import { attachBillSummaryToTrucks, getTruckSoldKg } from '@/utils/truckInventorySummary';
+import { attachBillSummaryToTrucks, getTruckAvailableKg, getTruckSoldKg } from '@/utils/truckInventorySummary';
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: '#604100',
@@ -191,16 +191,9 @@ function MetricCard({
 
 const TruckCard = memo(function TruckCard({ truck, onPress }: { truck: any; onPress: () => void }) {
   const totalKg: number = truck.totalKg;
-  const confirmedKg: number = truck.gradeInventory.reduce(
-    (s: number, g: any) => s + g.confirmedKg,
-    0
-  );
-  const provisionalKg: number = truck.gradeInventory.reduce(
-    (s: number, g: any) => s + g.provisionalKg,
-    0
-  );
-  const availableKg = Math.max(0, totalKg - confirmedKg - provisionalKg);
-  const soldPct = totalKg > 0 ? Math.round(((confirmedKg + provisionalKg) / totalKg) * 100) : 0;
+  const soldKg = getTruckSoldKg(truck);
+  const availableKg = getTruckAvailableKg(truck);
+  const soldPct = totalKg > 0 ? Math.round((soldKg / totalKg) * 100) : 0;
 
   return (
     <Pressable onPress={onPress}>
@@ -534,8 +527,7 @@ export default function HomeScreen() {
   );
   const totalStock = useMemo(() => dashboardTrucks.reduce(
     (sum, t) => {
-      const soldKg = getTruckSoldKg(t);
-      return sum + Math.max(0, t.totalKg - soldKg);
+      return sum + getTruckAvailableKg(t);
     },
     0
   ), [dashboardTrucks]);
