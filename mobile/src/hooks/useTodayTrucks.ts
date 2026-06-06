@@ -12,6 +12,7 @@ type InquiryRow = {
   grade_name: string;
   total_weight: number;
   status: string;
+  syncStatus?: string | null;
   charge_snapshot?: unknown;
 };
 
@@ -40,7 +41,7 @@ export function useTodayTrucks() {
       
       const { data: inquiryRows, error: inquiryError } = await supabase
         .from('inquiries')
-        .select('truck_id, grade, grade_name, total_weight, status, charge_snapshot')
+        .select('truck_id, grade, grade_name, total_weight, status, syncStatus, charge_snapshot')
         .eq('shop_id', shop!.shopId)
         .in('truck_id', truckIds);
       if (inquiryError) throw new Error(inquiryError.message);

@@ -10,6 +10,7 @@ type InquirySummaryRow =
       grade_name: string;
       total_weight: number;
       status: string;
+      syncStatus?: string | null;
       charge_snapshot?: unknown;
     }
   | Inquiry;
@@ -74,7 +75,15 @@ export function attachBillSummaryToTrucks(
     });
 
     rows.forEach((row) => {
-      if (getRowTruckId(row) !== truck.id || getRowStatus(row) === 'CANCELLED') return;
+      const syncStatus = 'syncStatus' in row ? (row.syncStatus ?? undefined) : undefined;
+
+      if (
+        getRowTruckId(row) !== truck.id ||
+        getRowStatus(row) === 'CANCELLED' ||
+        syncStatus === 'conflict'
+      ) {
+        return;
+      }
 
       getBillEntries(row).forEach((entry) => {
         const code = entry.grade || getRowGrade(row).code || 'UNKNOWN';

@@ -1,0 +1,4 @@
+- [ ] Inspect and update `mobile/src/hooks/useTodayTrucks.ts` to fetch `syncStatus` from `inquiries`
+- [ ] Update `mobile/src/utils/truckInventorySummary.ts` to ignore inquiries with `syncStatus === "conflict"` while still counting `PENDING`
+- [ ] Run TypeScript/lint checks for mobile
+- [ ] Sanity-check inventory numbers after sync-offline conflict scenarios
