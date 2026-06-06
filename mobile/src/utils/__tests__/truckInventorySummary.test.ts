@@ -1,4 +1,9 @@
-import { attachBillSummaryToTrucks, getTruckAvailableKg, getTruckSoldKg } from '../truckInventorySummary';
+import {
+  attachBillSummaryToTrucks,
+  getTruckAccountedPct,
+  getTruckAvailableKg,
+  getTruckSoldKg,
+} from '../truckInventorySummary';
 import type { Truck } from '@/types/truck';
 
 const baseTruck: Truck = {
@@ -94,5 +99,6 @@ describe('truckInventorySummary', () => {
     };
 
     expect(getTruckAvailableKg(truck)).toBe(2814);
+    expect(getTruckAccountedPct(truck)).toBe(84);
   });
 });

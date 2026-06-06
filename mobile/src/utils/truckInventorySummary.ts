@@ -101,3 +101,12 @@ export function getTruckSoldKg(truck: Truck) {
 export function getTruckAvailableKg(truck: Truck) {
   return Math.max(0, truck.totalKg - getTruckSoldKg(truck) - (truck.wastageKg || 0));
 }
+
+export function getTruckAccountedKg(truck: Truck) {
+  return Math.max(0, truck.totalKg - getTruckAvailableKg(truck));
+}
+
+export function getTruckAccountedPct(truck: Truck) {
+  if (truck.totalKg <= 0) return 0;
+  return Math.min(100, Math.round((getTruckAccountedKg(truck) / truck.totalKg) * 100));
+}

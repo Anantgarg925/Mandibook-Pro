@@ -31,7 +31,7 @@ import { APP_SESSION_KEY, MEMBER_SESSION_KEY, IMPERSONATION_KEY } from '@/lib/se
 import { getCurrentBusinessDate } from '@/lib/businessDay';
 import { mapShop, supabase } from '@/lib/supabase';
 import { resetToRoute } from '@/utils/navigation';
-import { attachBillSummaryToTrucks, getTruckAvailableKg, getTruckSoldKg } from '@/utils/truckInventorySummary';
+import { attachBillSummaryToTrucks, getTruckAccountedPct, getTruckAvailableKg } from '@/utils/truckInventorySummary';
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: '#604100',
@@ -190,10 +190,8 @@ function MetricCard({
 }
 
 const TruckCard = memo(function TruckCard({ truck, onPress }: { truck: any; onPress: () => void }) {
-  const totalKg: number = truck.totalKg;
-  const soldKg = getTruckSoldKg(truck);
   const availableKg = getTruckAvailableKg(truck);
-  const soldPct = totalKg > 0 ? Math.round((soldKg / totalKg) * 100) : 0;
+  const accountedPct = getTruckAccountedPct(truck);
 
   return (
     <Pressable onPress={onPress}>
@@ -252,8 +250,8 @@ const TruckCard = memo(function TruckCard({ truck, onPress }: { truck: any; onPr
           {/* Progress bar */}
           <View>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: Spacing.sm }}>
-              <Text style={{ fontSize: 10, color: UI.muted, fontWeight: '800' }}>SOLD INVENTORY</Text>
-              <Text style={{ fontSize: FontSize.xs, fontWeight: '800', color: UI.muted }}>{soldPct}%</Text>
+              <Text style={{ fontSize: 10, color: UI.muted, fontWeight: '800' }}>STOCK ACCOUNTED</Text>
+              <Text style={{ fontSize: FontSize.xs, fontWeight: '800', color: UI.muted }}>{accountedPct}%</Text>
             </View>
             <View
               style={{
@@ -266,7 +264,7 @@ const TruckCard = memo(function TruckCard({ truck, onPress }: { truck: any; onPr
               <View
                 style={{
                   height: 8,
-                  width: `${soldPct}%`,
+                  width: `${accountedPct}%`,
                   backgroundColor: UI.primary,
                   borderRadius: Radius.round,
                 }}
