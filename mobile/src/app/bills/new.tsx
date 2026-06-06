@@ -494,6 +494,7 @@ export default function NewBillScreen() {
       queryClient.invalidateQueries({ queryKey: ['inquiries', shop?.shopId] });
       queryClient.invalidateQueries({ queryKey: ['trucks', shop?.shopId] });
       queryClient.invalidateQueries({ queryKey: ['buyers', shop?.shopId] });
+      queryClient.invalidateQueries({ queryKey: ['transactions', shop?.shopId] });
     },
   });
 
