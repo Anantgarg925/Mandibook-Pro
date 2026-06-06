@@ -127,19 +127,23 @@ export async function processOfflineQueue(supabaseClient: any): Promise<boolean>
           
           try {
             if (payload.buyerUpsert) {
-              const { data: existing } = await supabaseClient
+              const { data: buyersRows } = await supabaseClient
                 .from('buyers')
-                .select('id')
-                .or(`phone.eq.${payload.buyerUpsert.phone},name.ilike.${payload.buyerUpsert.name}`)
-                .eq('shop_id', dbInq.shop_id)
-                .maybeSingle();
+                .select('id, name, phone')
+                .eq('shop_id', dbInq.shop_id);
+
+              const existing = (buyersRows || []).find((b: any) => {
+                const phoneMatch = !!payload.buyerUpsert.phone && b.phone === payload.buyerUpsert.phone;
+                const nameMatch = !!payload.buyerUpsert.name && !!b.name && b.name.toLowerCase() === payload.buyerUpsert.name.toLowerCase();
+                return phoneMatch || nameMatch;
+              });
 
               if (!existing) {
                 await supabaseClient.from('buyers').insert({
                   shop_id: dbInq.shop_id,
                   code: `B${Date.now()}`,
                   name: payload.buyerUpsert.name,
-                  phone: payload.buyerUpsert.phone,
+                  phone: payload.buyerUpsert.phone || '',
                   preferred_payment_mode: dbInq.payment_mode,
                   last_transaction_date: Date.now(),
                   created_at: Date.now(),
@@ -151,7 +155,9 @@ export async function processOfflineQueue(supabaseClient: any): Promise<boolean>
                   .eq('id', existing.id);
               }
             }
-          } catch { /* best-effort */ }
+          } catch (err) {
+            console.error('Best effort buyer upsert failed', err);
+          }
         }
         
         if (isSuccess) {
