@@ -376,6 +376,7 @@ export default function NewBillScreen() {
             if (!existing) {
               await supabase.from('buyers').insert({
                 shop_id: shop!.shopId,
+                code: `B${Date.now()}`,
                 name: payload.buyerUpsert.name,
                 phone: payload.buyerUpsert.phone,
                 preferred_payment_mode: payload.inquiry.paymentMode,

@@ -137,6 +137,7 @@ export async function processOfflineQueue(supabaseClient: any): Promise<boolean>
               if (!existing) {
                 await supabaseClient.from('buyers').insert({
                   shop_id: dbInq.shop_id,
+                  code: `B${Date.now()}`,
                   name: payload.buyerUpsert.name,
                   phone: payload.buyerUpsert.phone,
                   preferred_payment_mode: dbInq.payment_mode,
