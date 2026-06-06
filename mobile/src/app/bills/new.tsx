@@ -592,6 +592,8 @@ export default function NewBillScreen() {
     Keyboard.dismiss();
     // Immediate lock to prevent duplicate clicks (especially during offline/slow saves)
     if (isSavingRef.current || success) return;
+    isSavingRef.current = true; // Lock immediately!
+
     // Global validation for truck/agent
     const globalErrors: Record<string, string> = {};
     if (!boughtFromAgent && !selectedTruck) globalErrors.truck = 'गाड़ी चुनें';
@@ -608,9 +610,10 @@ export default function NewBillScreen() {
       isSavingRef.current = false;
       return;
     }
-    if (saveMutation.isPending) return;
-    
-    isSavingRef.current = true;
+    if (saveMutation.isPending) {
+      isSavingRef.current = false;
+      return;
+    }
 
     const slip = slipNumber ?? 1001;
 
@@ -638,7 +641,10 @@ export default function NewBillScreen() {
       });
     }
 
-    if (allEntries.length === 0) return;
+    if (allEntries.length === 0) {
+      isSavingRef.current = false;
+      return;
+    }
 
     const totalSacks = allEntries.reduce((sum, e) => sum + e.sacks, 0);
     const totalWeight = allEntries.reduce((sum, e) => sum + e.totalWeight, 0);
