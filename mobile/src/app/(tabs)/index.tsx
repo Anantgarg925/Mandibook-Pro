@@ -31,6 +31,7 @@ import { APP_SESSION_KEY, MEMBER_SESSION_KEY, IMPERSONATION_KEY } from '@/lib/se
 import { getCurrentBusinessDate } from '@/lib/businessDay';
 import { mapShop, supabase } from '@/lib/supabase';
 import { resetToRoute } from '@/utils/navigation';
+import { attachBillSummaryToTrucks, getTruckSoldKg } from '@/utils/truckInventorySummary';
 
 const STATUS_COLOR: Record<string, string> = {
   PENDING: '#604100',
@@ -527,16 +528,17 @@ export default function HomeScreen() {
   }, [launchComplete, launchVisible, pinVisible, setLaunchComplete]);
 
   const todaySale = useMemo(() => confirmed.reduce((s, i) => s + i.netAmount, 0), [confirmed]);
-  const totalStock = useMemo(() => trucks.reduce(
+  const dashboardTrucks = useMemo(
+    () => billsLoading ? trucks : attachBillSummaryToTrucks(trucks, inquiries, shop?.grades ?? []),
+    [billsLoading, inquiries, shop?.grades, trucks]
+  );
+  const totalStock = useMemo(() => dashboardTrucks.reduce(
     (sum, t) => {
-      const soldKg = t.gradeInventory.reduce(
-        (s: number, g: any) => s + g.confirmedKg + g.provisionalKg,
-        0
-      );
+      const soldKg = getTruckSoldKg(t);
       return sum + Math.max(0, t.totalKg - soldKg);
     },
     0
-  ), [trucks]);
+  ), [dashboardTrucks]);
 
   const initials = useMemo(() =>
     shop?.firmName
@@ -559,7 +561,7 @@ export default function HomeScreen() {
     [inquiries, search]
   );
 
-  const visibleTrucks = useMemo(() => trucks.slice(0, 3), [trucks]);
+  const visibleTrucks = useMemo(() => dashboardTrucks.slice(0, 3), [dashboardTrucks]);
 
   if (!launchComplete) {
     return (
@@ -896,7 +898,7 @@ export default function HomeScreen() {
             ) : null}
 
             {/* ── Today's Trucks (vertical cards) ── */}
-            {trucks.length > 0 ? (
+            {dashboardTrucks.length > 0 ? (
               <SectionCard>
                 {/* Section header */}
                 <View
