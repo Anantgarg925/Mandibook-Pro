@@ -16,21 +16,55 @@ type InquiryRow = {
 function attachBillSummary(trucks: Truck[], rows: InquiryRow[], grades: { code: string; name: string }[]): Truck[] {
   return trucks.map((truck) => {
     const bills = rows.filter((row) => row.truck_id === truck.id && row.status !== 'CANCELLED');
-    const gradeInventory = grades.map((grade) => {
-      const gradeBills = bills.filter((bill) => bill.grade === grade.code);
-      return {
+    const gradeMap = new Map<string, any>();
+
+    // 1. Initialize with shop grades
+    grades.forEach((grade) => {
+      gradeMap.set(grade.code, {
         code: grade.code,
         name: grade.name,
-        totalKg: truck.gradeInventory?.find((g: any) => g.code === grade.code)?.totalKg || 0,
-        confirmedKg: gradeBills
-          .filter((bill) => bill.status === 'CONFIRMED')
-          .reduce((sum, bill) => sum + (bill.total_weight || 0), 0),
-        provisionalKg: gradeBills
-          .filter((bill) => bill.status === 'PENDING' || bill.status === 'DELIVERED')
-          .reduce((sum, bill) => sum + (bill.total_weight || 0), 0),
-      };
+        totalKg: 0,
+        confirmedKg: 0,
+        provisionalKg: 0,
+      });
     });
-    return { ...truck, gradeInventory };
+
+    // 2. Add existing truck inventory grades
+    (truck.gradeInventory || []).forEach((g: any) => {
+      if (!gradeMap.has(g.code)) {
+        gradeMap.set(g.code, {
+          code: g.code,
+          name: g.name || g.code,
+          totalKg: g.totalKg || 0,
+          confirmedKg: 0,
+          provisionalKg: 0,
+        });
+      } else {
+        gradeMap.get(g.code)!.totalKg = g.totalKg || 0;
+      }
+    });
+
+    // 3. Process all active bills
+    bills.forEach((bill) => {
+      const code = bill.grade || 'UNKNOWN';
+      if (!gradeMap.has(code)) {
+        gradeMap.set(code, {
+          code,
+          name: bill.grade_name || code,
+          totalKg: 0,
+          confirmedKg: 0,
+          provisionalKg: 0,
+        });
+      }
+      const g = gradeMap.get(code)!;
+      if (bill.status === 'CONFIRMED') {
+        g.confirmedKg += bill.total_weight || 0;
+      } else {
+        g.provisionalKg += bill.total_weight || 0;
+      }
+    });
+
+    return { ...truck, gradeInventory: Array.from(gradeMap.values()) };
   });
 }
 
