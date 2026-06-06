@@ -38,7 +38,7 @@ export function calculateCharges(params: ChargeParams): ChargeResult {
   const apmc = applyApmc ? gross * (charges.apmcPct / 100) : 0;
   const bardana = applyBardana ? bardanaSacks * bardanaRate : 0;
   const cartage = totalWeight * charges.cartagePerKg;
-  const net = gross + apmc + bardana + cartage;
+  const net = gross + apmc + bardana;
   return { totalWeight, gross, apmc, bardana, cartage, net };
 }
 
@@ -50,7 +50,7 @@ export function calculateBill(totalWeight: number, ratePerKg: number, charges: {
   const gross = totalWeight * ratePerKg;
   const apmc = gross * ((charges.apmcCommission ?? 0) / 100);
   const cartage = totalWeight * (charges.cartagePerKg ?? 0);
-  const net = gross + apmc + cartage;
+  const net = gross + apmc;
   return {
     gross,
     apmc,
