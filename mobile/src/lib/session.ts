@@ -8,4 +8,5 @@ export type AppSession = {
   phone: string;
   role: string;
   sessionToken?: string;
+  ariaToken?: string;
 };

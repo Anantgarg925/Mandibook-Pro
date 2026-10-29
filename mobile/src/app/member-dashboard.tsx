@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View, Text, FlatList, Pressable, StyleSheet, BackHandler,
   Modal, KeyboardAvoidingView, ScrollView, TextInput, Alert
@@ -6,6 +6,9 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Speech from 'expo-speech';
 import { MaterialIcons } from '@expo/vector-icons';
 import { Bell, LogOut } from 'lucide-react-native';
 import { useShop } from '@/context/ShopContext';
@@ -24,12 +27,14 @@ import { useUgrai } from '@/hooks/useUgrai';
 import { useBuyers } from '@/hooks/useBuyers';
 import type { Buyer } from '@/types/inquiry';
 import { ThekedaarDashboard } from '@/components/ThekedaarDashboard';
+import { queryAria, queryAriaByVoice } from '@/lib/aria';
 
 type MemberSession = {
   id: string;
   name: string;
   phone: string;
   role: string;
+  ariaToken?: string;
 };
 
 const STATUS_COLOR: Record<string, string> = {
@@ -78,6 +83,14 @@ export default function MemberDashboardScreen() {
   const { unreadCount } = useBillNotifications();
   const { launchComplete, setLaunchComplete, sessionHydrated } = useLaunch();
   const [member, setMember] = useState<MemberSession | null>(null);
+  const [showAriaModal, setShowAriaModal] = useState(false);
+  const [ariaQuery, setAriaQuery] = useState('');
+  const [ariaResponse, setAriaResponse] = useState('');
+  const [ariaError, setAriaError] = useState('');
+  const [ariaLoading, setAriaLoading] = useState(false);
+  const [ariaRecording, setAriaRecording] = useState<Audio.Recording | null>(null);
+  const [ariaTranscript, setAriaTranscript] = useState('');
+  const ariaRecordingRef = useRef<Audio.Recording | null>(null);
 
   const { addCollection } = useUgrai();
   const { buyers } = useBuyers();
@@ -126,6 +139,150 @@ export default function MemberDashboardScreen() {
     }
   };
 
+  const closeAria = () => {
+    Speech.stop();
+    if (ariaRecordingRef.current) {
+      ariaRecordingRef.current.stopAndUnloadAsync().catch(() => {});
+      ariaRecordingRef.current = null;
+      setAriaRecording(null);
+    }
+    setShowAriaModal(false);
+  };
+
+  const openAria = () => {
+    setAriaError('');
+    setAriaResponse('');
+    setAriaQuery('');
+    setAriaTranscript('');
+    setShowAriaModal(true);
+  };
+
+  const speakAriaResponse = (text = ariaResponse) => {
+    const cleanText = text.trim();
+    if (!cleanText) return;
+    Speech.stop();
+    Speech.speak(cleanText, {
+      language: 'en-IN',
+      rate: 0.95,
+      pitch: 1,
+    });
+  };
+
+  const handleAskAria = async () => {
+    const query = ariaQuery.trim();
+    if (!query || ariaLoading) return;
+
+    setAriaLoading(true);
+    setAriaError('');
+    try {
+      const result = await queryAria({
+        query,
+        token: member?.ariaToken,
+      });
+
+      if (result.error || !result.response) {
+        setAriaError(result.error || 'ARIA did not return a response.');
+        setAriaResponse('');
+        return;
+      }
+
+      setAriaResponse(result.response);
+      speakAriaResponse(result.response);
+    } catch (err) {
+      setAriaError((err as Error).message || 'Could not reach ARIA.');
+      setAriaResponse('');
+    } finally {
+      setAriaLoading(false);
+    }
+  };
+
+  const handleToggleAriaRecording = async () => {
+    if (ariaLoading) return;
+
+    if (ariaRecording) {
+      const recording = ariaRecording;
+      ariaRecordingRef.current = null;
+      setAriaRecording(null);
+      setAriaLoading(true);
+      setAriaError('');
+      setAriaTranscript('');
+
+      try {
+        await recording.stopAndUnloadAsync();
+        const uri = recording.getURI();
+        if (!uri) throw new Error('Recording was not saved.');
+
+        const audioBase64 = await FileSystem.readAsStringAsync(uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+        const result = await queryAriaByVoice({
+          audioBase64,
+          audioFormat: 'm4a',
+          token: member?.ariaToken,
+        });
+
+        if (result.error || !result.response) {
+          setAriaError(result.error || 'ARIA did not return a response.');
+          setAriaResponse('');
+          return;
+        }
+
+        setAriaTranscript(result.transcript || '');
+        setAriaQuery(result.transcript || '');
+        setAriaResponse(result.response);
+        speakAriaResponse(result.response);
+      } catch (err) {
+        setAriaError((err as Error).message || 'Could not process voice query.');
+        setAriaResponse('');
+      } finally {
+        setAriaLoading(false);
+      }
+      return;
+    }
+
+    try {
+      const permission = await Audio.requestPermissionsAsync();
+      if (!permission.granted) {
+        setAriaError('Microphone permission is required to ask ARIA by voice.');
+        return;
+      }
+
+      Speech.stop();
+      setAriaError('');
+      setAriaResponse('');
+      setAriaTranscript('');
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+      const { recording } = await Audio.Recording.createAsync(
+        Audio.RecordingOptionsPresets.HIGH_QUALITY
+      );
+      ariaRecordingRef.current = recording;
+      setAriaRecording(recording);
+    } catch (err) {
+      setAriaError((err as Error).message || 'Could not start recording.');
+      ariaRecordingRef.current = null;
+      setAriaRecording(null);
+    }
+  };
+
+  useEffect(() => {
+    if (!showAriaModal) return;
+
+    const intro = 'Ask ARIA. Type your question and I will read the answer aloud.';
+    const timer = setTimeout(() => {
+      Speech.stop();
+      Speech.speak(intro, {
+        language: 'en-IN',
+        rate: 0.95,
+        pitch: 1,
+      });
+    }, 250);
+
+    return () => clearTimeout(timer);
+  }, [showAriaModal]);
+
   useEffect(() => {
     if (sessionHydrated && !launchComplete) {
       router.replace('/access-choice' as any);
@@ -143,6 +300,15 @@ export default function MemberDashboardScreen() {
   useEffect(() => {
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => true);
     return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      Speech.stop();
+      if (ariaRecordingRef.current) {
+        ariaRecordingRef.current.stopAndUnloadAsync().catch(() => {});
+      }
+    };
   }, []);
 
   const logout = async () => {
@@ -264,6 +430,27 @@ export default function MemberDashboardScreen() {
                     </View>
                     <Text style={styles.actionSecondaryTitle}>Today's Trucks</Text>
                     <Text style={styles.actionSecondarySub}>आज की गाड़ियाँ</Text>
+                  </View>
+                )}
+              </Pressable>
+            </View>
+
+            <View style={[styles.actionRow, { paddingHorizontal: Math.max(Spacing.md, contentHPad), paddingTop: 0 }]}>
+              <Pressable
+                testID="member-aria-btn"
+                onPress={openAria}
+                style={{ flex: 1 }}
+              >
+                {({ pressed }) => (
+                  <View style={[styles.ariaCard, pressed && { opacity: 0.92 }]}>
+                    <View style={styles.ariaIconWrap}>
+                      <MaterialIcons name="mic" size={25} color="#FFFFFF" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.ariaCardTitle}>ARIA Voice Agent</Text>
+                      <Text style={styles.ariaCardSub}>आवाज़ में जवाब</Text>
+                    </View>
+                    <MaterialIcons name="chevron-right" size={24} color="#FFFFFF" />
                   </View>
                 )}
               </Pressable>
@@ -419,6 +606,124 @@ export default function MemberDashboardScreen() {
         }
         contentContainerStyle={{ paddingBottom: 80 + insets.bottom }}
       />
+
+      {/* ARIA response modal */}
+      <Modal
+        visible={showAriaModal}
+        transparent
+        animationType="slide"
+        hardwareAccelerated={true}
+        statusBarTranslucent={true}
+        onRequestClose={closeAria}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={closeAria}
+        >
+          <KeyboardAvoidingView behavior="padding" style={styles.modalKeyboard}>
+            <Pressable
+              style={[
+                styles.ariaSheet,
+                { paddingBottom: Math.max(Spacing.lg, insets.bottom + Spacing.md) },
+              ]}
+              onPress={() => {}}
+            >
+              <View style={styles.ariaSheetHeader}>
+                <View>
+                  <Text style={styles.ariaSheetTitle}>ARIA</Text>
+                  <Text style={styles.ariaSheetSub}>Voice response</Text>
+                </View>
+                <Pressable testID="aria-close-btn" onPress={closeAria} style={styles.ariaCloseBtn}>
+                  <MaterialIcons name="close" size={22} color={Colors.text} />
+                </Pressable>
+              </View>
+
+              <View style={styles.ariaInputRow}>
+                <Pressable
+                  testID="aria-mic-btn"
+                  onPress={handleToggleAriaRecording}
+                  disabled={ariaLoading}
+                  style={({ pressed }) => [
+                    styles.ariaMicBtn,
+                    ariaRecording && styles.ariaMicBtnActive,
+                    ariaLoading && styles.ariaSendBtnDisabled,
+                    pressed && { opacity: 0.86 },
+                  ]}
+                >
+                  <MaterialIcons
+                    name={ariaRecording ? 'stop' : 'mic'}
+                    size={22}
+                    color="#FFFFFF"
+                  />
+                </Pressable>
+                <TextInput
+                  testID="aria-query-input"
+                  value={ariaQuery}
+                  onChangeText={(text) => {
+                    setAriaQuery(text);
+                    setAriaError('');
+                  }}
+                  placeholder="Total transactions and amount"
+                  placeholderTextColor={Colors.textSecond}
+                  style={styles.ariaInput}
+                  returnKeyType="send"
+                  onSubmitEditing={handleAskAria}
+                  editable={!ariaRecording}
+                />
+                <Pressable
+                  testID="aria-send-btn"
+                  onPress={handleAskAria}
+                  disabled={ariaLoading || !!ariaRecording || !ariaQuery.trim()}
+                  style={({ pressed }) => [
+                    styles.ariaSendBtn,
+                    (ariaLoading || !!ariaRecording || !ariaQuery.trim()) && styles.ariaSendBtnDisabled,
+                    pressed && { opacity: 0.86 },
+                  ]}
+                >
+                  {ariaLoading ? (
+                    <MaterialIcons name="hourglass-empty" size={22} color="#FFFFFF" />
+                  ) : (
+                    <MaterialIcons name="send" size={21} color="#FFFFFF" />
+                  )}
+                </Pressable>
+              </View>
+
+              <View style={styles.ariaAnswerBox}>
+                {ariaRecording ? (
+                  <View style={styles.ariaLoadingRow}>
+                    <MaterialIcons name="mic" size={20} color={Colors.danger} />
+                    <Text style={styles.ariaMutedText}>Listening... tap stop when done.</Text>
+                  </View>
+                ) : ariaLoading ? (
+                  <View style={styles.ariaLoadingRow}>
+                    <MaterialIcons name="graphic-eq" size={20} color={Colors.primary} />
+                    <Text style={styles.ariaMutedText}>ARIA is thinking...</Text>
+                  </View>
+                ) : ariaError ? (
+                  <Text style={styles.ariaErrorText}>{ariaError}</Text>
+                ) : ariaResponse ? (
+                  <>
+                    {ariaTranscript ? (
+                      <Text style={styles.ariaTranscriptText}>Heard: {ariaTranscript}</Text>
+                    ) : null}
+                    <Text style={styles.ariaAnswerText}>{ariaResponse}</Text>
+                    <Pressable
+                      testID="aria-speak-btn"
+                      onPress={() => speakAriaResponse()}
+                      style={styles.ariaReplayBtn}
+                    >
+                      <MaterialIcons name="volume-up" size={18} color={Colors.primary} />
+                      <Text style={styles.ariaReplayText}>Replay</Text>
+                    </Pressable>
+                  </>
+                ) : (
+                  <Text style={styles.ariaMutedText}>Tap the mic and ask ARIA</Text>
+                )}
+              </View>
+            </Pressable>
+          </KeyboardAvoidingView>
+        </Pressable>
+      </Modal>
 
       {/* Ugrai entry modal */}
       <Modal
@@ -758,6 +1063,39 @@ const styles = StyleSheet.create({
     color: Colors.textSecond,
     marginTop: 2,
   },
+  ariaCard: {
+    minHeight: 82,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    backgroundColor: '#0F766E',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    shadowColor: '#0F766E',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.24,
+    shadowRadius: 7,
+    elevation: 4,
+  },
+  ariaIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ariaCardTitle: {
+    fontSize: FontSize.md,
+    fontWeight: '900',
+    color: '#FFFFFF',
+  },
+  ariaCardSub: {
+    fontSize: FontSize.xs,
+    color: 'rgba(255,255,255,0.76)',
+    marginTop: 2,
+    fontWeight: '700',
+  },
 
   section: {
     paddingHorizontal: Spacing.md,
@@ -909,6 +1247,139 @@ const styles = StyleSheet.create({
     fontSize: FontSize.xs,
     color: Colors.textSecond,
     marginTop: 2,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.42)',
+    justifyContent: 'flex-end',
+  },
+  modalKeyboard: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  ariaSheet: {
+    backgroundColor: Colors.surface,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: Spacing.md,
+    gap: Spacing.md,
+  },
+  ariaSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  ariaSheetTitle: {
+    fontSize: FontSize.lg,
+    fontWeight: '900',
+    color: Colors.text,
+  },
+  ariaSheetSub: {
+    fontSize: FontSize.xs,
+    fontWeight: '700',
+    color: Colors.textSecond,
+    marginTop: 2,
+  },
+  ariaCloseBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: Colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ariaInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  ariaInput: {
+    flex: 1,
+    minHeight: 48,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: Spacing.md,
+    fontSize: FontSize.sm,
+    color: Colors.text,
+    fontWeight: '600',
+  },
+  ariaMicBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#0F766E',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ariaMicBtnActive: {
+    backgroundColor: Colors.danger,
+  },
+  ariaSendBtn: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: Colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ariaSendBtnDisabled: {
+    backgroundColor: Colors.border,
+  },
+  ariaAnswerBox: {
+    minHeight: 132,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    backgroundColor: '#F8FAFC',
+    padding: Spacing.md,
+    justifyContent: 'center',
+  },
+  ariaLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  ariaMutedText: {
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    color: Colors.textSecond,
+  },
+  ariaErrorText: {
+    fontSize: FontSize.sm,
+    fontWeight: '700',
+    color: Colors.danger,
+    lineHeight: 21,
+  },
+  ariaAnswerText: {
+    fontSize: FontSize.sm,
+    color: Colors.text,
+    lineHeight: 22,
+    fontWeight: '600',
+  },
+  ariaTranscriptText: {
+    fontSize: FontSize.xs,
+    color: Colors.textSecond,
+    lineHeight: 18,
+    fontWeight: '700',
+    marginBottom: Spacing.sm,
+  },
+  ariaReplayBtn: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: Spacing.md,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: Radius.round,
+    backgroundColor: '#E8F5E9',
+  },
+  ariaReplayText: {
+    fontSize: FontSize.xs,
+    fontWeight: '900',
+    color: Colors.primary,
   },
 
 });

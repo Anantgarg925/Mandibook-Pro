@@ -14,7 +14,8 @@ import { useShop, type TeamMember } from '@/context/ShopContext';
 import { useLaunch } from '@/context/LaunchContext';
 import { mapShop, supabase } from '@/lib/supabase';
 import { isFirmUnlocked } from '@/lib/firmAccess';
-import { APP_SESSION_KEY, MEMBER_SESSION_KEY } from '@/lib/session';
+import { APP_SESSION_KEY, MEMBER_SESSION_KEY, type AppSession } from '@/lib/session';
+import { loginAriaSession } from '@/lib/aria';
 import { resetToRoute } from '@/utils/navigation';
 export { APP_SESSION_KEY, MEMBER_SESSION_KEY };
 
@@ -100,14 +101,32 @@ export default function MemberLoginScreen() {
       if (activeShop && (isAdmin || member)) {
         const unlocked = await isFirmUnlocked(activeShop.shopId);
         setPinError(false);
-        const session = {
+        const session: AppSession = {
           id: member?.id ?? 'admin-member',
           name: member?.name ?? activeShop.ownerName,
           phone: member?.phone ?? activeShop.phone1,
           role: member?.role ?? 'ADMIN',
           sessionToken: remoteMatch.sessionToken,
         };
-        AsyncStorage.setItem(APP_SESSION_KEY, JSON.stringify(session)).catch(() => {});
+
+        let sessionToStore = session;
+
+        try {
+          const ariaResp = await loginAriaSession({
+            phone: session.phone,
+            memberId: session.id,
+          });
+
+          if (ariaResp.access_token) {
+            sessionToStore = { ...session, ariaToken: ariaResp.access_token };
+          } else {
+            console.warn('[ARIA] session not created:', ariaResp.error);
+          }
+        } catch (err) {
+          console.warn('[ARIA] login session failed:', (err as Error).message);
+        }
+
+        await AsyncStorage.setItem(APP_SESSION_KEY, JSON.stringify(sessionToStore));
         if (isAdmin) {
           AsyncStorage.removeItem(MEMBER_SESSION_KEY).catch(() => {});
           if (!unlocked) {
@@ -130,7 +149,7 @@ export default function MemberLoginScreen() {
             return;
           }
           setLaunchComplete(true);
-          AsyncStorage.setItem(MEMBER_SESSION_KEY, JSON.stringify(session)).catch(() => {});
+          AsyncStorage.setItem(MEMBER_SESSION_KEY, JSON.stringify(sessionToStore)).catch(() => {});
           resetToRoute(router, '/member-dashboard');
         }
         return;
@@ -146,6 +165,7 @@ export default function MemberLoginScreen() {
       setLoading(false);
     }
   };
+  
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -583,3 +603,4 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
   },
 });
+
